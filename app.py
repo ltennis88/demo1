@@ -728,7 +728,7 @@ if st.session_state["generated_scenario"]:
 # -----------------------------------------------------------------------------
 # CLASSIFY & STORE INQUIRY
 # -----------------------------------------------------------------------------
-st.header("Classify & Store Inquiry")
+st.header("Inquiry Classification")
 if st.session_state["generated_scenario"]:
     scenario_text = st.session_state["generated_scenario"].get("scenario_text", "")
     account_details = st.session_state["generated_scenario"].get("account_details", {})
@@ -823,7 +823,7 @@ else:
 # -----------------------------------------------------------------------------
 # DASHBOARD & LOGGED INQUIRIES (Enhanced View)
 # -----------------------------------------------------------------------------
-st.header("Dashboard & Logged Inquiries")
+st.header("Dashboard")
 df = st.session_state["inquiries"]
 if len(df) > 0:
     # Show Detailed Inquiry Cards first
@@ -1085,7 +1085,7 @@ else:
 # -----------------------------------------------------------------------------
 # EXPORT LOGGED DATA
 # -----------------------------------------------------------------------------
-st.header("Export Logged Data")
+st.subheaderheader("Data Exports")
 if len(df) > 0:
     csv_data = df.to_csv(index=False)
     st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
