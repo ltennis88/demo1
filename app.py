@@ -9,7 +9,7 @@ import plotly.express as px
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Contact Fowarding", initial_sidebar_state="collapsed", 
+st.set_page_config(layout="wide", page_title="Checkatrade AI Demo", initial_sidebar_state="collapsed", 
                  menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
@@ -394,43 +394,89 @@ def generate_response_suggestion(scenario, classification_result):
     # Get account details if available
     account_details = scenario.get("account_details", {})
     name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+    first_name = name.split()[0] if name else ""
+    latest_jobs = account_details.get("latest_jobs", "")
+    latest_reviews = account_details.get("latest_reviews", "")
+    project_cost = account_details.get("project_cost", "")
     
     # Generate appropriate greeting based on route type and available information
     greeting = ""
     if inbound_route in ["email", "whatsapp"]:
-        if name:
-            greeting = f"Hi {name.split()[0]},"
+        if first_name:
+            greeting = f"Hi {first_name},"
         else:
             greeting = "Hi there,"
     
-    # Generate response body based on classification
+    # Generate response body based on classification and scenario context
     body = ""
-    if "billing" in classification.lower():
-        body = "Thank you for contacting Checkatrade about your billing query. We'll look into this for you right away."
-    elif "complaint" in classification.lower():
-        body = "We're sorry to hear about your experience. Your feedback is important to us, and we'll investigate this matter."
+    
+    # Reference job details if relevant to the issue
+    job_reference = ""
+    if "complaint" in classification.lower() or "job" in scenario_text.lower() or "issue" in scenario_text.lower():
+        # Extract job type from latest_jobs if available
+        job_type = ""
+        if latest_jobs:
+            # Try to extract job type (e.g., "roof repair", "kitchen renovation")
+            job_words = ["renovation", "repair", "installation", "fitting", "refurbishment", "plumbing", "electrical", "roofing", "bathroom", "kitchen"]
+            for word in job_words:
+                if word in latest_jobs.lower():
+                    job_type = word
+                    break
+            
+            # If we have a job type, reference it specifically
+            if job_type:
+                job_reference = f"I can see this relates to your recent {job_type} work. "
+            else:
+                job_reference = f"I can see from your account that you've recently had work completed. "
+                
+            job_reference += "Could you confirm which specific aspects of the job you're experiencing issues with? "
+    
+    # Main response body based on classification
+    if "complaint" in classification.lower():
+        body = f"Thank you for contacting Checkatrade about your concerns. {job_reference}We're sorry to hear you're experiencing problems and want to help resolve this for you as quickly as possible."
+        
+        # Add follow-up questions specific to complaints
+        body += "\n\nTo help us address your concerns effectively, could you please provide:"
+        body += "\n- Details of what specifically hasn't met your expectations"
+        body += "\n- Any communication you've had with the tradesperson about these issues"
+        if project_cost:
+            body += f"\n- Whether you've made any payments toward the {project_cost} project cost"
+        
+    elif "billing" in classification.lower():
+        body = f"Thank you for contacting Checkatrade about your billing query. {job_reference}We'll look into this for you right away."
+        
+        # Add follow-up questions for billing
+        if project_cost:
+            body += f"\n\nI can see the project cost is {project_cost}. Could you please confirm which aspect of the payment you'd like assistance with?"
+        else:
+            body += "\n\nTo help resolve this quickly, could you provide details of the specific payment or charge you're inquiring about?"
+            
     elif "membership" in classification.lower():
         if "existing" in user_type:
             body = "Thank you for your query about your Checkatrade membership."
         else:
             body = "Thank you for your interest in becoming a Checkatrade member."
+            
     elif "technical" in classification.lower():
         body = "I understand you're experiencing technical difficulties. Let me help resolve this for you."
+        body += "\n\nCould you please share what specific error messages you're seeing or what functionality isn't working as expected?"
+        
     else:
-        body = "Thank you for contacting Checkatrade. We're happy to help with your inquiry."
+        if job_reference:
+            body = f"Thank you for contacting Checkatrade. {job_reference}We're happy to help with your inquiry."
+        else:
+            body = "Thank you for contacting Checkatrade. We're happy to help with your inquiry."
     
-    # Add scenario-specific details if appropriate
-    if "review" in scenario_text.lower():
-        body += " Reviews are an important part of the Checkatrade experience."
-    elif "payment" in scenario_text.lower() or "project" in scenario_text.lower():
-        body += " We'll check your payment details and get back to you shortly."
+    # Add review reference if relevant
+    if "review" in scenario_text.lower() and latest_reviews:
+        body += f"\n\nI can see you've recently provided feedback on our service. Your reviews are important to us and help maintain our high standards."
     
     # Different closing based on channel
     closing = ""
     if inbound_route == "email":
-        closing = "\n\nPlease let us know if you need any additional information.\n\nBest regards,\nThe Checkatrade Team"
+        closing = "\n\nWe're committed to ensuring your issue is resolved satisfactorily. I'll personally look into this and get back to you within 24 hours.\n\nBest regards,\nThe Checkatrade Team"
     elif inbound_route == "whatsapp":
-        closing = "\n\nIs there anything else I can help you with today?"
+        closing = "\n\nWe're here to help resolve this for you. Is there anything else you can tell me about the situation that would help us address your concerns more effectively?"
     
     return f"{greeting}\n\n{body}{closing}"
 
