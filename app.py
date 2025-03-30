@@ -607,7 +607,7 @@ def extract_specific_details(scenario_text):
 ###############################################################################
 # 9) STREAMLIT APP UI
 ###############################################################################
-st.title("Checkatrade AI Demo (Enhanced Agent View)")
+st.title("Contact Center AI Assistant")
 
 # -----------------------------------------------------------------------------
 # SCENARIO GENERATION
