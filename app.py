@@ -760,41 +760,29 @@ user_disabled = user_random
 with col2:
     # Create a horizontal layout for user type selection
     if not user_disabled:
-        # First, select between Tradesperson or Homeowner
-        user_category = st.radio(
-            "Select customer category:",
-            options=["Tradesperson", "Homeowner"],
+        # Simplify user type selection to 3 options
+        user_type = st.radio(
+            "Select customer type:",
+            options=["Existing Homeowner", "Existing Tradesperson", "Unknown/New Contact"],
             horizontal=True,
             label_visibility="collapsed"
         )
         
-        # Then, select between Existing or Prospective
-        user_status = st.radio(
-            "Select customer status:",
-            options=["Existing", "Prospective"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-        
-        # Display the selected combination
-        selected_type = f"{user_status} {user_category}"
-        st.markdown(f"<div style='text-align: center; margin-top: 5px;'><b>Selected:</b> {selected_type}</div>", unsafe_allow_html=True)
+        # Display the selected type
+        st.markdown(f"<div style='text-align: center; margin-top: 5px;'><b>Selected:</b> {user_type}</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='padding: 23px;'></div>", unsafe_allow_html=True)
 
 # Map the selection to the correct user_type value
 selected_user_type = None
 if not user_random:
-    if user_category == "Tradesperson":
-        if user_status == "Existing":
-            selected_user_type = "existing_tradesperson"
-        else:
-            selected_user_type = "prospective_tradesperson"
-    else:  # Homeowner
-        if user_status == "Existing":
-            selected_user_type = "existing_homeowner"
-        else:
-            selected_user_type = "prospective_homeowner"
+    if user_type == "Existing Homeowner":
+        selected_user_type = "existing_homeowner"
+    elif user_type == "Existing Tradesperson":
+        selected_user_type = "existing_tradesperson"
+    elif user_type == "Unknown/New Contact":
+        # For unknown/new, randomly choose between prospective homeowner or tradesperson
+        selected_user_type = random.choice(["prospective_homeowner", "prospective_tradesperson"])
 
 # Determine selected route
 selected_route = None
@@ -1048,320 +1036,433 @@ else:
 st.header("Dashboard")
 df = st.session_state["inquiries"]
 if len(df) > 0:
-    # Show Detailed Inquiry Cards first
-    st.subheader("Detailed Inquiry Cards")
-    for idx, row in df.iterrows():
-        with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
-            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
-                
-                if row['inbound_route']:
-                    st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
-                
-                if row['ivr_flow']:
-                    st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
-                
-                if row['ivr_selections']:
-                    st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
-            
-            with col2:
-                if row['user_type']:
-                    st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
-                
-                if row['phone_email']:
-                    st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
-                
-                if row['membership_id']:
-                    st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
-            
-            # Account details section - only show if there's actual account info
-            has_account_info = (row['account_name'] or row['account_location'] or 
-                               row['account_reviews'] or row['account_jobs'])
-            
-            if has_account_info:
-                st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
-                
-                if row['account_name']:
-                    st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['account_name']}</div>", unsafe_allow_html=True)
-                
-                if row['account_location']:
-                    st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['account_location']}</div>", unsafe_allow_html=True)
-                
-                if row['account_reviews']:
-                    st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['account_reviews']}</div>", unsafe_allow_html=True)
-                
-                if row['account_jobs']:
-                    st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['account_jobs']}</div>", unsafe_allow_html=True)
-                
-                # Show project cost and payment status side by side if available
-                if row['project_cost'] or row['payment_status']:
-                    st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>Project Cost: {row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {row['payment_status']}</div>", unsafe_allow_html=True)
-            
-            # Scenario text section
-            if row['scenario_text']:
-                st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
-            
-            # Classification summary section
-            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
-            
-            if row['classification']:
-                st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
-            
-            if row['priority']:
-                st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
-            
-            if row['summary']:
-                st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
-            
-            # Add FAQ suggestion and response suggestion
-            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
-            
-            # First search for relevant FAQ
-            faq_category = ""
-            # Try to parse the classification result to get related_faq_category
-            try:
-                # Check if we can find something related to faq_category in the summary
-                if "faq" in row['summary'].lower():
-                    faq_category = row['summary'].lower().split("faq")[1].strip().strip(".:,")
-            except:
-                pass
-                
-            relevant_faq, faq_score = find_relevant_faq(row['scenario_text'], df_faq)
-            
-            # Only display FAQ if it meets the relevance threshold
-            if relevant_faq and faq_score >= 3:
-                st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
-            
-            # Generate response suggestion for email or whatsapp
-            inbound_route = row['inbound_route']
-            if inbound_route in ["email", "whatsapp"]:
-                # Recreate scenario structure from row data
-                scenario_dict = {
-                    "inbound_route": row['inbound_route'],
-                    "scenario_text": row['scenario_text'],
-                    "user_type": row['user_type'],
-                    "account_details": {
-                        "name": row['account_name'],
-                        "location": row['account_location'],
-                        "latest_reviews": row['account_reviews'],
-                        "latest_jobs": row['account_jobs'],
-                        "project_cost": row['project_cost'],
-                        "payment_status": row['payment_status']
-                    }
-                }
-                
-                # Recreate classification structure
-                classification_dict = {
-                    "classification": row['classification'],
-                    "priority": row['priority'],
-                    "summary": row['summary']
-                }
-                
-                response_suggestion = generate_response_suggestion(scenario_dict, classification_dict)
-                
-                st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    # Sort inquiries by timestamp in descending order (most recent first)
+    try:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+    except:
+        # If timestamp conversion fails, just use the existing order
+        pass
+    
+    # Display the most recent inquiry card first with full details
+    st.subheader("Most Recent Inquiry")
+    
+    # Get the most recent inquiry
+    recent_row = df.iloc[0]
+    
+    # Create a container for the most recent inquiry
+    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+    
+    # Display header with classification and priority
+    st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>{recent_row['classification']} (Priority: {recent_row['priority']})</div>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{recent_row['timestamp']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['inbound_route']:
+            st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['ivr_flow']:
+            st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['ivr_flow']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['ivr_selections']:
+            st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['ivr_selections']}</div>", unsafe_allow_html=True)
+    
+    with col2:
+        if recent_row['user_type']:
+            st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['phone_email']:
+            st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['phone_email']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['membership_id']:
+            st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['membership_id']}</div>", unsafe_allow_html=True)
+    
+    # Account details section - only show if there's actual account info
+    has_account_info = (recent_row['account_name'] or recent_row['account_location'] or 
+                       recent_row['account_reviews'] or recent_row['account_jobs'])
+    
+    if has_account_info:
+        st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
+        
+        if recent_row['account_name']:
+            st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['account_name']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['account_location']:
+            st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['account_location']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['account_reviews']:
+            st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['account_reviews']}</div>", unsafe_allow_html=True)
+        
+        if recent_row['account_jobs']:
+            st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{recent_row['account_jobs']}</div>", unsafe_allow_html=True)
+        
+        # Show project cost and payment status side by side if available
+        if recent_row['project_cost'] or recent_row['payment_status']:
+            st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>Project Cost: {recent_row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {recent_row['payment_status']}</div>", unsafe_allow_html=True)
+    
+    # Scenario text section
+    if recent_row['scenario_text']:
+        st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{recent_row['scenario_text']}</div>", unsafe_allow_html=True)
+    
+    # Classification summary section
+    st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+    
+    if recent_row['classification']:
+        st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{recent_row['classification']}</div>", unsafe_allow_html=True)
+    
+    if recent_row['priority']:
+        st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{recent_row['priority']}</div>", unsafe_allow_html=True)
+    
+    if recent_row['summary']:
+        st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{recent_row['summary']}</div>", unsafe_allow_html=True)
+    
+    # Add FAQ suggestion and response suggestion
+    st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
+    
+    # First search for relevant FAQ
+    faq_category = ""
+    # Try to parse the classification result to get related_faq_category
+    try:
+        # Check if we can find something related to faq_category in the summary
+        if "faq" in recent_row['summary'].lower():
+            faq_category = recent_row['summary'].lower().split("faq")[1].strip().strip(".:,")
+    except:
+        pass
+        
+    relevant_faq, faq_score = find_relevant_faq(recent_row['scenario_text'], df_faq)
+    
+    # Only display FAQ if it meets the relevance threshold
+    if relevant_faq and faq_score >= 3:
+        st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
+    
+    # Generate response suggestion for email or whatsapp
+    inbound_route = recent_row['inbound_route']
+    if inbound_route in ["email", "whatsapp"]:
+        # Recreate scenario structure from row data
+        scenario_dict = {
+            "inbound_route": recent_row['inbound_route'],
+            "scenario_text": recent_row['scenario_text'],
+            "user_type": recent_row['user_type'],
+            "account_details": {
+                "name": recent_row['account_name'],
+                "location": recent_row['account_location'],
+                "latest_reviews": recent_row['account_reviews'],
+                "latest_jobs": recent_row['account_jobs'],
+                "project_cost": recent_row['project_cost'],
+                "payment_status": recent_row['payment_status']
+            }
+        }
+        
+        # Recreate classification structure
+        classification_dict = {
+            "classification": recent_row['classification'],
+            "priority": recent_row['priority'],
+            "summary": recent_row['summary']
+        }
+        
+        response_suggestion = generate_response_suggestion(scenario_dict, classification_dict)
+        
+        st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    
+    # Show previous inquiries in a collapsible expander
+    if len(df) > 1:
+        with st.expander("See More Inquiries"):
+            # Show the rest of the inquiries (excluding the most recent one)
+            for idx, row in df.iloc[1:].iterrows():
+                with st.expander(f"Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})"):
+                    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
+                        
+                        if row['inbound_route']:
+                            st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                        
+                        if row['ivr_flow']:
+                            st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                        
+                        if row['ivr_selections']:
+                            st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
+                    
+                    with col2:
+                        if row['user_type']:
+                            st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
+                        
+                        if row['phone_email']:
+                            st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                        
+                        if row['membership_id']:
+                            st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+                    
+                    # Account details section - only show if there's actual account info
+                    has_account_info = (row['account_name'] or row['account_location'] or 
+                                       row['account_reviews'] or row['account_jobs'])
+                    
+                    if has_account_info:
+                        st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
+                        
+                        if row['account_name']:
+                            st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_name']}</div>", unsafe_allow_html=True)
+                        
+                        if row['account_location']:
+                            st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_location']}</div>", unsafe_allow_html=True)
+                        
+                        if row['account_reviews']:
+                            st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_reviews']}</div>", unsafe_allow_html=True)
+                        
+                        if row['account_jobs']:
+                            st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_jobs']}</div>", unsafe_allow_html=True)
+                        
+                        # Show project cost and payment status side by side if available
+                        if row['project_cost'] or row['payment_status']:
+                            st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>Project Cost: {row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {row['payment_status']}</div>", unsafe_allow_html=True)
+                    
+                    # Scenario text section
+                    if row['scenario_text']:
+                        st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+                    
+                    # Classification summary section
+                    st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+                    
+                    if row['classification']:
+                        st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+                    
+                    if row['priority']:
+                        st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+                    
+                    if row['summary']:
+                        st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+                    
+                    # Add FAQ suggestion
+                    relevant_faq, faq_score = find_relevant_faq(row['scenario_text'], df_faq)
+                    
+                    # Only display FAQ if it meets the relevance threshold
+                    if relevant_faq and faq_score >= 3:
+                        st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
+                        st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     
     # Then show summary charts with expanded information
-    st.subheader("Summary Analytics")
-    
-    # Row 1: Classification and Priority distribution
-    colA, colB = st.columns(2)
-    with colA:
-        classification_counts = df["classification"].value_counts()
+    with st.expander("View Analytics Dashboard"):
+        st.subheader("Summary Analytics")
         
-        # Create pie chart with plotly express
-        fig1 = px.pie(
-            values=classification_counts.values,
-            names=classification_counts.index,
-            title="Classification Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
-        )
+        # Row 1: Classification and Priority distribution
+        colA, colB = st.columns(2)
+        with colA:
+            classification_counts = df["classification"].value_counts()
+            
+            # Create pie chart with plotly express
+            fig1 = px.pie(
+                values=classification_counts.values,
+                names=classification_counts.index,
+                title="Classification Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
+            )
+            
+            # Customize
+            fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
+            fig1.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig1, use_container_width=True)
+            
+            # Show classification breakdown as text too
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            for classification, count in classification_counts.items():
+                percentage = (count / len(df)) * 100
+                st.markdown(f"<div class='inquiry-label'>{classification}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        with colB:
+            priority_counts = df["priority"].value_counts()
+            
+            # Create color mapping for priorities
+            priority_colors = {
+                "High": "#DB4437",    # Red for high
+                "Medium": "#F4B400",  # Yellow for medium
+                "Low": "#0F9D58"      # Green for low
+            }
+            
+            # Create a pie chart using plotly express
+            fig2 = px.pie(
+                values=priority_counts.values,
+                names=priority_counts.index,
+                title="Priority Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=priority_colors
+            )
+            
+            # Customize
+            fig2.update_traces(textinfo='percent+label')
+            fig2.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
+            
+            # Show priority breakdown as text too
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            for priority, count in priority_counts.items():
+                percentage = (count / len(df)) * 100
+                st.markdown(f"<div class='inquiry-label'>{priority}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
-        # Customize
-        fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
-        fig1.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig1, use_container_width=True)
-        
-        # Show classification breakdown as text too
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        for classification, count in classification_counts.items():
-            percentage = (count / len(df)) * 100
-            st.markdown(f"<div class='inquiry-label'>{classification}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-    with colB:
-        priority_counts = df["priority"].value_counts()
-        
-        # Create color mapping for priorities
-        priority_colors = {
-            "High": "#DB4437",    # Red for high
-            "Medium": "#F4B400",  # Yellow for medium
-            "Low": "#0F9D58"      # Green for low
-        }
-        
-        # Create a pie chart using plotly express
-        fig2 = px.pie(
-            values=priority_counts.values,
-            names=priority_counts.index,
-            title="Priority Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_map=priority_colors
-        )
-        
-        # Customize
-        fig2.update_traces(textinfo='percent+label')
-        fig2.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig2, use_container_width=True)
-        
-        # Show priority breakdown as text too
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        for priority, count in priority_counts.items():
-            percentage = (count / len(df)) * 100
-            st.markdown(f"<div class='inquiry-label'>{priority}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Row 2: User type and Route distribution 
-    colC, colD = st.columns(2)
-    with colC:
-        user_type_counts = df["user_type"].value_counts()
-        
-        # Create horizontal bar chart using plotly express
-        fig3 = px.bar(
-            x=user_type_counts.values,
-            y=user_type_counts.index,
-            orientation='h',
-            title="User Type Distribution",
-            text=user_type_counts.values,
-            color_discrete_sequence=["#4285F4"]
-        )
-        
-        # Customize
-        fig3.update_layout(
-            xaxis_title="Count",
-            yaxis_title="",
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white"),
-            xaxis=dict(gridcolor="#444"),
-            yaxis=dict(gridcolor="#444")
-        )
-        
-        st.plotly_chart(fig3, use_container_width=True)
-        
-    with colD:
-        route_counts = df["inbound_route"].value_counts()
-        
-        # Create color mapping for routes
-        route_colors = {
-            "phone": "#4285F4",     # Blue for phone
-            "email": "#DB4437",     # Red for email
-            "whatsapp": "#0F9D58",  # Green for whatsapp
-            "web_form": "#F4B400"   # Yellow for web form
-        }
-        
-        # Create a pie chart using plotly express
-        fig4 = px.pie(
-            values=route_counts.values,
-            names=route_counts.index,
-            title="Inbound Route Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_map=route_colors
-        )
-        
-        # Customize
-        fig4.update_traces(textinfo='percent+label')
-        fig4.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig4, use_container_width=True)
+        # Row 2: User type and Route distribution 
+        colC, colD = st.columns(2)
+        with colC:
+            user_type_counts = df["user_type"].value_counts()
+            
+            # Create horizontal bar chart using plotly express
+            fig3 = px.bar(
+                x=user_type_counts.values,
+                y=user_type_counts.index,
+                orientation='h',
+                title="User Type Distribution",
+                text=user_type_counts.values,
+                color_discrete_sequence=["#4285F4"]
+            )
+            
+            # Customize
+            fig3.update_layout(
+                xaxis_title="Count",
+                yaxis_title="",
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="#444"),
+                yaxis=dict(gridcolor="#444")
+            )
+            
+            st.plotly_chart(fig3, use_container_width=True)
+            
+        with colD:
+            route_counts = df["inbound_route"].value_counts()
+            
+            # Create color mapping for routes
+            route_colors = {
+                "phone": "#4285F4",     # Blue for phone
+                "email": "#DB4437",     # Red for email
+                "whatsapp": "#0F9D58",  # Green for whatsapp
+                "web_form": "#F4B400"   # Yellow for web form
+            }
+            
+            # Create a pie chart using plotly express
+            fig4 = px.pie(
+                values=route_counts.values,
+                names=route_counts.index,
+                title="Inbound Route Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=route_colors
+            )
+            
+            # Customize
+            fig4.update_traces(textinfo='percent+label')
+            fig4.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig4, use_container_width=True)
 
-    # Common topics/themes from summaries
-    st.subheader("Common Topics & Themes")
-    topics_container = st.container()
-    with topics_container:
-        # Extract keywords from summaries to create topic tags
-        all_summaries = " ".join(df["summary"].dropna())
-        
-        # Display a word cloud-like representation with the most common words
-        common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
-                       "technical", "login", "access", "website", "app", "mobile", "payment",
-                       "renewal", "subscription", "complaint", "feedback", "review", "rating",
-                       "tradesperson", "homeowner", "service", "quality", "delay"]
-        
-        # Create a container with improved styling for a horizontal tag layout
-        st.markdown("""
-        <div class='info-container'>
-            <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
-        """, unsafe_allow_html=True)
-        
-        # Filter to only show words that appear in the summaries
-        matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
-        
-        # Generate random counts for demo purposes
-        for word in matching_words:
-            count = random.randint(1, len(df))
-            if count > 0:
-                # Calculate opacity based on count (more frequent = more opaque)
-                opacity = min(0.5 + (count / len(df)), 1.0)
-                # Create the tag with improved styling
-                st.markdown(f"""
-                    <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
-                         color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
-                         opacity: {opacity}; margin-bottom: 10px;">
-                        {word.title()} ({count})
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        st.markdown("""
+        # Common topics/themes from summaries
+        st.subheader("Common Topics & Themes")
+        topics_container = st.container()
+        with topics_container:
+            # Extract keywords from summaries to create topic tags
+            all_summaries = " ".join(df["summary"].dropna())
+            
+            # Display a word cloud-like representation with the most common words
+            common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
+                           "technical", "login", "access", "website", "app", "mobile", "payment",
+                           "renewal", "subscription", "complaint", "feedback", "review", "rating",
+                           "tradesperson", "homeowner", "service", "quality", "delay"]
+            
+            # Create a container with improved styling for a horizontal tag layout
+            st.markdown("""
+            <div class='info-container'>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
+            """, unsafe_allow_html=True)
+            
+            # Filter to only show words that appear in the summaries
+            matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
+            
+            # Generate random counts for demo purposes
+            for word in matching_words:
+                count = random.randint(1, len(df))
+                if count > 0:
+                    # Calculate opacity based on count (more frequent = more opaque)
+                    opacity = min(0.5 + (count / len(df)), 1.0)
+                    # Create the tag with improved styling
+                    st.markdown(f"""
+                        <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
+                             color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
+                             opacity: {opacity}; margin-bottom: 10px;">
+                            {word.title()} ({count})
+                        </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("""
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
+            """, unsafe_allow_html=True)
+            
 else:
     st.write("No inquiries logged yet. Generate and classify a scenario.")
 
