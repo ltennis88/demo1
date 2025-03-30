@@ -68,7 +68,7 @@ faq_context = build_faq_context(df_faq)
 ###############################################################################
 # The prompt instructs the LLM to return only valid JSON, including account details.
 scenario_generator_prompt_strict = f"""
-You are a scenario generator for Checkatrade’s inbound contact system.
+You are a scenario generator for Checkatrade's inbound contact system.
 
 Below is FAQ/taxonomy data for reference:
 {faq_context}
@@ -184,7 +184,6 @@ def classify_scenario(text):
 ###############################################################################
 # 9) STREAMLIT APP UI
 ###############################################################################
-st.set_page_config(layout="wide")
 st.title("Checkatrade AI Demo (Enhanced Agent View)")
 
 # Display FAQ/TAXONOMY CSV Data in an expander (for reference)
