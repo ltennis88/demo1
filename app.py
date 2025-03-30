@@ -316,6 +316,103 @@ def classify_scenario(text):
         }
 
 ###############################################################################
+# RESPONSE SUGGESTION HELPER FUNCTIONS
+###############################################################################
+def find_relevant_faq(scenario_text, faq_dataframe):
+    """
+    Find the most relevant FAQ based on the scenario text.
+    Returns the question string if found, or None if no good match
+    """
+    if faq_dataframe.empty:
+        return None
+    
+    # In a real implementation, this would use semantic search or embedding comparison
+    # For demo purposes, we'll use simple keyword matching
+    scenario_lower = scenario_text.lower()
+    best_match = None
+    
+    # Common keywords to look for
+    keywords = {
+        "bill": ["bill", "payment", "invoice", "charge"],
+        "account": ["account", "login", "password", "credentials", "sign in"],
+        "complaint": ["complaint", "unhappy", "dissatisfied", "poor service"],
+        "tradesperson": ["tradesperson", "trade", "contractor", "professional"],
+        "membership": ["membership", "subscription", "renewal", "join"],
+        "review": ["review", "rating", "feedback", "star"],
+        "refund": ["refund", "money back", "cancel"],
+        "quote": ["quote", "estimate", "price", "cost"],
+        "contact": ["contact", "reach", "phone", "email"]
+    }
+    
+    # Try to find a matching FAQ by category keywords
+    for category, terms in keywords.items():
+        if any(term in scenario_lower for term in terms):
+            matched_rows = faq_dataframe[faq_dataframe["Category"].str.lower() == category.lower()]
+            if not matched_rows.empty:
+                return matched_rows.iloc[0]["Question"]
+    
+    # Fallback to keyword matching in questions
+    for _, row in faq_dataframe.iterrows():
+        question = str(row.get("Question", "")).lower()
+        # Check if any significant words from the scenario appear in the question
+        if any(word in question for word in scenario_lower.split() if len(word) > 4):
+            return row["Question"]
+    
+    return None
+
+def generate_response_suggestion(scenario, classification_result):
+    """
+    Generate a suggested response based on scenario type (email/whatsapp)
+    """
+    inbound_route = scenario.get("inbound_route", "")
+    scenario_text = scenario.get("scenario_text", "")
+    user_type = scenario.get("user_type", "")
+    classification = classification_result.get("classification", "")
+    
+    # Get account details if available
+    account_details = scenario.get("account_details", {})
+    name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+    
+    # Generate appropriate greeting based on route type and available information
+    greeting = ""
+    if inbound_route in ["email", "whatsapp"]:
+        if name:
+            greeting = f"Hi {name.split()[0]},"
+        else:
+            greeting = "Hi there,"
+    
+    # Generate response body based on classification
+    body = ""
+    if "billing" in classification.lower():
+        body = "Thank you for contacting Checkatrade about your billing query. We'll look into this for you right away."
+    elif "complaint" in classification.lower():
+        body = "We're sorry to hear about your experience. Your feedback is important to us, and we'll investigate this matter."
+    elif "membership" in classification.lower():
+        if "existing" in user_type:
+            body = "Thank you for your query about your Checkatrade membership."
+        else:
+            body = "Thank you for your interest in becoming a Checkatrade member."
+    elif "technical" in classification.lower():
+        body = "I understand you're experiencing technical difficulties. Let me help resolve this for you."
+    else:
+        body = "Thank you for contacting Checkatrade. We're happy to help with your inquiry."
+    
+    # Add scenario-specific details if appropriate
+    if "review" in scenario_text.lower():
+        body += " Reviews are an important part of the Checkatrade experience."
+    elif "payment" in scenario_text.lower() or "project" in scenario_text.lower():
+        body += " We'll check your payment details and get back to you shortly."
+    
+    # Different closing based on channel
+    closing = ""
+    if inbound_route == "email":
+        closing = "\n\nPlease let us know if you need any additional information.\n\nBest regards,\nThe Checkatrade Team"
+    elif inbound_route == "whatsapp":
+        closing = "\n\nIs there anything else I can help you with today?"
+    
+    return f"{greeting}\n\n{body}{closing}"
+
+###############################################################################
 # 9) STREAMLIT APP UI
 ###############################################################################
 st.title("Checkatrade AI Demo (Enhanced Agent View)")
@@ -467,6 +564,23 @@ if st.session_state["generated_scenario"]:
                     ignore_index=True
                 )
                 st.success(f"Scenario classified as {new_row['classification']} (Priority: {new_row['priority']}).")
+                
+                # Get relevant FAQ if available
+                relevant_faq = find_relevant_faq(scenario_text, df_faq)
+                if relevant_faq:
+                    st.info(f"**Suggested FAQ:** {relevant_faq}")
+                
+                # Generate response suggestion for email or whatsapp
+                inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
+                if inbound_route in ["email", "whatsapp"]:
+                    response_suggestion = generate_response_suggestion(
+                        st.session_state["generated_scenario"], 
+                        classification_result
+                    )
+                    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='agent-section'>Suggested {inbound_route.capitalize()} Response</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='agent-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.warning("No scenario text found. Generate a scenario first.")
 else:
