@@ -57,6 +57,24 @@ html, body, [class*="css"] {
     background-color: #1E1E1E !important;
 }
 
+/* Topic tag styling */
+.tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.topic-tag {
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #2979FF;
+    color: white !important;
+    border-radius: 20px;
+    font-size: 14px;
+    margin: 5px;
+    font-weight: 500;
+}
+
 /* Override Streamlit's default text color */
 .element-container, .stMarkdown, .stText, .stSubheader {
     color: white !important;
@@ -144,7 +162,7 @@ if "inquiries" not in st.session_state:
         "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
         "phone_email", "membership_id", "scenario_text", "classification",
         "priority", "summary", "account_name", "account_location",
-        "account_reviews", "account_jobs"
+        "account_reviews", "account_jobs", "project_cost", "payment_status"
     ])
 
 if "generated_scenario" not in st.session_state:
@@ -192,8 +210,16 @@ The JSON object must have exactly these keys:
     - "name": if existing, a random first name; otherwise empty.
     - "surname": if existing, a random surname; otherwise empty.
     - "location": if existing, a UK location; otherwise empty.
-    - "latest_reviews": short text describing recent reviews if existing; otherwise empty.
-    - "latest_jobs": short text describing recent jobs if existing; otherwise empty.
+    - "latest_reviews": 
+        * For homeowners: reviews they've given to tradespeople (e.g., "Has given 5-star reviews to recent plumber and electrician"); 
+        * For tradespeople: reviews they've received (e.g., "Received a 5-star review for a recent kitchen renovation"); 
+        * Otherwise empty.
+    - "latest_jobs": 
+        * For homeowners: jobs completed for them (e.g., "Had a bathroom refurbishment completed last month"); 
+        * For tradespeople: jobs they've completed (e.g., "Completed a kitchen renovation last week"); 
+        * Otherwise empty.
+    - "project_cost": if existing user with recent jobs, a random cost (e.g. "£2,500"); otherwise empty.
+    - "payment_status": if existing user with recent jobs, one of "Paid", "Pending", "Partial Payment"; otherwise empty.
 - "scenario_text": a short, realistic reason for contacting Checkatrade (for example, a billing issue, a complaint, membership renewal, or looking for a tradesperson).
 
 Rules:
@@ -201,6 +227,7 @@ Rules:
 2. If inbound_route is "phone", include realistic ivr_flow and ivr_selections.
 3. For "existing" user types, fill out account_details with plausible data.
 4. The scenario_text must be specific to Checkatrade.
+5. Remember: homeowners GIVE reviews and have jobs completed FOR them; tradespeople RECEIVE reviews and complete jobs FOR homeowners.
 """
 
 ###############################################################################
@@ -294,32 +321,39 @@ def classify_scenario(text):
 st.title("Checkatrade AI Demo (Enhanced Agent View)")
 
 # -----------------------------------------------------------------------------
-# SECTION 1: SCENARIO GENERATION
+# SCENARIO GENERATION
 # -----------------------------------------------------------------------------
-st.header("1. Generate Scenario")
-
 col1, col2 = st.columns(2)
 with col1:
     route_mode = st.radio("Route Selection Mode", ["Random", "Specific"])
-with col2:
-    forced_route = None
     if route_mode == "Specific":
         forced_route = st.selectbox("Select inbound route", ["phone", "whatsapp", "email", "web_form"])
     else:
+        forced_route = None
         st.write("Inbound route will be chosen by the AI.")
 
-if st.button("Generate Scenario"):
-    with st.spinner("Generating scenario..."):
-        scenario_data = generate_scenario(forced_route)
-        st.session_state["generated_scenario"] = scenario_data
-        st.success("Scenario generated!")
+with col2:
+    # Empty space for visual balance
+    st.write("")
+    
+    if st.button("Generate Scenario", use_container_width=True):
+        with st.spinner("Generating scenario..."):
+            scenario_data = generate_scenario(forced_route)
+            st.session_state["generated_scenario"] = scenario_data
+            st.success("Scenario generated!")
 
 # Instead of raw JSON, display a formatted agent view for the generated scenario.
 if st.session_state["generated_scenario"]:
     scenario = st.session_state["generated_scenario"]
-    st.subheader("Scenario Details (Agent View)")
     
-    # Create columns for the entire layout
+    # Create columns for the titles
+    title_col1, title_col2 = st.columns(2)
+    with title_col1:
+        st.subheader("Scenario Details")
+    with title_col2:
+        st.subheader("Account Details")
+    
+    # Create columns for the content
     left_col, right_col = st.columns(2)
     
     # Left column for general scenario details
@@ -363,9 +397,6 @@ if st.session_state["generated_scenario"]:
     with right_col:
         st.markdown("<div class='info-container'>", unsafe_allow_html=True)
         
-        # Account details header
-        st.markdown("<div class='agent-section'>Account Details</div>", unsafe_allow_html=True)
-        
         account_details = scenario.get("account_details", {})
         name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
         
@@ -387,17 +418,25 @@ if st.session_state["generated_scenario"]:
         if account_details.get('latest_jobs'):
             st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs')}</div>", unsafe_allow_html=True)
+        
+        # Show project cost and payment status side by side if available
+        if account_details.get('project_cost') or account_details.get('payment_status'):
+            project_cost = account_details.get('project_cost', 'N/A')
+            payment_status = account_details.get('payment_status', 'N/A')
             
+            st.markdown("<div class='agent-label'>Project Details:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>Project Cost: {project_cost} &nbsp;&nbsp;&nbsp; Status: {payment_status}</div>", unsafe_allow_html=True)
+        
         st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 
 # -----------------------------------------------------------------------------
-# SECTION 2: CLASSIFY & STORE INQUIRY
+# CLASSIFY & STORE INQUIRY
 # -----------------------------------------------------------------------------
-st.header("2. Classify & Store Inquiry")
+st.header("Classify & Store Inquiry")
 if st.session_state["generated_scenario"]:
     scenario_text = st.session_state["generated_scenario"].get("scenario_text", "")
     account_details = st.session_state["generated_scenario"].get("account_details", {})
-    if st.button("Classify Scenario"):
+    if st.button("Classify Scenario", use_container_width=True):
         if scenario_text.strip():
             with st.spinner("Classifying scenario..."):
                 classification_result = classify_scenario(scenario_text)
@@ -418,7 +457,9 @@ if st.session_state["generated_scenario"]:
                     "account_name": account_details.get("name", ""),
                     "account_location": account_details.get("location", ""),
                     "account_reviews": account_details.get("latest_reviews", ""),
-                    "account_jobs": account_details.get("latest_jobs", "")
+                    "account_jobs": account_details.get("latest_jobs", ""),
+                    "project_cost": account_details.get("project_cost", ""),
+                    "payment_status": account_details.get("payment_status", "")
                 }
 
                 st.session_state["inquiries"] = pd.concat(
@@ -432,20 +473,12 @@ else:
     st.info("Generate a scenario above before classification.")
 
 # -----------------------------------------------------------------------------
-# SECTION 3: DASHBOARD & LOGGED INQUIRIES (Enhanced View)
+# DASHBOARD & LOGGED INQUIRIES (Enhanced View)
 # -----------------------------------------------------------------------------
-st.header("3. Dashboard & Logged Inquiries")
+st.header("Dashboard & Logged Inquiries")
 df = st.session_state["inquiries"]
 if len(df) > 0:
-    st.subheader("Summary Charts")
-    colA, colB = st.columns(2)
-    with colA:
-        st.write("**Inquiries by Classification:**")
-        st.bar_chart(df["classification"].value_counts())
-    with colB:
-        st.write("**Inquiries by Priority:**")
-        st.bar_chart(df["priority"].value_counts())
-    
+    # Show Detailed Inquiry Cards first
     st.subheader("Detailed Inquiry Cards")
     for idx, row in df.iterrows():
         with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
@@ -504,6 +537,11 @@ if len(df) > 0:
                 if row['account_jobs']:
                     st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='inquiry-detail'>{row['account_jobs']}</div>", unsafe_allow_html=True)
+                
+                # Show project cost and payment status side by side if available
+                if row['project_cost'] or row['payment_status']:
+                    st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>Project Cost: {row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {row['payment_status']}</div>", unsafe_allow_html=True)
             
             # Scenario text section
             if row['scenario_text']:
@@ -526,13 +564,82 @@ if len(df) > 0:
                 st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
             
             st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    
+    # Then show summary charts with expanded information
+    st.subheader("Summary Analytics")
+    
+    # Row 1: Classification and Priority distribution
+    colA, colB = st.columns(2)
+    with colA:
+        st.write("**Inquiries by Classification:**")
+        classification_counts = df["classification"].value_counts()
+        st.bar_chart(classification_counts)
+        
+        # Show classification breakdown as text too
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        for classification, count in classification_counts.items():
+            percentage = (count / len(df)) * 100
+            st.markdown(f"<div class='inquiry-label'>{classification}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    with colB:
+        st.write("**Inquiries by Priority:**")
+        priority_counts = df["priority"].value_counts()
+        st.bar_chart(priority_counts)
+        
+        # Show priority breakdown as text too
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        for priority, count in priority_counts.items():
+            percentage = (count / len(df)) * 100
+            st.markdown(f"<div class='inquiry-label'>{priority}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Row 2: User type and Route distribution 
+    colC, colD = st.columns(2)
+    with colC:
+        st.write("**Inquiries by User Type:**")
+        user_type_counts = df["user_type"].value_counts()
+        st.bar_chart(user_type_counts)
+        
+    with colD:
+        st.write("**Inquiries by Route:**")
+        route_counts = df["inbound_route"].value_counts()
+        st.bar_chart(route_counts)
+        
+    # Common topics/themes from summaries
+    st.subheader("Common Topics & Themes")
+    topics_container = st.container()
+    with topics_container:
+        # Extract keywords from summaries to create topic tags
+        all_summaries = " ".join(df["summary"].dropna())
+        
+        # Display a word cloud-like representation with the most common words
+        common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
+                       "technical", "login", "access", "website", "app", "mobile", "payment",
+                       "renewal", "subscription", "complaint", "feedback", "review", "rating",
+                       "tradesperson", "homeowner", "service", "quality", "delay"]
+        
+        st.markdown("<div class='info-container tag-container'>", unsafe_allow_html=True)
+        for word in common_words:
+            if word.lower() in all_summaries.lower():
+                # Generate a random count for demo purposes - in real app, count actual occurrences
+                count = random.randint(1, len(df))
+                if count > 0:
+                    opacity = min(0.5 + (count / len(df)), 1.0)
+                    st.markdown(f"""
+                        <span class="topic-tag" style="opacity: {opacity}">
+                            {word.title()} ({count})
+                        </span>
+                    """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
 else:
     st.write("No inquiries logged yet. Generate and classify a scenario.")
 
 # -----------------------------------------------------------------------------
-# SECTION 4: EXPORT LOGGED DATA
+# EXPORT LOGGED DATA
 # -----------------------------------------------------------------------------
-st.header("4. Export Logged Data")
+st.header("Export Logged Data")
 if len(df) > 0:
     csv_data = df.to_csv(index=False)
     st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
