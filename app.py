@@ -8,8 +8,7 @@ import random
 ###############################################################################
 # 1) CONFIGURE OPENAI
 ###############################################################################
-# Hard-coded key for private demo (NOT recommended in production or public repos).
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+openai.api_key = st.secrets["OPENAI_API_KEY"]  # Must be in your Streamlit secrets
 
 ###############################################################################
 # 2) SET UP STREAMLIT SESSION STATE
@@ -29,62 +28,40 @@ if "inquiries" not in st.session_state:
         "summary"
     ])
 
-# We'll store the generated scenario in session state so we can classify it
 if "generated_scenario" not in st.session_state:
     st.session_state["generated_scenario"] = None
 
 ###############################################################################
 # 3) SCENARIO GENERATION PROMPTS
 ###############################################################################
-# This prompt handles both random route OR user-specified route logic (phone, whatsapp, email, web_form).
-# If route is phone, it picks one of two IVR flows (Flow A or Flow B), random IVR selections, final spoken_text, etc.
-scenario_generator_prompt_base = """
+scenario_generator_prompt_strict = """
 You are a scenario generator for Checkatrade’s inbound contact system.
-Produce a single inbound scenario in JSON format with the following structure:
+Produce a single inbound scenario in STRICT JSON FORMAT ONLY (no extra text),
+with these keys exactly:
+- "inbound_route" (one of: phone, whatsapp, email, web_form)
+- "ivr_flow" (string, often "" if not phone)
+- "ivr_selections" (array of pressed options, or [])
+- "user_type" ("existing_tradesperson", "existing_homeowner", 
+   "prospective_tradesperson", or "prospective_homeowner")
+- "phone_email" (random phone # or email if relevant, or empty)
+- "membership_id" ("T-12345" if existing_tradesperson, else "")
+- "scenario_text" (short reason for contacting Checkatrade)
 
-{
-  "inbound_route": "...",
-  "ivr_flow": "...",           
-  "ivr_selections": [],
-  "user_type": "...",
-  "phone_email": "...",
-  "membership_id": "...",
-  "scenario_text": "..."
-}
-
-Rules & Logic:
-1. inbound_route can be one of: phone, whatsapp, email, web_form.
-2. If inbound_route = "phone":
-   - Randomly pick between two IVR flows (Flow A or Flow B).
-   - Flow A:
-       1. "Tradesperson" or "Homeowner"
-       2. If tradesperson: [join (1), renewal (2), negative review (3), more business (4), other inquiries (5)]
-       3. If homeowner: [reputable tradesperson(1), complaint(2), payment(3), general(4), if tradesperson press 5]
-   - Flow B is the second set you have for phone:
-       "Thank you for calling Checker Trade... etc."
-       Similar structure: tradesperson vs homeowner, sub-options, etc.
-   - "ivr_selections": an array of the pressed options or text labels. 
-   - Then generate a final spoken_text that might confirm or override the selected IVR path.
-   - "membership_id" only if user_type is "existing_tradesperson", else empty.
-3. If inbound_route = "whatsapp" or "email" or "web_form", no IVR flow needed, so ivr_flow = "", ivr_selections = [].
-4. user_type can be: existing_tradesperson, existing_homeowner, prospective_tradesperson, prospective_homeowner.
-5. If user_type is existing_tradesperson, produce membership_id like "T-12345". 
-   Otherwise, membership_id = "".
-6. phone_email:
-   - If inbound_route = phone or whatsapp, produce a random phone number e.g. +44 7700 XXXYYY
-   - If inbound_route = email, produce a random email e.g. "someone@example.com"
-   - If inbound_route = web_form, can be an email or empty.
-7. scenario_text: mention a typical reason (billing, negative review, membership renewal, complaint, etc.).
-8. Return valid JSON ONLY (no extra commentary).
+Rules:
+1. Return ONLY valid JSON. DO NOT include disclaimers or code fences.
+2. If inbound_route = "phone", you can populate ivr_flow & ivr_selections. 
+   Otherwise leave them "" / [].
+3. user_type picks if membership_id is used (existing_tradesperson).
+4. scenario_text is a short snippet (billing, complaint, membership renewal, etc.).
+5. No additional text outside the JSON.
 """
 
-# Classification prompt
 classification_prompt_template = """
-You are an AI classification assistant for Checkatrade. 
+You are an AI classification assistant for Checkatrade.
 Given the scenario text below, return a JSON object with:
 {
   "classification": "...",  // e.g. "Billing", "Membership", "Tech Support", "Complaints", "General", etc.
-  "priority": "...",        // "High", "Medium", or "Low"
+  "priority": "...",        // "High", "Medium", "Low"
   "summary": "..."          // a short 1-2 sentence summary
 }
 
@@ -93,37 +70,39 @@ Scenario text:
 """
 
 ###############################################################################
-# Helper function to talk to OpenAI for scenario generation
+# Helper function: generate a scenario
 ###############################################################################
 def generate_scenario(selected_route=None):
     """
-    Calls the OpenAI Chat API to produce a scenario in JSON.
-    If selected_route is None, let the model pick any route.
-    If selected_route is 'phone', 'whatsapp', etc., we instruct the model to use that route.
+    Calls OpenAI ChatCompletion to produce a scenario in JSON.
+    If selected_route is None, we let the LLM pick any route. 
+    If selected_route is 'phone','whatsapp','email','web_form', we instruct the LLM to use that route.
     """
-    # Build a user prompt that includes or excludes the route constraint
+    # Build user content with or without a forced route
     if selected_route is None:
-        user_content = scenario_generator_prompt_base + "\n\nGenerate any route (phone, whatsapp, email, or web_form)."
+        user_content = scenario_generator_prompt_strict + "\n\nYou may pick any route (phone, whatsapp, email, web_form)."
     else:
-        user_content = scenario_generator_prompt_base + f"\n\nForce the inbound_route to be '{selected_route}'."
+        user_content = scenario_generator_prompt_strict + f"\n\nForce inbound_route to be '{selected_route}'."
 
+    # Call the ChatCompletion endpoint:
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",  # <--- custom model name as requested
         messages=[
-            {"role": "system", "content": "You generate random inbound scenarios for Checkatrade."},
+            {"role": "system", "content": "You generate random inbound scenarios."},
             {"role": "user", "content": user_content}
         ],
-        temperature=0.9,
-        max_tokens=400
+        temperature=0.3,
+        max_tokens=300
     )
+
     raw_reply = response["choices"][0]["message"]["content"].strip()
-    
+
     # Attempt to parse
     try:
         scenario_data = json.loads(raw_reply)
         return scenario_data
     except:
-        # If JSON parse fails, return an error scenario
+        # If parse fails, return an "error" scenario
         return {
             "inbound_route": "error",
             "ivr_flow": "",
@@ -135,17 +114,17 @@ def generate_scenario(selected_route=None):
         }
 
 ###############################################################################
-# Helper function to classify scenario
+# Helper function: classify scenario
 ###############################################################################
 def classify_scenario(text):
     """
-    Classify scenario text using the classification_prompt_template
-    Return a dict with classification, priority, summary
+    Classify scenario text using classification_prompt_template.
+    Return a dict: { "classification": "...", "priority": "...", "summary": "..." }
     """
     prompt = classification_prompt_template.replace("{SCENARIO}", text)
-    
+
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",  # same custom model name
         messages=[
             {"role": "system", "content": "You classify inbound queries for Checkatrade."},
             {"role": "user", "content": prompt}
@@ -154,7 +133,6 @@ def classify_scenario(text):
         max_tokens=200
     )
     raw_reply = response["choices"][0]["message"]["content"].strip()
-    
     try:
         classification_data = json.loads(raw_reply)
         return classification_data
@@ -168,50 +146,48 @@ def classify_scenario(text):
 ###############################################################################
 # STREAMLIT APP
 ###############################################################################
-st.title("Checkatrade AI Demo with IVR Logic for Phone Calls")
+st.title("Checkatrade AI Demo (IVR + GPT-4o-mini)")
 st.write("""
-A simple Streamlit app to (1) generate random or route-specific inbound scenarios, 
-(2) incorporate IVR flows if phone, (3) classify them with OpenAI, and (4) display a dashboard.
+Generate inbound scenarios (phone, WhatsApp, email, web form), 
+classify them, and view a live dashboard. 
+Uses a custom model "gpt-4o-mini" (make sure this model exists in your account).
 """)
 
-# ---------------------------
+# -----------------------------------------------------------------------------
 # SECTION 1: SCENARIO SELECTION
-# ---------------------------
+# -----------------------------------------------------------------------------
 st.header("1. Scenario Generation")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    # Let user choose: "Random route" or a specific route
-    random_or_specific = st.radio("How do you want to pick the inbound route?", 
-                                  ["Random", "Specific"])
+    # Choose "Random" or "Specific" route
+    random_or_specific = st.radio("Pick inbound route method", ["Random", "Specific"])
 with col2:
-    # If user picks "Specific," let them choose which one
     route_choice = None
     if random_or_specific == "Specific":
         route_choice = st.selectbox("Select inbound route", ["phone", "whatsapp", "email", "web_form"])
     else:
-        st.write("Route will be randomly chosen by the AI.")
+        st.write("Route will be chosen by the AI (Random).")
 
+# Button to generate scenario
 if st.button("Generate Scenario"):
     with st.spinner("Generating scenario..."):
         if random_or_specific == "Random":
-            scenario_data = generate_scenario(None)  # Let the AI pick any route
+            scenario_data = generate_scenario(None)
         else:
-            scenario_data = generate_scenario(route_choice)  # Force the chosen route
+            scenario_data = generate_scenario(route_choice)
 
         st.session_state["generated_scenario"] = scenario_data
-        st.success("Scenario generated successfully!")
+        st.success("Scenario generated!")
 
-# Display scenario
 if st.session_state["generated_scenario"]:
     st.subheader("Generated Scenario (Raw JSON)")
     st.json(st.session_state["generated_scenario"])
 
-
-# ---------------------------
+# -----------------------------------------------------------------------------
 # SECTION 2: Classify & Store
-# ---------------------------
+# -----------------------------------------------------------------------------
 st.header("2. Classify This Scenario")
 if st.session_state["generated_scenario"]:
     scenario_text = st.session_state["generated_scenario"].get("scenario_text", "")
@@ -220,7 +196,7 @@ if st.session_state["generated_scenario"]:
             with st.spinner("Classifying..."):
                 result = classify_scenario(scenario_text)
                 now = time.strftime("%Y-%m-%d %H:%M:%S")
-                
+
                 new_row = {
                     "timestamp": now,
                     "inbound_route": st.session_state["generated_scenario"].get("inbound_route", ""),
@@ -234,22 +210,22 @@ if st.session_state["generated_scenario"]:
                     "priority": result.get("priority", "Medium"),
                     "summary": result.get("summary", "")
                 }
-                
+
                 # Append to session DataFrame
                 st.session_state["inquiries"] = pd.concat(
                     [st.session_state["inquiries"], pd.DataFrame([new_row])],
                     ignore_index=True
                 )
-                
+
                 st.success(f"Classified as {new_row['classification']} (Priority: {new_row['priority']}).")
         else:
-            st.warning("No scenario text to classify. Please generate a scenario first.")
+            st.warning("No scenario text found. Generate a scenario first.")
 else:
-    st.info("Generate a scenario above first.")
+    st.info("Generate a scenario above.")
 
-# ---------------------------
+# -----------------------------------------------------------------------------
 # SECTION 3: Dashboard & Data
-# ---------------------------
+# -----------------------------------------------------------------------------
 st.header("3. Dashboard & Data")
 
 df = st.session_state["inquiries"]
@@ -267,11 +243,11 @@ if len(df) > 0:
 else:
     st.write("No inquiries yet. Please generate and classify a scenario.")
 
-
-# ---------------------------
+# -----------------------------------------------------------------------------
 # SECTION 4: Export Logged Data
-# ---------------------------
+# -----------------------------------------------------------------------------
 st.header("4. Export Data")
+
 if len(df) > 0:
     csv_data = df.to_csv(index=False)
     st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
