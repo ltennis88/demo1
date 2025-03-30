@@ -236,11 +236,28 @@ Rules:
 ###############################################################################
 classification_prompt_template = """
 You are an AI classification assistant for Checkatrade.
-Given the scenario text below, return a JSON object with keys:
+
+Given the scenario text below, please analyze the inquiry and return a JSON object with:
+1. The most appropriate classification
+2. The priority level
+3. A brief summary
+4. Whether this is related to a specific FAQ
+
+Here's how to classify:
+- Classification: Choose the most specific category (e.g., "Billing Dispute", "Job Quality Complaint", "Membership Query", "Technical Support", etc.)
+- Priority: 
+  * "High" for urgent issues affecting customers immediately (complaints, work issues, payment disputes)
+  * "Medium" for important but not critical matters (account questions, general inquiries)
+  * "Low" for informational requests or future-dated concerns
+- Summary: A concise 1-2 sentence summary that captures the key issue
+- FAQ Relation: If the inquiry directly relates to common questions about job issues, payment disputes, finding tradespeople, etc.
+
+Return only valid JSON in this format:
 {
-  "classification": "...",  // e.g., "Billing", "Membership", "Tech Support", "Complaints", etc.
-  "priority": "...",        // "High", "Medium", or "Low"
-  "summary": "..."          // a short 1-2 sentence summary
+  "classification": "...",
+  "priority": "High|Medium|Low",
+  "summary": "...",
+  "related_faq_category": "..."  // E.g. "job_issue", "billing", "technical", "membership", or "" if none applies
 }
 
 Scenario text:
@@ -312,7 +329,7 @@ def classify_scenario(text):
             {"role": "user", "content": prompt}
         ],
         temperature=0.5,
-        max_tokens=200
+        max_tokens=300
     )
     raw_reply = response["choices"][0]["message"]["content"].strip()
     try:
@@ -322,7 +339,8 @@ def classify_scenario(text):
         return {
             "classification": "General",
             "priority": "Medium",
-            "summary": "Could not parse classification JSON."
+            "summary": "Could not parse classification JSON.",
+            "related_faq_category": ""
         }
 
 ###############################################################################
@@ -343,44 +361,103 @@ def self_process_ivr_selections(ivr_selections):
 def find_relevant_faq(scenario_text, faq_dataframe):
     """
     Find the most relevant FAQ based on the scenario text.
-    Returns the question string if found, or None if no good match
+    Returns a tuple (question, relevance_score) if found, or (None, 0) if no good match
     """
     if faq_dataframe.empty:
-        return None
+        return None, 0
     
-    # In a real implementation, this would use semantic search or embedding comparison
-    # For demo purposes, we'll use simple keyword matching
+    # In a real implementation, this would use embedding similarity
+    # For demo purposes, we'll use improved keyword matching
     scenario_lower = scenario_text.lower()
-    best_match = None
     
-    # Common keywords to look for
-    keywords = {
-        "bill": ["bill", "payment", "invoice", "charge"],
-        "account": ["account", "login", "password", "credentials", "sign in"],
-        "complaint": ["complaint", "unhappy", "dissatisfied", "poor service"],
-        "tradesperson": ["tradesperson", "trade", "contractor", "professional"],
-        "membership": ["membership", "subscription", "renewal", "join"],
-        "review": ["review", "rating", "feedback", "star"],
-        "refund": ["refund", "money back", "cancel"],
-        "quote": ["quote", "estimate", "price", "cost"],
-        "contact": ["contact", "reach", "phone", "email"]
+    # First, look for direct issue mentions in the scenario text
+    issue_keywords = {
+        "job not completed": ["not completed", "unfinished", "incomplete", "left halfway", "abandoned"],
+        "quality issues": ["poor quality", "bad workmanship", "not satisfied", "poor standard", "substandard"],
+        "delayed work": ["delayed", "late", "behind schedule", "taking too long", "missed deadline"],
+        "billing dispute": ["overcharged", "invoice", "billing", "payment dispute", "charge", "refund"],
+        "tradesperson communication": ["not responding", "ghosted", "won't return calls", "can't reach", "no communication"],
+        "complaint": ["unhappy", "disappointed", "complaint", "not happy", "issue", "problem"],
+        "account access": ["can't login", "password", "reset", "access", "account", "sign in"],
+        "app technical": ["app", "website", "technical", "error", "not working", "glitch"],
+        "find tradesperson": ["looking for", "need to find", "searching for", "recommend", "suggestion"],
+        "membership": ["membership", "subscribe", "join", "renewal", "cancel subscription"]
     }
     
-    # Try to find a matching FAQ by category keywords
-    for category, terms in keywords.items():
-        if any(term in scenario_lower for term in terms):
-            matched_rows = faq_dataframe[faq_dataframe["Category"].str.lower() == category.lower()]
-            if not matched_rows.empty:
-                return matched_rows.iloc[0]["Question"]
+    # Try direct issue matching first - this has the highest relevance score
+    for issue, keywords in issue_keywords.items():
+        # Count how many keywords from this issue are in the scenario
+        matches = sum(1 for keyword in keywords if keyword in scenario_lower)
+        if matches >= 2:  # If we have at least 2 matching keywords for an issue type
+            # Find FAQs related to this issue
+            for _, row in faq_dataframe.iterrows():
+                question = str(row.get("Question", "")).lower()
+                # If the issue matches keywords in the question, return it with high relevance
+                keyword_matches = sum(1 for keyword in keywords if keyword in question)
+                if keyword_matches >= 2:
+                    return row["Question"], 8  # High relevance for direct issue match
     
-    # Fallback to keyword matching in questions
+    # If no direct issue match, try matching by category
+    category_keywords = {
+        "complaint": ["complaint", "dissatisfied", "poor service", "issue", "problem"],
+        "tradesperson": ["tradesperson", "trade", "contractor", "professional", "worker"],
+        "job": ["job", "work", "project", "task", "service"],
+        "billing": ["bill", "payment", "invoice", "charge", "cost", "price"],
+        "account": ["account", "login", "password", "credentials", "sign in", "profile"],
+        "membership": ["membership", "subscription", "renewal", "join", "register"],
+        "reviews": ["review", "rating", "feedback", "star", "comment"],
+        "technical": ["technical", "app", "website", "online", "digital", "error"]
+    }
+    
+    # Find matching category
+    matching_categories = []
+    for category, terms in category_keywords.items():
+        matches = sum(1 for term in terms if term in scenario_lower)
+        if matches >= 1:
+            matching_categories.append((category, matches))
+    
+    # Sort categories by number of matches
+    matching_categories.sort(key=lambda x: x[1], reverse=True)
+    
+    # If we have matching categories, find FAQs in those categories
+    if matching_categories:
+        for category, category_match_count in matching_categories:
+            matched_rows = faq_dataframe[faq_dataframe["Category"].str.lower().str.contains(category.lower())]
+            if not matched_rows.empty:
+                # Find the FAQ that best matches specific words in the scenario
+                best_match = None
+                best_match_score = 0
+                
+                for _, row in matched_rows.iterrows():
+                    question = str(row.get("Question", "")).lower()
+                    # Count how many significant words from scenario appear in the question
+                    score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                    if score > best_match_score:
+                        best_match_score = score
+                        best_match = row["Question"]
+                
+                if best_match and best_match_score >= 2:
+                    # Relevance is based on both category match and word match
+                    relevance = category_match_count + best_match_score
+                    return best_match, relevance
+    
+    # Last resort: look for any significant word matches
+    best_match = None
+    best_score = 0
+    
     for _, row in faq_dataframe.iterrows():
         question = str(row.get("Question", "")).lower()
         # Check if any significant words from the scenario appear in the question
-        if any(word in question for word in scenario_lower.split() if len(word) > 4):
-            return row["Question"]
+        scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
+        matches = sum(1 for word in scenario_words if word in question)
+        if matches > best_score:
+            best_score = matches
+            best_match = row["Question"]
     
-    return None
+    if best_match and best_score >= 2:  # Require at least 2 significant word matches
+        return best_match, best_score
+    
+    return None, 0
 
 def generate_response_suggestion(scenario, classification_result):
     """
@@ -640,9 +717,44 @@ if st.session_state["generated_scenario"]:
                 )
                 st.success(f"Scenario classified as {new_row['classification']} (Priority: {new_row['priority']}).")
                 
-                # Get relevant FAQ if available
-                relevant_faq = find_relevant_faq(scenario_text, df_faq)
-                if relevant_faq:
+                # Get relevant FAQ based on the classification result and scenario text
+                faq_category = classification_result.get("related_faq_category", "")
+                relevant_faq = None
+                faq_relevance_score = 0  # Track how relevant the match is
+
+                # First try to use the model's suggested FAQ category
+                if faq_category and faq_category.lower() not in ["", "none", "n/a"]:
+                    # Filter FAQ dataframe by the suggested category
+                    category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower())]
+                    if not category_matches.empty:
+                        # Look for the best match within this category
+                        best_match = None
+                        best_score = 0
+                        
+                        for _, row in category_matches.iterrows():
+                            question = str(row.get("Question", "")).lower()
+                            scenario_lower = scenario_text.lower()
+                            # Count significant word matches
+                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                            if score > best_score:
+                                best_score = score
+                                best_match = row["Question"]
+                        
+                        if best_match and best_score >= 2:  # Require at least 2 significant matches
+                            relevant_faq = best_match
+                            faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+
+                # If no FAQ found via category or low relevance, use our keyword matching function
+                if not relevant_faq or faq_relevance_score < 3:
+                    keyword_faq, keyword_score = find_relevant_faq(scenario_text, df_faq)
+                    if keyword_faq and keyword_score >= 3:  # Higher threshold for keyword matching
+                        # If we already have a FAQ but this one is more relevant, replace it
+                        if keyword_score > faq_relevance_score:
+                            relevant_faq = keyword_faq
+                            faq_relevance_score = keyword_score
+
+                # Only display FAQ if we have a sufficiently relevant match
+                if relevant_faq and faq_relevance_score >= 3:
                     st.info(f"**Suggested FAQ:** {relevant_faq}")
                 
                 # Generate response suggestion for email or whatsapp
