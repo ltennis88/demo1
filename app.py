@@ -212,12 +212,12 @@ The JSON object must have exactly these keys:
     - "surname": if existing, a random surname; otherwise empty.
     - "location": if existing, a UK location; otherwise empty.
     - "latest_reviews": 
-        * For homeowners: reviews they've given to tradespeople (e.g., "Has given 5-star reviews to recent plumber and electrician"); 
-        * For tradespeople: reviews they've received (e.g., "Received a 5-star review for a recent kitchen renovation"); 
+        * For homeowners: Reviews with SPECIFIC DETAILS about jobs completed by various tradespeople. Mention the type of job, the quality, and the tradesperson type. Be creative - examples: "Gave 4.5 stars to a roofer who fixed leaking gutters last week", "Recently gave mixed reviews (3-star) to a plumber who was late but fixed bathroom taps efficiently", "Left detailed positive feedback for a landscaper who transformed the garden with new paving and planting". 
+        * For tradespeople: SPECIFIC reviews they've received, e.g. "Recent 5-star review for rewiring a period property with minimal disruption", "Mixed feedback on a bathroom installation with some comments about delays", "Consistent 4-star ratings for fence installations with comments on tidiness".
         * Otherwise empty.
     - "latest_jobs": 
-        * For homeowners: jobs completed for them (e.g., "Had a bathroom refurbishment completed last month"); 
-        * For tradespeople: jobs they've completed (e.g., "Completed a kitchen renovation last week"); 
+        * For homeowners: DETAILED jobs completed for them by SPECIFIC TRADE TYPES (choose from: plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway specialist, fencing contractor, or tree surgeon). Examples: "Complete rewiring of a period property by an electrician with additional security lights", "New composite decking and landscaping completed last month", "Bathroom renovation with custom tiling and new fixtures", "Emergency roof repair after storm damage", "Kitchen extension with bifold doors and new appliances".
+        * For tradespeople: DETAILED jobs they've completed with SPECIFIC aspects. Choose from trades above and include details like: "Installed a new consumer unit and rewired a Victorian property", "Completed a large garden landscaping project with water feature and lighting", "Fitted a new kitchen with custom cabinetry and island", "Repaired storm damage to roof and replaced broken tiles", "Built a two-story extension with bi-fold doors".
         * Otherwise empty.
     - "project_cost": if existing user with recent jobs, a random cost (e.g. "£2,500"); otherwise empty.
     - "payment_status": if existing user with recent jobs, one of "Paid", "Pending", "Partial Payment"; otherwise empty.
@@ -229,6 +229,8 @@ Rules:
 3. For "existing" user types, fill out account_details with plausible data.
 4. The scenario_text must be specific to Checkatrade.
 5. Remember: homeowners GIVE reviews and have jobs completed FOR them; tradespeople RECEIVE reviews and complete jobs FOR homeowners.
+6. For jobs and reviews, be SPECIFIC about what work was done, who did it, and include realistic details.
+7. Vary the trade types used in the examples (plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway/patio specialist, fencing contractor, tree surgeon).
 """
 
 ###############################################################################
@@ -1111,19 +1113,34 @@ if len(df) > 0:
                        "renewal", "subscription", "complaint", "feedback", "review", "rating",
                        "tradesperson", "homeowner", "service", "quality", "delay"]
         
-        st.markdown("<div class='info-container tag-container'>", unsafe_allow_html=True)
-        for word in common_words:
-            if word.lower() in all_summaries.lower():
-                # Generate a random count for demo purposes - in real app, count actual occurrences
-                count = random.randint(1, len(df))
-                if count > 0:
-                    opacity = min(0.5 + (count / len(df)), 1.0)
-                    st.markdown(f"""
-                        <span class="topic-tag" style="opacity: {opacity}">
-                            {word.title()} ({count})
-                        </span>
-                    """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Create a container with improved styling for a horizontal tag layout
+        st.markdown("""
+        <div class='info-container'>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
+        """, unsafe_allow_html=True)
+        
+        # Filter to only show words that appear in the summaries
+        matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
+        
+        # Generate random counts for demo purposes
+        for word in matching_words:
+            count = random.randint(1, len(df))
+            if count > 0:
+                # Calculate opacity based on count (more frequent = more opaque)
+                opacity = min(0.5 + (count / len(df)), 1.0)
+                # Create the tag with improved styling
+                st.markdown(f"""
+                    <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
+                         color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
+                         opacity: {opacity}; margin-bottom: 10px;">
+                        {word.title()} ({count})
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown("""
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
 else:
     st.write("No inquiries logged yet. Generate and classify a scenario.")
