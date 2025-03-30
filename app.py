@@ -11,6 +11,45 @@ import random
 st.set_page_config(layout="wide", page_title="Checkatrade AI Demo")
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
+# Add global CSS for better UI
+st.markdown("""
+<style>
+/* Common styles for detail items */
+.agent-detail, .inquiry-detail {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+/* Common styles for labels */
+.agent-label, .inquiry-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: #333;
+}
+
+/* Common styles for section headers */
+.agent-section, .inquiry-section {
+    margin-top: 20px;
+    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #ddd;
+    color: #1E88E5;
+}
+
+/* Additional container styling */
+.info-container {
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+</style>
+""", unsafe_allow_html=True)
+
 ###############################################################################
 # 2) LOAD FAQ / TAXONOMY DATA
 ###############################################################################
@@ -222,23 +261,56 @@ if st.button("Generate Scenario"):
 if st.session_state["generated_scenario"]:
     scenario = st.session_state["generated_scenario"]
     st.subheader("Scenario Details (Agent View)")
-    st.markdown(f"""
-**Inbound Route:** {scenario.get("inbound_route", "N/A")}
-**IVR Flow:** {scenario.get("ivr_flow", "N/A")}
-**IVR Selections:** {', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else "N/A"}
-**User Type:** {scenario.get("user_type", "N/A")}
-**Phone/Email:** {scenario.get("phone_email", "N/A")}
-**Membership ID:** {scenario.get("membership_id", "N/A")}
+    
+    # Use the info-container class for better styling
+    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<div class='agent-label'>Inbound Route:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='agent-detail'>{scenario.get('inbound_route', 'N/A')}</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='agent-label'>IVR Flow:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='agent-detail'>{scenario.get('ivr_flow', 'N/A')}</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='agent-label'>IVR Selections:</div>", unsafe_allow_html=True)
+        ivr_selections = ', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else "N/A"
+        st.markdown(f"<div class='agent-detail'>{ivr_selections}</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='agent-label'>User Type:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='agent-detail'>{scenario.get('user_type', 'N/A')}</div>", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("<div class='agent-label'>Phone/Email:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='agent-detail'>{scenario.get('phone_email', 'N/A')}</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
 
-### Account Details
-- **Name:** {scenario.get("account_details", {}).get("name", "N/A")} {scenario.get("account_details", {}).get("surname", "")}
-- **Location:** {scenario.get("account_details", {}).get("location", "N/A")}
-- **Latest Reviews:** {scenario.get("account_details", {}).get("latest_reviews", "N/A")}
-- **Latest Jobs:** {scenario.get("account_details", {}).get("latest_jobs", "N/A")}
-
-### Reason for Contact
-{scenario.get("scenario_text", "N/A")}
-""", unsafe_allow_html=False)
+    # Account details in a separate section
+    st.markdown("<div class='agent-section'>Account Details</div>", unsafe_allow_html=True)
+    
+    account_details = scenario.get("account_details", {})
+    name = f"{account_details.get('name', 'N/A')} {account_details.get('surname', '')}"
+    
+    st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='agent-detail'>{name}</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='agent-detail'>{account_details.get('location', 'N/A')}</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='agent-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='agent-detail'>{account_details.get('latest_reviews', 'N/A')}</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs', 'N/A')}</div>", unsafe_allow_html=True)
+    
+    # Reason for contact in a separate section
+    st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text', 'N/A')}</div>", unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 
 # -----------------------------------------------------------------------------
 # SECTION 2: CLASSIFY & STORE INQUIRY
@@ -299,29 +371,65 @@ if len(df) > 0:
     st.subheader("Detailed Inquiry Cards")
     for idx, row in df.iterrows():
         with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
-            st.markdown(f"""
-**Timestamp:** {row['timestamp']}  
-**Inbound Route:** {row['inbound_route']}  
-**IVR Flow:** {row['ivr_flow']}  
-**IVR Selections:** {row['ivr_selections']}  
-**User Type:** {row['user_type']}  
-**Phone/Email:** {row['phone_email']}  
-**Membership ID:** {row['membership_id']}
-
-### Account Details
-- **Name:** {row['account_name']}
-- **Location:** {row['account_location']}
-- **Latest Reviews:** {row['account_reviews']}
-- **Latest Jobs:** {row['account_jobs']}
-
-### Scenario Text
-{row['scenario_text']}
-
-### Classification Summary
-- **Classification:** {row['classification']}
-- **Priority:** {row['priority']}
-- **Summary:** {row['summary']}
-""")
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+            
+            # Account details section
+            st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['account_name']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['account_location']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['account_reviews']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['account_jobs']}</div>", unsafe_allow_html=True)
+            
+            # Scenario text section
+            st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+            
+            # Classification summary section
+            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 else:
     st.write("No inquiries logged yet. Generate and classify a scenario.")
 
