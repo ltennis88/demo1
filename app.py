@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import time
 import random
-import plotly.graph_objects as go
+import plotly.express as px
 
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
@@ -699,35 +699,24 @@ if len(df) > 0:
         st.write("**Inquiries by Classification:**")
         classification_counts = df["classification"].value_counts()
         
-        # Replace bar chart with pie chart
-        classifications = classification_counts.index.tolist()
-        counts = classification_counts.values.tolist()
+        # Create pie chart with plotly express
+        fig1 = px.pie(
+            values=classification_counts.values,
+            names=classification_counts.index,
+            title="Classification Distribution",
+            hole=0.4,  # Makes it a donut chart
+            color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
+        )
         
-        # Create a color palette
-        colors = ["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
-        
-        # Create a pie chart
-        fig1 = {
-            "data": [{
-                "type": "pie",
-                "labels": classifications,
-                "values": counts,
-                "textinfo": "label+percent",
-                "textposition": "inside",
-                "marker": {"colors": colors[:len(classifications)]},
-                "hole": 0.4,  # Makes it a donut chart
-                "pull": [0.05 if i == counts.index(max(counts)) else 0 for i in range(len(counts))],  # Pull out the largest slice
-            }],
-            "layout": {
-                "title": "Classification Distribution",
-                "showlegend": True,
-                "legend": {"orientation": "h", "y": -0.1},
-                "height": 300,
-                "paper_bgcolor": "rgba(0,0,0,0)",
-                "plot_bgcolor": "rgba(0,0,0,0)",
-                "font": {"color": "white"},
-            }
-        }
+        # Customize
+        fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
+        fig1.update_layout(
+            legend=dict(orientation="h", y=-0.1),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white")
+        )
         
         st.plotly_chart(fig1, use_container_width=True)
         
@@ -742,10 +731,6 @@ if len(df) > 0:
         st.write("**Inquiries by Priority:**")
         priority_counts = df["priority"].value_counts()
         
-        # Replace bar chart with pie chart
-        priorities = priority_counts.index.tolist()
-        counts = priority_counts.values.tolist()
-        
         # Create color mapping for priorities
         priority_colors = {
             "High": "#DB4437",    # Red for high
@@ -753,30 +738,24 @@ if len(df) > 0:
             "Low": "#0F9D58"      # Green for low
         }
         
-        # Get colors in the right order based on the priorities
-        pie_colors = [priority_colors.get(p, "#4285F4") for p in priorities]
+        # Create a pie chart using plotly express
+        fig2 = px.pie(
+            values=priority_counts.values,
+            names=priority_counts.index,
+            title="Priority Distribution",
+            hole=0.4,  # Makes it a donut chart
+            color_discrete_map=priority_colors
+        )
         
-        # Create a pie chart
-        fig2 = {
-            "data": [{
-                "type": "pie",
-                "labels": priorities,
-                "values": counts,
-                "textinfo": "label+percent",
-                "textposition": "inside",
-                "marker": {"colors": pie_colors},
-                "hole": 0.4,  # Makes it a donut chart
-            }],
-            "layout": {
-                "title": "Priority Distribution",
-                "showlegend": True,
-                "legend": {"orientation": "h", "y": -0.1},
-                "height": 300,
-                "paper_bgcolor": "rgba(0,0,0,0)",
-                "plot_bgcolor": "rgba(0,0,0,0)",
-                "font": {"color": "white"},
-            }
-        }
+        # Customize
+        fig2.update_traces(textinfo='percent+label')
+        fig2.update_layout(
+            legend=dict(orientation="h", y=-0.1),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white")
+        )
         
         st.plotly_chart(fig2, use_container_width=True)
         
@@ -793,41 +772,33 @@ if len(df) > 0:
         st.write("**Inquiries by User Type:**")
         user_type_counts = df["user_type"].value_counts()
         
-        # Replace bar chart with horizontal bar chart
-        user_types = user_type_counts.index.tolist()
-        counts = user_type_counts.values.tolist()
+        # Create horizontal bar chart using plotly express
+        fig3 = px.bar(
+            x=user_type_counts.values,
+            y=user_type_counts.index,
+            orientation='h',
+            title="User Type Distribution",
+            text=user_type_counts.values,
+            color_discrete_sequence=["#4285F4"]
+        )
         
-        # Create a horizontal bar chart
-        fig3 = {
-            "data": [{
-                "type": "bar",
-                "orientation": "h",
-                "x": counts,
-                "y": user_types,
-                "marker": {"color": "#4285F4"},
-                "text": counts,
-                "textposition": "auto",
-            }],
-            "layout": {
-                "title": "User Type Distribution",
-                "xaxis": {"title": "Count", "gridcolor": "#444"},
-                "yaxis": {"title": "", "gridcolor": "#444"},
-                "height": 300,
-                "paper_bgcolor": "rgba(0,0,0,0)",
-                "plot_bgcolor": "rgba(0,0,0,0)",
-                "font": {"color": "white"},
-            }
-        }
+        # Customize
+        fig3.update_layout(
+            xaxis_title="Count",
+            yaxis_title="",
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white"),
+            xaxis=dict(gridcolor="#444"),
+            yaxis=dict(gridcolor="#444")
+        )
         
         st.plotly_chart(fig3, use_container_width=True)
         
     with colD:
         st.write("**Inquiries by Route:**")
         route_counts = df["inbound_route"].value_counts()
-        
-        # Replace bar chart with pie chart
-        routes = route_counts.index.tolist()
-        counts = route_counts.values.tolist()
         
         # Create color mapping for routes
         route_colors = {
@@ -837,30 +808,24 @@ if len(df) > 0:
             "web_form": "#F4B400"   # Yellow for web form
         }
         
-        # Get colors in the right order based on the routes
-        pie_colors = [route_colors.get(r, "#9C27B0") for r in routes]
+        # Create a pie chart using plotly express
+        fig4 = px.pie(
+            values=route_counts.values,
+            names=route_counts.index,
+            title="Inbound Route Distribution",
+            hole=0.4,  # Makes it a donut chart
+            color_discrete_map=route_colors
+        )
         
-        # Create a pie chart
-        fig4 = {
-            "data": [{
-                "type": "pie",
-                "labels": routes,
-                "values": counts,
-                "textinfo": "label+percent",
-                "textposition": "inside",
-                "marker": {"colors": pie_colors},
-                "hole": 0.4,  # Makes it a donut chart
-            }],
-            "layout": {
-                "title": "Inbound Route Distribution",
-                "showlegend": True,
-                "legend": {"orientation": "h", "y": -0.1},
-                "height": 300,
-                "paper_bgcolor": "rgba(0,0,0,0)",
-                "plot_bgcolor": "rgba(0,0,0,0)",
-                "font": {"color": "white"},
-            }
-        }
+        # Customize
+        fig4.update_traces(textinfo='percent+label')
+        fig4.update_layout(
+            legend=dict(orientation="h", y=-0.1),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white")
+        )
         
         st.plotly_chart(fig4, use_container_width=True)
 
