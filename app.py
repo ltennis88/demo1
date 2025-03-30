@@ -294,10 +294,11 @@ Scenario text:
 ###############################################################################
 # 7) HELPER: GENERATE SCENARIO VIA OPENAI
 ###############################################################################
-def generate_scenario(selected_route=None):
+def generate_scenario(selected_route=None, selected_user_type=None):
     """
     Generates a scenario using OpenAI's ChatCompletion.
     If selected_route is provided (phone, whatsapp, email, web_form), force that route.
+    If selected_user_type is provided, force that user type.
     """
     # Build a more diverse prompt by specifying diversity requirements
     diversity_instructions = """
@@ -308,10 +309,18 @@ def generate_scenario(selected_route=None):
     4. Create a wide variety of realistic customer inquiries that reflect different service needs
     """
     
-    if selected_route is None:
-        user_content = scenario_generator_prompt_strict + diversity_instructions + "\n\nYou may pick any inbound_route."
+    # Start with base prompt
+    user_content = scenario_generator_prompt_strict + diversity_instructions
+    
+    # Add route and user type instructions
+    if selected_route and selected_user_type:
+        user_content += f"\n\nForce inbound_route to '{selected_route}' and user_type to '{selected_user_type}'."
+    elif selected_route:
+        user_content += f"\n\nForce inbound_route to '{selected_route}'."
+    elif selected_user_type:
+        user_content += f"\n\nForce user_type to '{selected_user_type}'."
     else:
-        user_content = scenario_generator_prompt_strict + diversity_instructions + f"\n\nForce inbound_route to '{selected_route}'."
+        user_content += "\n\nYou may pick any inbound_route and user_type."
 
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",  # Replace with a valid model if needed (e.g., "gpt-3.5-turbo")
@@ -325,13 +334,16 @@ def generate_scenario(selected_route=None):
     raw_reply = response["choices"][0]["message"]["content"].strip()
     try:
         scenario_data = json.loads(raw_reply)
+        # Ensure the selected user type is applied
+        if selected_user_type:
+            scenario_data["user_type"] = selected_user_type
         return scenario_data
     except Exception as e:
         return {
             "inbound_route": "error",
             "ivr_flow": "",
             "ivr_selections": [],
-            "user_type": "unknown",
+            "user_type": selected_user_type if selected_user_type else "unknown",
             "phone_email": "",
             "membership_id": "",
             "account_details": {
@@ -817,24 +829,20 @@ if not route_random:
 # Generate button in a new row
 if st.button("Generate New Inquiry", use_container_width=True):
     with st.spinner("Generating scenario..."):
-        scenario_data = generate_scenario(selected_route)
+        scenario_data = generate_scenario(selected_route, selected_user_type)
         
-        # Override user type if specified
-        if selected_user_type:
-            scenario_data["user_type"] = selected_user_type
-            
-            # Clear account details if changing from existing to prospective
-            if "prospective" in selected_user_type and scenario_data.get("account_details"):
-                scenario_data["account_details"] = {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
-                }
-                scenario_data["membership_id"] = ""
+        # Clear account details if changing from existing to prospective
+        if selected_user_type and "prospective" in selected_user_type and scenario_data.get("account_details"):
+            scenario_data["account_details"] = {
+                "name": "",
+                "surname": "",
+                "location": "",
+                "latest_reviews": "",
+                "latest_jobs": "",
+                "project_cost": "",
+                "payment_status": ""
+            }
+            scenario_data["membership_id"] = ""
         
         st.session_state["generated_scenario"] = scenario_data
         st.success("Scenario generated!")
