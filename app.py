@@ -158,13 +158,38 @@ df_faq = load_faq_csv()
 ###############################################################################
 # 3) SET UP SESSION STATE
 ###############################################################################
+@st.cache_data
+def load_dummy_inquiries():
+    """
+    Loads dummy inquiry data from inquiries.json file if it exists.
+    """
+    try:
+        with open("inquiries.json", "r") as f:
+            inquiries_data = json.load(f)
+        df = pd.DataFrame(inquiries_data)
+        return df
+    except Exception as e:
+        # If file doesn't exist or has issues, return empty DataFrame
+        return pd.DataFrame(columns=[
+            "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
+            "phone_email", "membership_id", "scenario_text", "classification",
+            "priority", "summary", "account_name", "account_location",
+            "account_reviews", "account_jobs", "project_cost", "payment_status"
+        ])
+
 if "inquiries" not in st.session_state:
-    st.session_state["inquiries"] = pd.DataFrame(columns=[
-        "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
-        "phone_email", "membership_id", "scenario_text", "classification",
-        "priority", "summary", "account_name", "account_location",
-        "account_reviews", "account_jobs", "project_cost", "payment_status"
-    ])
+    # Try to load dummy data first
+    dummy_data = load_dummy_inquiries()
+    if not dummy_data.empty:
+        st.session_state["inquiries"] = dummy_data
+    else:
+        # If no dummy data, initialize with empty DataFrame
+        st.session_state["inquiries"] = pd.DataFrame(columns=[
+            "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
+            "phone_email", "membership_id", "scenario_text", "classification",
+            "priority", "summary", "account_name", "account_location",
+            "account_reviews", "account_jobs", "project_cost", "payment_status"
+        ])
 
 if "generated_scenario" not in st.session_state:
     st.session_state["generated_scenario"] = None
