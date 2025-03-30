@@ -8,17 +8,25 @@ import random
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Checkatrade AI Demo")
+st.set_page_config(layout="wide", page_title="Checkatrade AI Demo", initial_sidebar_state="collapsed", 
+                 menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Add global CSS for better UI
 st.markdown("""
 <style>
+/* Force dark theme */
+html, body, [class*="css"] {
+    color: white !important;
+    background-color: #121212 !important;
+}
+
 /* Common styles for detail items */
 .agent-detail, .inquiry-detail {
     margin-bottom: 12px;
     padding: 8px 12px;
-    background-color: #f8f9fa;
+    color: white;
+    background-color: #2C2C2C;
     border-radius: 5px;
 }
 
@@ -26,7 +34,7 @@ st.markdown("""
 .agent-label, .inquiry-label {
     font-weight: bold;
     margin-bottom: 4px;
-    color: #333;
+    color: #e0e0e0;
 }
 
 /* Common styles for section headers */
@@ -36,8 +44,8 @@ st.markdown("""
     font-size: 18px;
     font-weight: bold;
     padding-bottom: 5px;
-    border-bottom: 1px solid #ddd;
-    color: #1E88E5;
+    border-bottom: 1px solid #757575;
+    color: #64B5F6;
 }
 
 /* Additional container styling */
@@ -45,7 +53,67 @@ st.markdown("""
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 8px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid #424242;
+    background-color: #1E1E1E !important;
+}
+
+/* Override Streamlit's default text color */
+.element-container, .stMarkdown, .stText, .stSubheader {
+    color: white !important;
+}
+
+/* Override header colors */
+h1, h2, h3, h4, h5, h6 {
+    color: white !important;
+}
+
+/* Override text colors */
+p, div, span, li, label {
+    color: white !important;
+}
+
+/* Add styles for charts and expanders */
+.stExpander {
+    border: 1px solid #424242 !important;
+    background-color: #1E1E1E !important;
+}
+
+/* Dark theme for buttons */
+.stButton>button {
+    background-color: #333 !important;
+    color: white !important;
+    border: 1px solid #555 !important;
+}
+
+.stButton>button:hover {
+    background-color: #444 !important;
+    border: 1px solid #777 !important;
+}
+
+/* Set background color to dark */
+.main .block-container, .appview-container {
+    background-color: #121212 !important;
+}
+
+/* Override streamlit radio buttons and checkboxes */
+.stRadio > div, .stCheckbox > div {
+    color: white !important;
+}
+
+/* Make select boxes dark */
+.stSelectbox > div > div {
+    background-color: #333 !important;
+    color: white !important;
+}
+
+/* Dark header */
+header {
+    background-color: #121212 !important;
+}
+
+/* Force dark theme for all elements */
+div.stApp {
+    background-color: #121212 !important;
 }
 </style>
 """, unsafe_allow_html=True)
