@@ -254,18 +254,27 @@ def generate_scenario(selected_route=None):
     Generates a scenario using OpenAI's ChatCompletion.
     If selected_route is provided (phone, whatsapp, email, web_form), force that route.
     """
+    # Build a more diverse prompt by specifying diversity requirements
+    diversity_instructions = """
+    IMPORTANT: Ensure true randomness and diversity in scenario generation:
+    1. Randomize user_type among all four options (don't always use existing_homeowner)
+    2. Base the scenario_text on different topics from the FAQ/taxonomy data provided
+    3. Don't repeatedly use the Home Health Check report issue
+    4. Create a wide variety of realistic customer inquiries that reflect different service needs
+    """
+    
     if selected_route is None:
-        user_content = scenario_generator_prompt_strict + "\n\nYou may pick any inbound_route."
+        user_content = scenario_generator_prompt_strict + diversity_instructions + "\n\nYou may pick any inbound_route."
     else:
-        user_content = scenario_generator_prompt_strict + f"\n\nForce inbound_route to '{selected_route}'."
+        user_content = scenario_generator_prompt_strict + diversity_instructions + f"\n\nForce inbound_route to '{selected_route}'."
 
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",  # Replace with a valid model if needed (e.g., "gpt-3.5-turbo")
         messages=[
-            {"role": "system", "content": "You generate random inbound scenarios for Checkatrade."},
+            {"role": "system", "content": "You generate diverse and random inbound scenarios for Checkatrade using FAQ topics as inspiration."},
             {"role": "user", "content": user_content}
         ],
-        temperature=0.4,
+        temperature=0.8,  # Increased temperature for more diversity
         max_tokens=500
     )
     raw_reply = response["choices"][0]["message"]["content"].strip()
@@ -429,102 +438,103 @@ with col1:
         forced_route = None
         st.write("Inbound route will be chosen by the AI.")
 
-with col2:
-    # Empty space for visual balance
-    st.write("")
-    
+    # Move button below route selection
     if st.button("Generate Scenario", use_container_width=True):
         with st.spinner("Generating scenario..."):
             scenario_data = generate_scenario(forced_route)
             st.session_state["generated_scenario"] = scenario_data
             st.success("Scenario generated!")
 
-# Instead of raw JSON, display a formatted agent view for the generated scenario.
-if st.session_state["generated_scenario"]:
-    scenario = st.session_state["generated_scenario"]
+with col2:
+    # Empty space for visual balance
+    st.write("")
     
-    # Create columns for the titles
-    title_col1, title_col2 = st.columns(2)
-    with title_col1:
-        st.subheader("Scenario Details")
-    with title_col2:
-        st.subheader("Account Details")
-    
-    # Create columns for the content
-    left_col, right_col = st.columns(2)
-    
-    # Left column for general scenario details
-    with left_col:
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+    # Instead of raw JSON, display a formatted agent view for the generated scenario.
+    if st.session_state["generated_scenario"]:
+        scenario = st.session_state["generated_scenario"]
         
-        # Basic scenario information
-        if scenario.get('inbound_route'):
-            st.markdown("<div class='agent-label'>Inbound Route:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{scenario.get('inbound_route', 'N/A')}</div>", unsafe_allow_html=True)
+        # Create columns for the titles
+        title_col1, title_col2 = st.columns(2)
+        with title_col1:
+            st.subheader("Scenario Details")
+        with title_col2:
+            st.subheader("Account Details")
         
-        if scenario.get('ivr_flow'):
-            st.markdown("<div class='agent-label'>IVR Flow:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{scenario.get('ivr_flow', 'N/A')}</div>", unsafe_allow_html=True)
+        # Create columns for the content
+        left_col, right_col = st.columns(2)
         
-        ivr_selections = ', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else ""
-        if ivr_selections:
-            st.markdown("<div class='agent-label'>IVR Selections:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{ivr_selections}</div>", unsafe_allow_html=True)
-        
-        if scenario.get('user_type'):
-            st.markdown("<div class='agent-label'>User Type:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{scenario.get('user_type', 'N/A')}</div>", unsafe_allow_html=True)
+        # Left column for general scenario details
+        with left_col:
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
             
-        if scenario.get('phone_email'):
-            st.markdown("<div class='agent-label'>Phone/Email:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{scenario.get('phone_email', 'N/A')}</div>", unsafe_allow_html=True)
-        
-        if scenario.get('membership_id'):
-            st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
+            # Basic scenario information
+            if scenario.get('inbound_route'):
+                st.markdown("<div class='agent-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{scenario.get('inbound_route', 'N/A')}</div>", unsafe_allow_html=True)
             
-        # Reason for contact
-        if scenario.get('scenario_text'):
-            st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text')}</div>", unsafe_allow_html=True)
+            if scenario.get('ivr_flow'):
+                st.markdown("<div class='agent-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{scenario.get('ivr_flow', 'N/A')}</div>", unsafe_allow_html=True)
             
-        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
-    
-    # Right column for account details
-    with right_col:
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        
-        account_details = scenario.get("account_details", {})
-        name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
-        
-        if name:
-            st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{name}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
-            st.markdown("<div class='agent-detail'>No account information available</div>", unsafe_allow_html=True)
-        
-        if account_details.get('location'):
-            st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{account_details.get('location')}</div>", unsafe_allow_html=True)
-        
-        if account_details.get('latest_reviews'):
-            st.markdown("<div class='agent-label'>Latest Reviews:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{account_details.get('latest_reviews')}</div>", unsafe_allow_html=True)
-        
-        if account_details.get('latest_jobs'):
-            st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs')}</div>", unsafe_allow_html=True)
-        
-        # Show project cost and payment status side by side if available
-        if account_details.get('project_cost') or account_details.get('payment_status'):
-            project_cost = account_details.get('project_cost', 'N/A')
-            payment_status = account_details.get('payment_status', 'N/A')
+            ivr_selections = ', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else ""
+            if ivr_selections:
+                st.markdown("<div class='agent-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{ivr_selections}</div>", unsafe_allow_html=True)
             
-            st.markdown("<div class='agent-label'>Project Details:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='agent-detail'>Project Cost: {project_cost} &nbsp;&nbsp;&nbsp; Status: {payment_status}</div>", unsafe_allow_html=True)
+            if scenario.get('user_type'):
+                st.markdown("<div class='agent-label'>User Type:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{scenario.get('user_type', 'N/A')}</div>", unsafe_allow_html=True)
+                
+            if scenario.get('phone_email'):
+                st.markdown("<div class='agent-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{scenario.get('phone_email', 'N/A')}</div>", unsafe_allow_html=True)
+            
+            if scenario.get('membership_id'):
+                st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
+                
+            # Reason for contact
+            if scenario.get('scenario_text'):
+                st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text')}</div>", unsafe_allow_html=True)
+                
+            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
         
-        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+        # Right column for account details
+        with right_col:
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            
+            account_details = scenario.get("account_details", {})
+            name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+            
+            if name:
+                st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{name}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
+                st.markdown("<div class='agent-detail'>No account information available</div>", unsafe_allow_html=True)
+            
+            if account_details.get('location'):
+                st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{account_details.get('location')}</div>", unsafe_allow_html=True)
+            
+            if account_details.get('latest_reviews'):
+                st.markdown("<div class='agent-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{account_details.get('latest_reviews')}</div>", unsafe_allow_html=True)
+            
+            if account_details.get('latest_jobs'):
+                st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs')}</div>", unsafe_allow_html=True)
+            
+            # Show project cost and payment status side by side if available
+            if account_details.get('project_cost') or account_details.get('payment_status'):
+                project_cost = account_details.get('project_cost', 'N/A')
+                payment_status = account_details.get('payment_status', 'N/A')
+                
+                st.markdown("<div class='agent-label'>Project Details:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='agent-detail'>Project Cost: {project_cost} &nbsp;&nbsp;&nbsp; Status: {payment_status}</div>", unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 
 # -----------------------------------------------------------------------------
 # CLASSIFY & STORE INQUIRY
