@@ -717,26 +717,143 @@ st.title("Contact Center AI Assistant")
 # -----------------------------------------------------------------------------
 # SCENARIO GENERATION
 # -----------------------------------------------------------------------------
-col1, col2 = st.columns(2)
-with col1:
-    route_mode = st.radio("Route Selection Mode", ["Random", "Specific"])
-    if route_mode == "Specific":
-        forced_route = st.selectbox("Select inbound route", ["phone", "whatsapp", "email", "web_form"])
-    else:
-        forced_route = None
-        st.write("Inbound route will be chosen by the AI.")
+st.header("Generate New Inquiry")
 
-    # Move button below route selection
-    if st.button("Generate Scenario", use_container_width=True):
-        with st.spinner("Generating scenario..."):
-            scenario_data = generate_scenario(forced_route)
-            st.session_state["generated_scenario"] = scenario_data
-            st.success("Scenario generated!")
+# Create columns for the route selection mode
+col1, col2, col3, col4, col5 = st.columns([1, 0.75, 0.75, 0.75, 0.75])
+
+# Route Selection
+with col1:
+    st.markdown("<div class='inquiry-label'>Route Selection:</div>", unsafe_allow_html=True)
+    route_random = st.checkbox("Random Route", value=True, key="route_random")
+
+# Enable route options only if Random is not selected
+route_disabled = route_random
 
 with col2:
-    # Empty space for visual balance
-    st.write("")
-    
+    st.markdown("<div class='inquiry-label'>Phone</div>", unsafe_allow_html=True)
+    route_phone = st.checkbox("", key="route_phone", disabled=route_disabled)
+
+with col3:
+    st.markdown("<div class='inquiry-label'>Email</div>", unsafe_allow_html=True)
+    route_email = st.checkbox("", key="route_email", disabled=route_disabled)
+
+with col4:
+    st.markdown("<div class='inquiry-label'>WhatsApp</div>", unsafe_allow_html=True)
+    route_whatsapp = st.checkbox("", key="route_whatsapp", disabled=route_disabled)
+
+with col5:
+    st.markdown("<div class='inquiry-label'>Web Form</div>", unsafe_allow_html=True)
+    route_webform = st.checkbox("", key="route_webform", disabled=route_disabled)
+
+# User Type Selection
+st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col1:
+    st.markdown("<div class='inquiry-label'>Customer Type:</div>", unsafe_allow_html=True)
+    user_random = st.checkbox("Random Type", value=True, key="user_random")
+
+# Enable user type options only if Random is not selected
+user_disabled = user_random
+
+with col2:
+    # Create a horizontal layout for user type selection
+    if not user_disabled:
+        # First, select between Tradesperson or Homeowner
+        user_category = st.radio(
+            "Select customer category:",
+            options=["Tradesperson", "Homeowner"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        
+        # Then, select between Existing or Prospective
+        user_status = st.radio(
+            "Select customer status:",
+            options=["Existing", "Prospective"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        
+        # Display the selected combination
+        selected_type = f"{user_status} {user_category}"
+        st.markdown(f"<div style='text-align: center; margin-top: 5px;'><b>Selected:</b> {selected_type}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div style='padding: 23px;'></div>", unsafe_allow_html=True)
+
+# Map the selection to the correct user_type value
+selected_user_type = None
+if not user_random:
+    if user_category == "Tradesperson":
+        if user_status == "Existing":
+            selected_user_type = "existing_tradesperson"
+        else:
+            selected_user_type = "prospective_tradesperson"
+    else:  # Homeowner
+        if user_status == "Existing":
+            selected_user_type = "existing_homeowner"
+        else:
+            selected_user_type = "prospective_homeowner"
+
+# Determine selected route
+selected_route = None
+if not route_random:
+    # Check which route is selected (in priority order)
+    if route_phone:
+        selected_route = "phone"
+        # Disable other options if this one is selected
+        if route_email:
+            st.warning("Multiple routes selected. Using Phone as priority.")
+        if route_whatsapp:
+            st.warning("Multiple routes selected. Using Phone as priority.")
+        if route_webform:
+            st.warning("Multiple routes selected. Using Phone as priority.")
+    elif route_email:
+        selected_route = "email"
+        # Disable other options if this one is selected
+        if route_whatsapp:
+            st.warning("Multiple routes selected. Using Email as priority.")
+        if route_webform:
+            st.warning("Multiple routes selected. Using Email as priority.")
+    elif route_whatsapp:
+        selected_route = "whatsapp"
+        # Disable other options if this one is selected
+        if route_webform:
+            st.warning("Multiple routes selected. Using WhatsApp as priority.")
+    elif route_webform:
+        selected_route = "web_form"
+    else:
+        selected_route = "web_form"  # Default if none selected
+
+# Generate button in a new row
+if st.button("Generate New Inquiry", use_container_width=True):
+    with st.spinner("Generating scenario..."):
+        scenario_data = generate_scenario(selected_route)
+        
+        # Override user type if specified
+        if selected_user_type:
+            scenario_data["user_type"] = selected_user_type
+            
+            # Clear account details if changing from existing to prospective
+            if "prospective" in selected_user_type and scenario_data.get("account_details"):
+                scenario_data["account_details"] = {
+                    "name": "",
+                    "surname": "",
+                    "location": "",
+                    "latest_reviews": "",
+                    "latest_jobs": "",
+                    "project_cost": "",
+                    "payment_status": ""
+                }
+                scenario_data["membership_id"] = ""
+        
+        st.session_state["generated_scenario"] = scenario_data
+        st.success("Scenario generated!")
+        
+# Create a visual separation before the scenario display
+st.markdown("<hr style='margin: 30px 0px; border-color: #424242;'/>", unsafe_allow_html=True)
+
 # Move scenario display outside the columns to be full width below the Generate Scenario button
 if st.session_state["generated_scenario"]:
     scenario = st.session_state["generated_scenario"]
