@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import time
 import random
+import plotly.graph_objects as go
 
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
@@ -449,92 +450,92 @@ with col2:
     # Empty space for visual balance
     st.write("")
     
-    # Instead of raw JSON, display a formatted agent view for the generated scenario.
-    if st.session_state["generated_scenario"]:
-        scenario = st.session_state["generated_scenario"]
+# Move scenario display outside the columns to be full width below the Generate Scenario button
+if st.session_state["generated_scenario"]:
+    scenario = st.session_state["generated_scenario"]
+    
+    # Create columns for the titles
+    title_col1, title_col2 = st.columns(2)
+    with title_col1:
+        st.subheader("Scenario Details")
+    with title_col2:
+        st.subheader("Account Details")
+    
+    # Create columns for the content
+    left_col, right_col = st.columns(2)
+    
+    # Left column for general scenario details
+    with left_col:
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
         
-        # Create columns for the titles
-        title_col1, title_col2 = st.columns(2)
-        with title_col1:
-            st.subheader("Scenario Details")
-        with title_col2:
-            st.subheader("Account Details")
+        # Basic scenario information
+        if scenario.get('inbound_route'):
+            st.markdown("<div class='agent-label'>Inbound Route:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('inbound_route', 'N/A')}</div>", unsafe_allow_html=True)
         
-        # Create columns for the content
-        left_col, right_col = st.columns(2)
+        if scenario.get('ivr_flow'):
+            st.markdown("<div class='agent-label'>IVR Flow:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('ivr_flow', 'N/A')}</div>", unsafe_allow_html=True)
         
-        # Left column for general scenario details
-        with left_col:
-            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-            
-            # Basic scenario information
-            if scenario.get('inbound_route'):
-                st.markdown("<div class='agent-label'>Inbound Route:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{scenario.get('inbound_route', 'N/A')}</div>", unsafe_allow_html=True)
-            
-            if scenario.get('ivr_flow'):
-                st.markdown("<div class='agent-label'>IVR Flow:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{scenario.get('ivr_flow', 'N/A')}</div>", unsafe_allow_html=True)
-            
-            ivr_selections = ', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else ""
-            if ivr_selections:
-                st.markdown("<div class='agent-label'>IVR Selections:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{ivr_selections}</div>", unsafe_allow_html=True)
-            
-            if scenario.get('user_type'):
-                st.markdown("<div class='agent-label'>User Type:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{scenario.get('user_type', 'N/A')}</div>", unsafe_allow_html=True)
-                
-            if scenario.get('phone_email'):
-                st.markdown("<div class='agent-label'>Phone/Email:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{scenario.get('phone_email', 'N/A')}</div>", unsafe_allow_html=True)
-            
-            if scenario.get('membership_id'):
-                st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
-                
-            # Reason for contact
-            if scenario.get('scenario_text'):
-                st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text')}</div>", unsafe_allow_html=True)
-                
-            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+        ivr_selections = ', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else ""
+        if ivr_selections:
+            st.markdown("<div class='agent-label'>IVR Selections:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{ivr_selections}</div>", unsafe_allow_html=True)
         
-        # Right column for account details
-        with right_col:
-            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        if scenario.get('user_type'):
+            st.markdown("<div class='agent-label'>User Type:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('user_type', 'N/A')}</div>", unsafe_allow_html=True)
             
-            account_details = scenario.get("account_details", {})
-            name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+        if scenario.get('phone_email'):
+            st.markdown("<div class='agent-label'>Phone/Email:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('phone_email', 'N/A')}</div>", unsafe_allow_html=True)
+        
+        if scenario.get('membership_id'):
+            st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
             
-            if name:
-                st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{name}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
-                st.markdown("<div class='agent-detail'>No account information available</div>", unsafe_allow_html=True)
+        # Reason for contact
+        if scenario.get('scenario_text'):
+            st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text')}</div>", unsafe_allow_html=True)
             
-            if account_details.get('location'):
-                st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{account_details.get('location')}</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    
+    # Right column for account details
+    with right_col:
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        
+        account_details = scenario.get("account_details", {})
+        name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+        
+        if name:
+            st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{name}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
+            st.markdown("<div class='agent-detail'>No account information available</div>", unsafe_allow_html=True)
+        
+        if account_details.get('location'):
+            st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{account_details.get('location')}</div>", unsafe_allow_html=True)
+        
+        if account_details.get('latest_reviews'):
+            st.markdown("<div class='agent-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{account_details.get('latest_reviews')}</div>", unsafe_allow_html=True)
+        
+        if account_details.get('latest_jobs'):
+            st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs')}</div>", unsafe_allow_html=True)
+        
+        # Show project cost and payment status side by side if available
+        if account_details.get('project_cost') or account_details.get('payment_status'):
+            project_cost = account_details.get('project_cost', 'N/A')
+            payment_status = account_details.get('payment_status', 'N/A')
             
-            if account_details.get('latest_reviews'):
-                st.markdown("<div class='agent-label'>Latest Reviews:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{account_details.get('latest_reviews')}</div>", unsafe_allow_html=True)
-            
-            if account_details.get('latest_jobs'):
-                st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs')}</div>", unsafe_allow_html=True)
-            
-            # Show project cost and payment status side by side if available
-            if account_details.get('project_cost') or account_details.get('payment_status'):
-                project_cost = account_details.get('project_cost', 'N/A')
-                payment_status = account_details.get('payment_status', 'N/A')
-                
-                st.markdown("<div class='agent-label'>Project Details:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='agent-detail'>Project Cost: {project_cost} &nbsp;&nbsp;&nbsp; Status: {payment_status}</div>", unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+            st.markdown("<div class='agent-label'>Project Details:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>Project Cost: {project_cost} &nbsp;&nbsp;&nbsp; Status: {payment_status}</div>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 
 # -----------------------------------------------------------------------------
 # CLASSIFY & STORE INQUIRY
@@ -697,7 +698,38 @@ if len(df) > 0:
     with colA:
         st.write("**Inquiries by Classification:**")
         classification_counts = df["classification"].value_counts()
-        st.bar_chart(classification_counts)
+        
+        # Replace bar chart with pie chart
+        classifications = classification_counts.index.tolist()
+        counts = classification_counts.values.tolist()
+        
+        # Create a color palette
+        colors = ["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
+        
+        # Create a pie chart
+        fig1 = {
+            "data": [{
+                "type": "pie",
+                "labels": classifications,
+                "values": counts,
+                "textinfo": "label+percent",
+                "textposition": "inside",
+                "marker": {"colors": colors[:len(classifications)]},
+                "hole": 0.4,  # Makes it a donut chart
+                "pull": [0.05 if i == counts.index(max(counts)) else 0 for i in range(len(counts))],  # Pull out the largest slice
+            }],
+            "layout": {
+                "title": "Classification Distribution",
+                "showlegend": True,
+                "legend": {"orientation": "h", "y": -0.1},
+                "height": 300,
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+                "font": {"color": "white"},
+            }
+        }
+        
+        st.plotly_chart(fig1, use_container_width=True)
         
         # Show classification breakdown as text too
         st.markdown("<div class='info-container'>", unsafe_allow_html=True)
@@ -709,7 +741,44 @@ if len(df) > 0:
     with colB:
         st.write("**Inquiries by Priority:**")
         priority_counts = df["priority"].value_counts()
-        st.bar_chart(priority_counts)
+        
+        # Replace bar chart with pie chart
+        priorities = priority_counts.index.tolist()
+        counts = priority_counts.values.tolist()
+        
+        # Create color mapping for priorities
+        priority_colors = {
+            "High": "#DB4437",    # Red for high
+            "Medium": "#F4B400",  # Yellow for medium
+            "Low": "#0F9D58"      # Green for low
+        }
+        
+        # Get colors in the right order based on the priorities
+        pie_colors = [priority_colors.get(p, "#4285F4") for p in priorities]
+        
+        # Create a pie chart
+        fig2 = {
+            "data": [{
+                "type": "pie",
+                "labels": priorities,
+                "values": counts,
+                "textinfo": "label+percent",
+                "textposition": "inside",
+                "marker": {"colors": pie_colors},
+                "hole": 0.4,  # Makes it a donut chart
+            }],
+            "layout": {
+                "title": "Priority Distribution",
+                "showlegend": True,
+                "legend": {"orientation": "h", "y": -0.1},
+                "height": 300,
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+                "font": {"color": "white"},
+            }
+        }
+        
+        st.plotly_chart(fig2, use_container_width=True)
         
         # Show priority breakdown as text too
         st.markdown("<div class='info-container'>", unsafe_allow_html=True)
@@ -723,13 +792,78 @@ if len(df) > 0:
     with colC:
         st.write("**Inquiries by User Type:**")
         user_type_counts = df["user_type"].value_counts()
-        st.bar_chart(user_type_counts)
+        
+        # Replace bar chart with horizontal bar chart
+        user_types = user_type_counts.index.tolist()
+        counts = user_type_counts.values.tolist()
+        
+        # Create a horizontal bar chart
+        fig3 = {
+            "data": [{
+                "type": "bar",
+                "orientation": "h",
+                "x": counts,
+                "y": user_types,
+                "marker": {"color": "#4285F4"},
+                "text": counts,
+                "textposition": "auto",
+            }],
+            "layout": {
+                "title": "User Type Distribution",
+                "xaxis": {"title": "Count", "gridcolor": "#444"},
+                "yaxis": {"title": "", "gridcolor": "#444"},
+                "height": 300,
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+                "font": {"color": "white"},
+            }
+        }
+        
+        st.plotly_chart(fig3, use_container_width=True)
         
     with colD:
         st.write("**Inquiries by Route:**")
         route_counts = df["inbound_route"].value_counts()
-        st.bar_chart(route_counts)
         
+        # Replace bar chart with pie chart
+        routes = route_counts.index.tolist()
+        counts = route_counts.values.tolist()
+        
+        # Create color mapping for routes
+        route_colors = {
+            "phone": "#4285F4",     # Blue for phone
+            "email": "#DB4437",     # Red for email
+            "whatsapp": "#0F9D58",  # Green for whatsapp
+            "web_form": "#F4B400"   # Yellow for web form
+        }
+        
+        # Get colors in the right order based on the routes
+        pie_colors = [route_colors.get(r, "#9C27B0") for r in routes]
+        
+        # Create a pie chart
+        fig4 = {
+            "data": [{
+                "type": "pie",
+                "labels": routes,
+                "values": counts,
+                "textinfo": "label+percent",
+                "textposition": "inside",
+                "marker": {"colors": pie_colors},
+                "hole": 0.4,  # Makes it a donut chart
+            }],
+            "layout": {
+                "title": "Inbound Route Distribution",
+                "showlegend": True,
+                "legend": {"orientation": "h", "y": -0.1},
+                "height": 300,
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+                "font": {"color": "white"},
+            }
+        }
+        
+        st.plotly_chart(fig4, use_container_width=True)
+
     # Common topics/themes from summaries
     st.subheader("Common Topics & Themes")
     topics_container = st.container()
