@@ -636,18 +636,24 @@ def generate_response_suggestion(scenario, classification_result):
     if "review" in scenario_text.lower() and latest_reviews:
         body += f"\n\nI can see you've recently provided feedback on our service. Your reviews are important to us and help maintain our high standards."
     
-    # Add FAQ link if applicable - this would be replaced with actual links in a real system
+    # Add FAQ link section with more prominent and friendly message
     faq_link = ""
-    if "membership" in classification.lower():
-        faq_link = "\n\nYou might find our Membership FAQ section helpful: [Checkatrade.com/MembershipFAQ]"
-    elif "insurance" in scenario_text.lower():
-        faq_link = "\n\nFor more information about insurance requirements, please visit: [Checkatrade.com/InsuranceInfo]"
-    elif "billing" in classification.lower():
-        faq_link = "\n\nOur billing FAQ section may be helpful: [Checkatrade.com/BillingFAQ]"
     
-    # Add the FAQ link to the body if it exists
-    if faq_link:
-        body += faq_link
+    if "membership" in classification.lower():
+        faq_link = "\n\n📚 **For your convenience:** Many of our members find our Membership FAQ helpful for quick answers. Please check our comprehensive guide at [Checkatrade.com/MembershipFAQ] which covers common questions about account management, benefits, and renewal processes."
+    elif "insurance" in scenario_text.lower():
+        faq_link = "\n\n📚 **For your convenience:** We've put together detailed information about insurance requirements and coverage at [Checkatrade.com/InsuranceInfo]. This resource explains all our insurance policies and answers common questions you might have."
+    elif "billing" in classification.lower():
+        faq_link = "\n\n📚 **For your convenience:** Our billing FAQ section at [Checkatrade.com/BillingFAQ] provides detailed guidance on payment processes, invoice questions, and subscription details that may help answer your questions immediately."
+    elif "complaint" in classification.lower() or "job" in classification.lower():
+        faq_link = "\n\n📚 **For your convenience:** We have a dedicated help section about resolving job quality issues at [Checkatrade.com/JobResolutionHelp] which offers step-by-step guidance on our resolution process."
+    elif "technical" in classification.lower():
+        faq_link = "\n\n📚 **For your convenience:** Our technical support hub at [Checkatrade.com/TechSupport] contains troubleshooting guides, video tutorials, and solutions to common technical issues you may encounter."
+    else:
+        faq_link = "\n\n📚 **For your convenience:** You may find immediate answers to your questions in our FAQ section at [Checkatrade.com/FAQ]. Our help center is available 24/7 with searchable solutions to common questions."
+    
+    # Add the FAQ link to the body
+    body += faq_link
     
     # Different closing based on channel
     closing = ""
