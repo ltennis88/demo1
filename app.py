@@ -9,7 +9,7 @@ import random
 # 1) CONFIGURE OPENAI
 ###############################################################################
 # Hard-coded key for private demo (NOT recommended in production or public repos).
-openai.api_key = "YOUR_OPENAI_API_KEY_HERE"
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 ###############################################################################
 # 2) SET UP STREAMLIT SESSION STATE
