@@ -1085,7 +1085,7 @@ else:
 # -----------------------------------------------------------------------------
 # EXPORT LOGGED DATA
 # -----------------------------------------------------------------------------
-st.subheaderheader("Data Exports")
+st.subheader("Data Exports")
 if len(df) > 0:
     csv_data = df.to_csv(index=False)
     st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
