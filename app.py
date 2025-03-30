@@ -9,7 +9,7 @@ import plotly.express as px
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Checkatrade AI Demo", initial_sidebar_state="collapsed", 
+st.set_page_config(layout="wide", page_title="Contact Fowarding", initial_sidebar_state="collapsed", 
                  menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
