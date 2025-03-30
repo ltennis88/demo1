@@ -374,17 +374,39 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     
     # First, look for direct issue mentions in the scenario text
     issue_keywords = {
-        "job not completed": ["not completed", "unfinished", "incomplete", "left halfway", "abandoned"],
-        "quality issues": ["poor quality", "bad workmanship", "not satisfied", "poor standard", "substandard"],
-        "delayed work": ["delayed", "late", "behind schedule", "taking too long", "missed deadline"],
-        "billing dispute": ["overcharged", "invoice", "billing", "payment dispute", "charge", "refund"],
-        "tradesperson communication": ["not responding", "ghosted", "won't return calls", "can't reach", "no communication"],
-        "complaint": ["unhappy", "disappointed", "complaint", "not happy", "issue", "problem"],
-        "account access": ["can't login", "password", "reset", "access", "account", "sign in"],
-        "app technical": ["app", "website", "technical", "error", "not working", "glitch"],
-        "find tradesperson": ["looking for", "need to find", "searching for", "recommend", "suggestion"],
-        "membership": ["membership", "subscribe", "join", "renewal", "cancel subscription"]
+        "job not completed": ["not completed", "unfinished", "incomplete", "left halfway", "abandoned", "not finished"],
+        "quality issues": ["poor quality", "bad workmanship", "not satisfied", "poor standard", "substandard", "quality issue", "poor work", "faulty"],
+        "delayed work": ["delayed", "late", "behind schedule", "taking too long", "missed deadline", "overdue"],
+        "billing dispute": ["overcharged", "invoice", "billing", "payment dispute", "charge", "refund", "overpriced", "cost dispute"],
+        "tradesperson communication": ["not responding", "ghosted", "won't return calls", "can't reach", "no communication", "stopped responding", "no reply"],
+        "complaint": ["unhappy", "disappointed", "complaint", "not happy", "issue", "problem", "dissatisfied"],
+        "account access": ["can't login", "password", "reset", "access", "account", "sign in", "login failed"],
+        "app technical": ["app", "website", "technical", "error", "not working", "glitch", "broken"],
+        "find tradesperson": ["looking for", "need to find", "searching for", "recommend", "suggestion", "need a", "looking to hire"],
+        "membership": ["membership", "subscribe", "join", "renewal", "cancel subscription", "subscription fee"],
+        "warranty issues": ["warranty", "guarantee", "promised warranty", "no warranty", "warranty claim", "coverage", "warranty period"],
+        "tradesperson qualifications": ["qualifications", "certified", "licensed", "accredited", "training", "skills", "experience"],
+        "repair issues": ["repair failed", "still broken", "not fixed", "same issue", "recurring problem", "issue persists"]
     }
+    
+    # Special case for warranty issues which are particularly sensitive
+    if "warranty" in scenario_lower or "guarantee" in scenario_lower:
+        # Look for FAQs specifically about warranties
+        warranty_matches = []
+        for _, row in faq_dataframe.iterrows():
+            question = str(row.get("Question", "")).lower()
+            if "warranty" in question or "guarantee" in question:
+                # Count how many words overlap between scenario and question
+                scenario_words = set(scenario_lower.split())
+                question_words = set(question.split())
+                overlap_count = len(scenario_words.intersection(question_words))
+                warranty_matches.append((row["Question"], overlap_count + 5))  # Bonus for warranty match
+        
+        if warranty_matches:
+            # Return the one with highest score
+            warranty_matches.sort(key=lambda x: x[1], reverse=True)
+            if warranty_matches[0][1] >= 6:  # Higher threshold for relevance
+                return warranty_matches[0]
     
     # Try direct issue matching first - this has the highest relevance score
     for issue, keywords in issue_keywords.items():
@@ -399,24 +421,33 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 if keyword_matches >= 2:
                     return row["Question"], 8  # High relevance for direct issue match
     
-    # If no direct issue match, try matching by category
+    # If no direct issue match, try matching by category with improved categories
     category_keywords = {
-        "complaint": ["complaint", "dissatisfied", "poor service", "issue", "problem"],
-        "tradesperson": ["tradesperson", "trade", "contractor", "professional", "worker"],
-        "job": ["job", "work", "project", "task", "service"],
-        "billing": ["bill", "payment", "invoice", "charge", "cost", "price"],
-        "account": ["account", "login", "password", "credentials", "sign in", "profile"],
-        "membership": ["membership", "subscription", "renewal", "join", "register"],
-        "reviews": ["review", "rating", "feedback", "star", "comment"],
-        "technical": ["technical", "app", "website", "online", "digital", "error"]
+        "complaint": ["complaint", "dissatisfied", "poor service", "issue", "problem", "unhappy", "disappointed"],
+        "tradesperson": ["tradesperson", "trade", "contractor", "professional", "worker", "electrician", "plumber", "roofer", "builder"],
+        "job quality": ["job", "work", "quality", "standard", "workmanship", "completed", "finished", "done", "performed"],
+        "warranty": ["warranty", "guarantee", "coverage", "protection", "promised", "assured", "certified"],
+        "billing": ["bill", "payment", "invoice", "charge", "cost", "price", "fee", "refund"],
+        "account": ["account", "login", "password", "credentials", "sign in", "profile", "dashboard"],
+        "membership": ["membership", "subscription", "renewal", "join", "register", "member"],
+        "reviews": ["review", "rating", "feedback", "star", "comment", "testimonial", "reputation"],
+        "technical": ["technical", "app", "website", "online", "digital", "error", "malfunction"]
     }
     
-    # Find matching category
+    # Find matching category with improved scoring
     matching_categories = []
     for category, terms in category_keywords.items():
-        matches = sum(1 for term in terms if term in scenario_lower)
-        if matches >= 1:
-            matching_categories.append((category, matches))
+        # Use weighted matching - exact matches worth more than partial matches
+        exact_matches = sum(1 for term in terms if f" {term} " in f" {scenario_lower} ")
+        contains_matches = sum(1 for term in terms if term in scenario_lower) - exact_matches
+        total_score = (exact_matches * 2) + contains_matches
+        
+        if total_score > 0:
+            # Give extra weight to certain important categories
+            if category in ["warranty", "job quality", "complaint"] and total_score > 1:
+                total_score += 2
+            
+            matching_categories.append((category, total_score))
     
     # Sort categories by number of matches
     matching_categories.sort(key=lambda x: x[1], reverse=True)
@@ -432,31 +463,72 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 
                 for _, row in matched_rows.iterrows():
                     question = str(row.get("Question", "")).lower()
-                    # Count how many significant words from scenario appear in the question
-                    score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                    
+                    # Enhanced scoring system:
+                    # 1. More weight for matching significant words
+                    # 2. Bonus for multiple word matches
+                    # 3. Penalty for questions with irrelevant topics
+                    
+                    # Get significant words (longer words carry more meaning)
+                    scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
+                    
+                    # Count matches
+                    word_matches = sum(1 for word in scenario_words if word in question)
+                    
+                    # Bonus for consecutive words matching (phrases)
+                    phrase_bonus = 0
+                    for i in range(len(scenario_words) - 1):
+                        phrase = f"{scenario_words[i]} {scenario_words[i+1]}"
+                        if phrase in question:
+                            phrase_bonus += 2
+                    
+                    # Check for irrelevant topics that would make the FAQ inappropriate
+                    irrelevant_terms = ["drone", "survey", "partnership", "newsletter", "marketing"]
+                    irrelevance_penalty = sum(3 for term in irrelevant_terms if term in question)
+                    
+                    # Final score
+                    score = word_matches + phrase_bonus + (category_match_count/2) - irrelevance_penalty
+                    
                     if score > best_match_score:
                         best_match_score = score
                         best_match = row["Question"]
                 
-                if best_match and best_match_score >= 2:
+                if best_match and best_match_score >= 3:  # Higher threshold for relevance
                     # Relevance is based on both category match and word match
-                    relevance = category_match_count + best_match_score
+                    relevance = best_match_score
                     return best_match, relevance
     
-    # Last resort: look for any significant word matches
+    # Last resort: look for any significant word matches with improved scoring
     best_match = None
     best_score = 0
     
+    # Important topic words that should be given more weight
+    important_topics = ["warranty", "guarantee", "electrician", "complaint", "quality", "problem", "issue"]
+    
     for _, row in faq_dataframe.iterrows():
         question = str(row.get("Question", "")).lower()
+        
         # Check if any significant words from the scenario appear in the question
         scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
+        
+        # Basic matching score
         matches = sum(1 for word in scenario_words if word in question)
-        if matches > best_score:
-            best_score = matches
+        
+        # Bonus for important topics
+        topic_bonus = sum(2 for word in important_topics if word in scenario_lower and word in question)
+        
+        # Penalty for likely irrelevant topics
+        irrelevant_terms = ["drone", "survey", "partnership", "newsletter", "marketing"]
+        irrelevance_penalty = sum(3 for term in irrelevant_terms if term in question)
+        
+        # Final score
+        total_score = matches + topic_bonus - irrelevance_penalty
+        
+        if total_score > best_score:
+            best_score = total_score
             best_match = row["Question"]
     
-    if best_match and best_score >= 2:  # Require at least 2 significant word matches
+    if best_match and best_score >= 3:  # Higher threshold for relevance
         return best_match, best_score
     
     return None, 0
