@@ -911,6 +911,56 @@ if len(df) > 0:
                 st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
             
+            # Add FAQ suggestion and response suggestion
+            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
+            
+            # First search for relevant FAQ
+            faq_category = ""
+            # Try to parse the classification result to get related_faq_category
+            try:
+                # Check if we can find something related to faq_category in the summary
+                if "faq" in row['summary'].lower():
+                    faq_category = row['summary'].lower().split("faq")[1].strip().strip(".:,")
+            except:
+                pass
+                
+            relevant_faq, faq_score = find_relevant_faq(row['scenario_text'], df_faq)
+            
+            # Only display FAQ if it meets the relevance threshold
+            if relevant_faq and faq_score >= 3:
+                st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
+            
+            # Generate response suggestion for email or whatsapp
+            inbound_route = row['inbound_route']
+            if inbound_route in ["email", "whatsapp"]:
+                # Recreate scenario structure from row data
+                scenario_dict = {
+                    "inbound_route": row['inbound_route'],
+                    "scenario_text": row['scenario_text'],
+                    "user_type": row['user_type'],
+                    "account_details": {
+                        "name": row['account_name'],
+                        "location": row['account_location'],
+                        "latest_reviews": row['account_reviews'],
+                        "latest_jobs": row['account_jobs'],
+                        "project_cost": row['project_cost'],
+                        "payment_status": row['payment_status']
+                    }
+                }
+                
+                # Recreate classification structure
+                classification_dict = {
+                    "classification": row['classification'],
+                    "priority": row['priority'],
+                    "summary": row['summary']
+                }
+                
+                response_suggestion = generate_response_suggestion(scenario_dict, classification_dict)
+                
+                st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
+            
             st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     
     # Then show summary charts with expanded information
@@ -919,7 +969,6 @@ if len(df) > 0:
     # Row 1: Classification and Priority distribution
     colA, colB = st.columns(2)
     with colA:
-        st.write("**Inquiries by Classification:**")
         classification_counts = df["classification"].value_counts()
         
         # Create pie chart with plotly express
@@ -951,7 +1000,6 @@ if len(df) > 0:
         st.markdown("</div>", unsafe_allow_html=True)
         
     with colB:
-        st.write("**Inquiries by Priority:**")
         priority_counts = df["priority"].value_counts()
         
         # Create color mapping for priorities
@@ -992,7 +1040,6 @@ if len(df) > 0:
     # Row 2: User type and Route distribution 
     colC, colD = st.columns(2)
     with colC:
-        st.write("**Inquiries by User Type:**")
         user_type_counts = df["user_type"].value_counts()
         
         # Create horizontal bar chart using plotly express
@@ -1020,7 +1067,6 @@ if len(df) > 0:
         st.plotly_chart(fig3, use_container_width=True)
         
     with colD:
-        st.write("**Inquiries by Route:**")
         route_counts = df["inbound_route"].value_counts()
         
         # Create color mapping for routes
