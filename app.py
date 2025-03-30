@@ -508,6 +508,9 @@ def generate_response_suggestion(scenario, classification_result):
                 
             job_reference += "Could you confirm which specific aspects of the job you're experiencing issues with? "
     
+    # Extract specific details from scenario for context
+    specific_details = extract_specific_details(scenario_text)
+    
     # Main response body based on classification
     if "complaint" in classification.lower():
         body = f"Thank you for contacting Checkatrade about your concerns. {job_reference}We're sorry to hear you're experiencing problems and want to help resolve this for you as quickly as possible."
@@ -520,7 +523,7 @@ def generate_response_suggestion(scenario, classification_result):
             body += f"\n- Whether you've made any payments toward the {project_cost} project cost"
         
     elif "billing" in classification.lower():
-        body = f"Thank you for contacting Checkatrade about your billing query. {job_reference}We'll look into this for you right away."
+        body = f"Thank you for contacting Checkatrade about your billing query. {specific_details}We'll look into this for you right away."
         
         # Add follow-up questions for billing
         if project_cost:
@@ -528,25 +531,49 @@ def generate_response_suggestion(scenario, classification_result):
         else:
             body += "\n\nTo help resolve this quickly, could you provide details of the specific payment or charge you're inquiring about?"
             
-    elif "membership" in classification.lower():
-        if "existing" in user_type:
-            body = "Thank you for your query about your Checkatrade membership."
+    elif "membership" in classification.lower() or "insurance" in scenario_text.lower() or "account" in scenario_text.lower():
+        if "insurance" in scenario_text.lower() or "public liability" in scenario_text.lower():
+            body = f"Thank you for contacting Checkatrade about updating your Public Liability Insurance details. I'd be happy to help you with this important account update."
+            body += "\n\nTo update your insurance information, I'll need the following details:"
+            body += "\n- Your new insurance provider name"
+            body += "\n- Policy number"
+            body += "\n- Coverage amount"
+            body += "\n- Effective dates of the policy"
+            body += "\n\nOnce you provide these details, I can update your account immediately. Alternatively, you can update this information directly through your account dashboard by going to the 'Insurance Details' section."
+        elif "existing" in user_type:
+            body = f"Thank you for your query about your Checkatrade membership. {specific_details}"
+            body += "\n\nI'll take a look at your account and make sure everything is updated correctly. If you have any specific details or documents you need to upload, please let me know and I can guide you through the process."
         else:
-            body = "Thank you for your interest in becoming a Checkatrade member."
+            body = f"Thank you for your interest in becoming a Checkatrade member. {specific_details}"
+            body += "\n\nTo proceed with your membership application, we'll need to gather some information about your business and services. Would you like me to outline the steps involved, or do you have specific questions about the membership process?"
             
     elif "technical" in classification.lower():
-        body = "I understand you're experiencing technical difficulties. Let me help resolve this for you."
-        body += "\n\nCould you please share what specific error messages you're seeing or what functionality isn't working as expected?"
+        body = f"I understand you're experiencing technical difficulties with {specific_details}. Let me help resolve this for you."
+        body += "\n\nCould you please share what specific error messages you're seeing or what functionality isn't working as expected? Screenshots can be helpful if available."
+        body += "\n\nIn the meantime, you might try clearing your browser cache or using our mobile app as an alternative."
         
     else:
         if job_reference:
             body = f"Thank you for contacting Checkatrade. {job_reference}We're happy to help with your inquiry."
         else:
-            body = "Thank you for contacting Checkatrade. We're happy to help with your inquiry."
+            body = f"Thank you for contacting Checkatrade. {specific_details}We're happy to help with your inquiry."
     
     # Add review reference if relevant
     if "review" in scenario_text.lower() and latest_reviews:
         body += f"\n\nI can see you've recently provided feedback on our service. Your reviews are important to us and help maintain our high standards."
+    
+    # Add FAQ link if applicable - this would be replaced with actual links in a real system
+    faq_link = ""
+    if "membership" in classification.lower():
+        faq_link = "\n\nYou might find our Membership FAQ section helpful: [Checkatrade.com/MembershipFAQ]"
+    elif "insurance" in scenario_text.lower():
+        faq_link = "\n\nFor more information about insurance requirements, please visit: [Checkatrade.com/InsuranceInfo]"
+    elif "billing" in classification.lower():
+        faq_link = "\n\nOur billing FAQ section may be helpful: [Checkatrade.com/BillingFAQ]"
+    
+    # Add the FAQ link to the body if it exists
+    if faq_link:
+        body += faq_link
     
     # Different closing based on channel
     closing = ""
@@ -556,6 +583,26 @@ def generate_response_suggestion(scenario, classification_result):
         closing = "\n\nWe're here to help resolve this for you. Is there anything else you can tell me about the situation that would help us address your concerns more effectively?"
     
     return f"{greeting}\n\n{body}{closing}"
+
+def extract_specific_details(scenario_text):
+    """
+    Extract specific details from the scenario text to include in the response
+    """
+    # This is a simple version - in a real system this could use NER or other techniques
+    specific_details = ""
+    
+    if "insurance" in scenario_text.lower() or "public liability" in scenario_text.lower():
+        specific_details = "I understand you need assistance with updating your Public Liability Insurance details. "
+    elif "password" in scenario_text.lower() or "login" in scenario_text.lower():
+        specific_details = "I understand you're having trouble accessing your account. "
+    elif "payment" in scenario_text.lower() or "bill" in scenario_text.lower():
+        specific_details = "I understand you have a query about your payment or billing. "
+    elif "membership" in scenario_text.lower():
+        specific_details = "I understand you have a question about your membership. "
+    elif "tradesperson" in scenario_text.lower() or "contractor" in scenario_text.lower():
+        specific_details = "I understand you have a concern regarding a tradesperson. "
+    
+    return specific_details
 
 ###############################################################################
 # 9) STREAMLIT APP UI
