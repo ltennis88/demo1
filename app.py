@@ -319,12 +319,14 @@ if st.session_state["generated_scenario"]:
     scenario = st.session_state["generated_scenario"]
     st.subheader("Scenario Details (Agent View)")
     
-    # Use the info-container class for better styling
-    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+    # Create columns for the entire layout
+    left_col, right_col = st.columns(2)
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
+    # Left column for general scenario details
+    with left_col:
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        
+        # Basic scenario information
         if scenario.get('inbound_route'):
             st.markdown("<div class='agent-label'>Inbound Route:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{scenario.get('inbound_route', 'N/A')}</div>", unsafe_allow_html=True)
@@ -341,8 +343,7 @@ if st.session_state["generated_scenario"]:
         if scenario.get('user_type'):
             st.markdown("<div class='agent-label'>User Type:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{scenario.get('user_type', 'N/A')}</div>", unsafe_allow_html=True)
-    
-    with col2:
+            
         if scenario.get('phone_email'):
             st.markdown("<div class='agent-label'>Phone/Email:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{scenario.get('phone_email', 'N/A')}</div>", unsafe_allow_html=True)
@@ -350,17 +351,30 @@ if st.session_state["generated_scenario"]:
         if scenario.get('membership_id'):
             st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
-
-    # Account details in a separate section
-    account_details = scenario.get("account_details", {})
-    name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+            
+        # Reason for contact
+        if scenario.get('scenario_text'):
+            st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text')}</div>", unsafe_allow_html=True)
+            
+        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     
-    if name or account_details.get('location') or account_details.get('latest_reviews') or account_details.get('latest_jobs'):
+    # Right column for account details
+    with right_col:
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        
+        # Account details header
         st.markdown("<div class='agent-section'>Account Details</div>", unsafe_allow_html=True)
-    
+        
+        account_details = scenario.get("account_details", {})
+        name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
+        
         if name:
             st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{name}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
+            st.markdown("<div class='agent-detail'>No account information available</div>", unsafe_allow_html=True)
         
         if account_details.get('location'):
             st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
@@ -373,13 +387,8 @@ if st.session_state["generated_scenario"]:
         if account_details.get('latest_jobs'):
             st.markdown("<div class='agent-label'>Latest Jobs:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{account_details.get('latest_jobs')}</div>", unsafe_allow_html=True)
-    
-    # Reason for contact in a separate section
-    if scenario.get('scenario_text'):
-        st.markdown("<div class='agent-section'>Reason for Contact</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='agent-detail'>{scenario.get('scenario_text')}</div>", unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+            
+        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 
 # -----------------------------------------------------------------------------
 # SECTION 2: CLASSIFY & STORE INQUIRY
