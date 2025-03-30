@@ -21,15 +21,18 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 @st.cache_data
 def load_faq_csv():
+    """
+    Loads a CSV with columns: Type, Category, Question
+    (Adjust as needed if your CSV has different column names.)
+    """
     try:
-        df_faq = pd.read_csv("faq_taxonomy.csv")  # e.g., columns might be ["Category", "Question", "Answer"]
+        df_faq = pd.read_csv("faq_taxonomy.csv")
     except:
-        # If file doesn't exist or columns differ, we handle it gracefully
-        df_faq = pd.DataFrame({"Category": [], "Question": [], "Answer": []})
+        # If file not found or columns differ, handle gracefully
+        df_faq = pd.DataFrame(columns=["Type", "Category", "Question"])
     return df_faq
 
 df_faq = load_faq_csv()
-
 ###############################################################################
 # 3) SET UP STREAMLIT SESSION STATE
 ###############################################################################
