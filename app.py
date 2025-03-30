@@ -328,6 +328,18 @@ def classify_scenario(text):
 ###############################################################################
 # RESPONSE SUGGESTION HELPER FUNCTIONS
 ###############################################################################
+def self_process_ivr_selections(ivr_selections):
+    """
+    Safely process ivr_selections to handle any type that might be received.
+    Returns a string representation suitable for storing in the DataFrame.
+    """
+    if isinstance(ivr_selections, list):
+        return ", ".join(map(str, ivr_selections))
+    elif ivr_selections:
+        return str(ivr_selections)
+    else:
+        return ""
+
 def find_relevant_faq(scenario_text, faq_dataframe):
     """
     Find the most relevant FAQ based on the scenario text.
@@ -477,7 +489,13 @@ if st.session_state["generated_scenario"]:
             st.markdown("<div class='agent-label'>IVR Flow:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{scenario.get('ivr_flow', 'N/A')}</div>", unsafe_allow_html=True)
         
-        ivr_selections = ', '.join(scenario.get("ivr_selections", [])) if scenario.get("ivr_selections") else ""
+        # Add type checking for ivr_selections
+        ivr_selections_list = scenario.get("ivr_selections", [])
+        if isinstance(ivr_selections_list, list):
+            ivr_selections = ', '.join(map(str, ivr_selections_list))
+        else:
+            ivr_selections = str(ivr_selections_list) if ivr_selections_list else ""
+            
         if ivr_selections:
             st.markdown("<div class='agent-label'>IVR Selections:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{ivr_selections}</div>", unsafe_allow_html=True)
@@ -554,7 +572,7 @@ if st.session_state["generated_scenario"]:
                     "timestamp": now,
                     "inbound_route": st.session_state["generated_scenario"].get("inbound_route", ""),
                     "ivr_flow": st.session_state["generated_scenario"].get("ivr_flow", ""),
-                    "ivr_selections": ", ".join(st.session_state["generated_scenario"].get("ivr_selections", [])),
+                    "ivr_selections": self_process_ivr_selections(st.session_state["generated_scenario"].get("ivr_selections", [])),
                     "user_type": st.session_state["generated_scenario"].get("user_type", ""),
                     "phone_email": st.session_state["generated_scenario"].get("phone_email", ""),
                     "membership_id": st.session_state["generated_scenario"].get("membership_id", ""),
