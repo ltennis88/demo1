@@ -5,6 +5,7 @@ import json
 import time
 import random
 import plotly.express as px
+import os
 
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
@@ -147,7 +148,7 @@ def load_faq_csv():
     Expected columns: Type, Category, Question.
     """
     try:
-        df = pd.read_csv("faq_taxonomy.csv")
+        df = pd.read_csv("faq_taxonomy.csv", sep=';')  # Changed delimiter to semicolon
     except Exception as e:
         st.error("Error loading faq_taxonomy.csv. Please ensure the file exists and is in plain text CSV format.")
         df = pd.DataFrame(columns=["Type", "Category", "Question"])
@@ -195,6 +196,23 @@ def load_dummy_inquiries():
             "priority", "summary", "account_name", "account_location",
             "account_reviews", "account_jobs", "project_cost", "payment_status"
         ])
+
+def save_inquiries_to_file():
+    """
+    Saves the current inquiries DataFrame to inquiries.json
+    """
+    try:
+        # Convert DataFrame to JSON and save with nice formatting
+        json_data = st.session_state["inquiries"].to_dict(orient="records")
+        with open("inquiries.json", "w") as f:
+            json.dump(json_data, f, indent=2)
+            
+        # Stage and commit the changes
+        os.system('git add inquiries.json')
+        os.system('git commit -m "Updated inquiries database with new entries"')
+        os.system('git push origin main')
+    except Exception as e:
+        st.warning(f"Failed to save inquiries to file: {str(e)}")
 
 if "inquiries" not in st.session_state:
     # Try to load dummy data first
@@ -1114,11 +1132,16 @@ def generate_response_suggestion(scenario, classification_result):
         # Find relevant membership terms based on the query
         relevant_terms = []
         for section in membership_terms.get("sections", []):
-            if any(word in scenario_text for word in section["title"].lower().split()):
-                relevant_terms.append(section["content"])
-                for subsection in section.get("subsections", []):
-                    if any(word in scenario_text for word in subsection["title"].lower().split()):
-                        relevant_terms.append(subsection["content"])
+            # Safely get content from section
+            section_content = section.get("content", "")
+            if section_content and any(word in scenario_text for word in section.get("title", "").lower().split()):
+                relevant_terms.append(section_content)
+            
+            # Safely handle subsections
+            for subsection in section.get("subsections", []):
+                subsection_content = subsection.get("content", "")
+                if subsection_content and any(word in scenario_text for word in subsection.get("title", "").lower().split()):
+                    relevant_terms.append(subsection_content)
         
         if relevant_terms:
             membership_info = " ".join(relevant_terms)
@@ -1447,6 +1470,10 @@ if st.session_state["generated_scenario"]:
             st.markdown("<div class='agent-label'>Name:</div>", unsafe_allow_html=True)
             st.markdown("<div class='agent-detail'>No account information available</div>", unsafe_allow_html=True)
         
+        if scenario.get('membership_id'):
+            st.markdown("<div class='agent-label'>Membership ID:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='agent-detail'>{scenario.get('membership_id', 'N/A')}</div>", unsafe_allow_html=True)
+        
         if account_details.get('location'):
             st.markdown("<div class='agent-label'>Location:</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='agent-detail'>{account_details.get('location')}</div>", unsafe_allow_html=True)
@@ -1506,34 +1533,60 @@ if st.session_state["generated_scenario"]:
                     [st.session_state["inquiries"], pd.DataFrame([new_row])],
                     ignore_index=True
                 )
-                st.success(f"Scenario classified as {new_row['classification']} (Priority: {new_row['priority']}).")
+                
+                # Save to file and push to git
+                save_inquiries_to_file()
+                
+                st.success(f"Scenario classified as {new_row['classification']} (Priority: {new_row['priority']}) and saved to database.")
                 
                 # Get relevant FAQ based on the classification result and scenario text
                 faq_category = classification_result.get("related_faq_category", "")
                 relevant_faq = None
-                faq_relevance_score = 0  # Track how relevant the match is
+                faq_relevance_score = 0
 
                 # First try to use the model's suggested FAQ category
                 if faq_category and faq_category.lower() not in ["", "none", "n/a"]:
-                    # Filter FAQ dataframe by the suggested category
-                    category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower())]
-                    if not category_matches.empty:
-                        # Look for the best match within this category
-                        best_match = None
-                        best_score = 0
-                        
-                        for _, row in category_matches.iterrows():
-                            question = str(row.get("Question", "")).lower()
-                            scenario_lower = scenario_text.lower()
-                            # Count significant word matches
-                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
-                            if score > best_score:
-                                best_score = score
-                                best_match = row["Question"]
-                        
-                        if best_match and best_score >= 2:  # Require at least 2 significant matches
-                            relevant_faq = best_match
-                            faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+                    # First check if Category column exists
+                    if "Category" in df_faq.columns:
+                        # Filter FAQ dataframe by the suggested category
+                        category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower(), na=False)]
+                        if not category_matches.empty:
+                            # Look for the best match within this category
+                            best_match = None
+                            best_score = 0
+                            
+                            for _, row in category_matches.iterrows():
+                                question = str(row.get("Question", "")).lower()
+                                scenario_lower = scenario_text.lower()
+                                # Count significant word matches
+                                score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                if score > best_score:
+                                    best_score = score
+                                    best_match = row["Question"]
+                            
+                                if best_match and best_score >= 2:  # Require at least 2 significant matches
+                                    relevant_faq = best_match
+                                    faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+                    else:
+                        # If Category column doesn't exist, try searching in Type column instead
+                        if "Type" in df_faq.columns:
+                            category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
+                            if not category_matches.empty:
+                                # Same matching logic as above
+                                best_match = None
+                                best_score = 0
+                                
+                                for _, row in category_matches.iterrows():
+                                    question = str(row.get("Question", "")).lower()
+                                    scenario_lower = scenario_text.lower()
+                                    score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                    if score > best_score:
+                                        best_score = score
+                                        best_match = row["Question"]
+                                
+                                if best_match and best_score >= 2:
+                                    relevant_faq = best_match
+                                    faq_relevance_score = best_score + 2
 
                 # If no FAQ found via category or low relevance, use our keyword matching function
                 if not relevant_faq or faq_relevance_score < 3:
@@ -1624,7 +1677,8 @@ if len(df) > 0:
         
         # Account details section - only show if there's actual account info
         has_account_info = (recent_row['account_name'] or recent_row['account_location'] or 
-                           recent_row['account_reviews'] or recent_row['account_jobs'])
+                           recent_row['account_reviews'] or recent_row['account_jobs'] or
+                           recent_row['membership_id'])
         
         if has_account_info:
             st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
@@ -1632,6 +1686,10 @@ if len(df) > 0:
             if recent_row['account_name']:
                 st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['account_name']}</div>", unsafe_allow_html=True)
+            
+            if recent_row['membership_id']:
+                st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['membership_id']}</div>", unsafe_allow_html=True)
             
             if recent_row['account_location']:
                 st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
@@ -1764,7 +1822,8 @@ if len(df) > 0:
                 
                 # Account details section - only show if there's actual account info
                 has_account_info = (row['account_name'] or row['account_location'] or 
-                                   row['account_reviews'] or row['account_jobs'])
+                                   row['account_reviews'] or row['account_jobs'] or
+                                   row['membership_id'])
                 
                 if has_account_info:
                     st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
@@ -1772,6 +1831,10 @@ if len(df) > 0:
                     if row['account_name']:
                         st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['account_name']}</div>", unsafe_allow_html=True)
+                    
+                    if row['membership_id']:
+                        st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
                     
                     if row['account_location']:
                         st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
@@ -2173,3 +2236,16 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
+
+# -----------------------------------------------------------------------------
+# DATA EXPORTS
+# -----------------------------------------------------------------------------
+st.header("Data Exports")
+if len(df) > 0:
+    csv_data = df.to_csv(index=False)
+    st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
+
+    json_data = df.to_json(orient="records")
+    st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json")
+else:
+    st.write("No data to export yet.")
