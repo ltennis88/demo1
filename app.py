@@ -1275,7 +1275,7 @@ def extract_specific_details(scenario_text):
 # Remove duplicate title and navigation here
 
 # Generate New Inquiry Section
-st.header("Generate New Inquiry")
+# Removed duplicate header here, already defined at line 234
 
 # Route Selection
 st.markdown("<div class='inquiry-label'>Route Selection:</div>", unsafe_allow_html=True)
