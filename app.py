@@ -2272,13 +2272,18 @@ with st.expander("View Analytics Dashboard"):
     st.subheader("Token Usage Analytics")
     
     if st.session_state["token_usage"]["generations"]:
-        # Create DataFrames for each operation type
+        # Create DataFrame from token usage data
         df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
         df_tokens['timestamp'] = pd.to_datetime(df_tokens['timestamp'])
         
-        # Split data by operation
-        scenario_data = df_tokens[df_tokens['operation'].isna()]  # Scenario generation doesn't have operation field
-        classification_data = df_tokens[df_tokens['operation'] == 'classification']
+        # Split data by operation, handling case where operation field might not exist
+        if 'operation' in df_tokens.columns:
+            scenario_data = df_tokens[df_tokens['operation'].isna()]  # Scenario generation doesn't have operation field
+            classification_data = df_tokens[df_tokens['operation'] == 'classification']
+        else:
+            # If operation field doesn't exist, treat all data as scenario generation
+            scenario_data = df_tokens
+            classification_data = pd.DataFrame()
         
         # Calculate averages for scenario generation
         if not scenario_data.empty:
