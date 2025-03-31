@@ -1359,40 +1359,41 @@ if st.button("Generate New Inquiry", use_container_width=True):
         scenario_data = generate_scenario(selected_route, selected_user_type)
         st.session_state["generated_scenario"] = scenario_data
         
-        # Get the most recent generation data
-        latest_generation = st.session_state["token_usage"]["generations"][-1]
-        
-        # Create columns for metrics display
-        st.markdown("### Generation Metrics")
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-        
-        with metric_col1:
-            st.metric(
-                "Response Time",
-                f"{latest_generation['response_time']:.2f}s"
-            )
-        
-        with metric_col2:
-            st.metric(
-                "Input Tokens",
-                f"{latest_generation['input_tokens']:,}",
-                f"${latest_generation['input_cost']:.4f}"
-            )
-        
-        with metric_col3:
-            st.metric(
-                "Output Tokens",
-                f"{latest_generation['output_tokens']:,}",
-                f"${latest_generation['output_cost']:.4f}"
-            )
-        
-        with metric_col4:
-            st.metric(
-                "Total Cost",
-                f"${latest_generation['total_cost']:.4f}"
-            )
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Get the most recent generation data - check if the list is not empty first
+        if st.session_state["token_usage"]["generations"]:
+            latest_generation = st.session_state["token_usage"]["generations"][-1]
+            
+            # Create columns for metrics display
+            st.markdown("### Generation Metrics")
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            
+            with metric_col1:
+                st.metric(
+                    "Response Time",
+                    f"{latest_generation['response_time']:.2f}s"
+                )
+            
+            with metric_col2:
+                st.metric(
+                    "Input Tokens",
+                    f"{latest_generation['input_tokens']:,}",
+                    f"${latest_generation['input_cost']:.4f}"
+                )
+            
+            with metric_col3:
+                st.metric(
+                    "Output Tokens",
+                    f"{latest_generation['output_tokens']:,}",
+                    f"${latest_generation['output_cost']:.4f}"
+                )
+            
+            with metric_col4:
+                st.metric(
+                    "Total Cost",
+                    f"${latest_generation['total_cost']:.4f}"
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
         
         st.success("Scenario generated successfully!")
 
