@@ -107,7 +107,7 @@ if "cached_response_prompt_tokens" not in st.session_state:
 st.set_page_config(
     layout="wide", 
     page_title="Contact Center AI Assistant",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="auto"
 )
 
 # Setup API key
@@ -138,34 +138,24 @@ html, body, [class*="css"] {
     margin-right: auto !important;
 }
 
-/* Reduce sidebar width */
-[data-testid="stSidebar"] {
-    width: 12rem !important;
-    min-width: 12rem !important;
-    max-width: 12rem !important;
+/* Navigation buttons */
+.stButton button {
     background-color: #1E1E1E !important;
-    border-right: 1px solid #424242 !important;
+    color: white !important;
+    border: 1px solid #424242 !important;
+    border-radius: 4px !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: bold !important;
 }
 
-[data-testid="stSidebar"] > div:first-child {
-    width: 12rem !important;
-    min-width: 12rem !important;
-    max-width: 12rem !important;
+.stButton button:hover {
+    background-color: #2E2E2E !important;
+    border-color: #64B5F6 !important;
 }
 
-/* More compact sidebar content */
-[data-testid="stSidebar"] .block-container {
-    padding-top: 2rem !important;
-}
-
-/* Improve sidebar headings */
-[data-testid="stSidebar"] h1, 
-[data-testid="stSidebar"] h2, 
-[data-testid="stSidebar"] h3 {
-    font-size: 1.2rem !important;
-    margin-top: 1rem !important;
-    margin-bottom: 0.75rem !important;
-    color: #64B5F6 !important;
+.active-nav-button button {
+    background-color: #2979FF !important;
+    border-color: #2979FF !important;
 }
 
 /* Common styles for detail items */
@@ -425,49 +415,40 @@ section[data-testid="stSidebar"] ~ .css-1d391kg {
 </style>
 """, unsafe_allow_html=True)
 
-# Add a clear title for the main page
+# Main app title
 st.title("Contact Center AI Assistant")
 
-# Create horizontal navigation with buttons - using Streamlit buttons directly
-col1, col2, col3 = st.columns(3)
+# Create navigation buttons
+st.markdown("### Navigate")
+col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+
 with col1:
-    main_btn = st.button("🏠 Main Dashboard", use_container_width=True, 
-                      type="primary" if st.session_state.get("page", "main") == "main" else "secondary")
+    generate_btn = st.button("Generate Inquiry", use_container_width=True)
+    
 with col2:
-    inquiries_btn = st.button("📋 View Inquiries", use_container_width=True,
-                          type="primary" if st.session_state.get("page", "main") == "inquiries" else "secondary")
+    classify_btn = st.button("Classify Inquiry", use_container_width=True)
+    
 with col3:
-    analytics_btn = st.button("📊 Analytics Dashboard", use_container_width=True,
-                          type="primary" if st.session_state.get("page", "main") == "analytics" else "secondary")
+    inquiries_btn = st.button("View Inquiries", use_container_width=True)
+    
+with col4:
+    analytics_btn = st.button("Analytics", use_container_width=True)
 
-# Handle navigation
-if "page" not in st.session_state:
-    st.session_state["page"] = "main"
-
-if main_btn:
-    st.session_state["page"] = "main"
-if inquiries_btn:
+# Set the active page based on button clicks
+if generate_btn:
+    st.session_state["page"] = "generate"
+elif classify_btn:
+    st.session_state["page"] = "classify"
+elif inquiries_btn:
     st.session_state["page"] = "inquiries"
-if analytics_btn:
+elif analytics_btn:
     st.session_state["page"] = "analytics"
 
-# Show the current page content
-if st.session_state["page"] == "main":
-    # Remove the duplicate title, just generate the new inquiry section directly
-    st.header("Generate New Inquiry")
-elif st.session_state["page"] == "inquiries":
-    # Import and run view inquiries code
-    from pages.view_inquiries import show_inquiries
-    show_inquiries()
-    st.stop()  # Stop execution of the rest of the script
-elif st.session_state["page"] == "analytics":
-    # Import and run analytics code
-    from pages.analytics_dashboard import show_analytics
-    show_analytics()
-    st.stop()  # Stop execution of the rest of the script
+# Divider
+st.markdown("<hr>", unsafe_allow_html=True)
 
 ###############################################################################
-# 3) LOAD FAQ / TAXONOMY DATA
+# LOAD DATA FUNCTIONS
 ###############################################################################
 @st.cache_data
 def load_faq_csv():
@@ -1822,45 +1803,45 @@ if st.session_state["generated_scenario"]:
                 if faq_category and faq_category.lower() not in ["", "none", "n/a"]:
                     # First check if Category column exists
                     if "Category" in df_faq.columns:
-                    # Filter FAQ dataframe by the suggested category
+                        # Filter FAQ dataframe by the suggested category
                         category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower(), na=False)]
-                    if not category_matches.empty:
-                        # Look for the best match within this category
-                        best_match = None
-                        best_score = 0
-                        
-                        for _, row in category_matches.iterrows():
-                            question = str(row.get("Question", "")).lower()
-                            scenario_lower = scenario_text.lower()
-                            # Count significant word matches
-                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
-                            if score > best_score:
-                                best_score = score
-                                best_match = row["Question"]
-                        
-                        if best_match and best_score >= 2:  # Require at least 2 significant matches
-                            relevant_faq = best_match
-                            faq_relevance_score = best_score + 2  # Bonus for model-suggested category
-                    else:
-                        # If Category column doesn't exist, try searching in Type column instead
-                        if "Type" in df_faq.columns:
-                            category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
-                            if not category_matches.empty:
-                                # Same matching logic as above
-                                best_match = None
-                                best_score = 0
-                                
-                                for _, row in category_matches.iterrows():
-                                    question = str(row.get("Question", "")).lower()
-                                    scenario_lower = scenario_text.lower()
-                                    score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
-                                    if score > best_score:
-                                        best_score = score
-                                        best_match = row["Question"]
-                                
-                                if best_match and best_score >= 2:
+                        if not category_matches.empty:
+                            # Look for the best match within this category
+                            best_match = None
+                            best_score = 0
+                            
+                            for _, row in category_matches.iterrows():
+                                question = str(row.get("Question", "")).lower()
+                                scenario_lower = scenario_text.lower()
+                                # Count significant word matches
+                                score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                if score > best_score:
+                                    best_score = score
+                                    best_match = row["Question"]
+                            
+                                if best_match and best_score >= 2:  # Require at least 2 significant matches
                                     relevant_faq = best_match
-                                    faq_relevance_score = best_score + 2
+                                    faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+                            else:
+                                # If Category column doesn't exist, try searching in Type column instead
+                                if "Type" in df_faq.columns:
+                                    category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
+                                    if not category_matches.empty:
+                                        # Same matching logic as above
+                                        best_match = None
+                                        best_score = 0
+                                        
+                                        for _, row in category_matches.iterrows():
+                                            question = str(row.get("Question", "")).lower()
+                                            scenario_lower = scenario_text.lower()
+                                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                            if score > best_score:
+                                                best_score = score
+                                                best_match = row["Question"]
+                                        
+                                        if best_match and best_score >= 2:
+                                            relevant_faq = best_match
+                                            faq_relevance_score = best_score + 2
 
                 # If no FAQ found via category or low relevance, use our keyword matching function
                 if not relevant_faq or faq_relevance_score < 3:
@@ -1907,42 +1888,6 @@ if st.session_state["generated_scenario"]:
                     except Exception as e:
                         st.error(f"Could not generate response suggestion: {str(e)}")
 
-                # After displaying the classification card, add the agent action area
-                st.markdown("""
-                <div class="classification-card">
-                    <div class="classification-header">Agent Actions</div>
-                """, unsafe_allow_html=True)
-
-                # Case status selection
-                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
-                selected_status = st.selectbox(
-                    "Update Case Status:",
-                    options=case_status_options,
-                    index=case_status_options.index("New") if st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"] == "New" 
-                    else case_status_options.index(st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"])
-                )
-
-                # Agent notes text area
-                agent_notes = st.text_area(
-                    "Agent Notes:",
-                    value=st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["agent_notes"],
-                    height=150,
-                    placeholder="Enter your notes about the case here..."
-                )
-
-                # Save button for agent updates
-                if st.button("Save Agent Updates", use_container_width=True):
-                    # Update the DataFrame with the new status and notes
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "case_status"] = selected_status
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "agent_notes"] = agent_notes
-                    
-                    # Save to file
-                    save_inquiries_to_file()
-                    
-                    st.success(f"Case {st.session_state['current_case_id']} updated - Status: {selected_status}")
-
-                st.markdown("</div>", unsafe_allow_html=True)
-
                 # Add metrics for the classification tokens and cost
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
@@ -1964,31 +1909,15 @@ if st.session_state["generated_scenario"]:
                     total_cost = last_usage["total_cost"]
                     st.metric("Total Cost", f"${total_cost:.4f}")
                 
-                # Store all classification fields in the inquiries DataFrame
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "classification"] = classification_result.get("classification", "")
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "department"] = classification_result.get("department", "")
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "subdepartment"] = classification_result.get("subdepartment", "")
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "priority"] = classification_result.get("priority", "")
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "estimated_response_time"] = classification_result.get("estimated_response_time", "")
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "summary"] = classification_result.get("summary", "")
-                st.session_state["inquiries"].at[st.session_state["current_case_id"], "related_faq_category"] = classification_result.get("related_faq_category", "")
-                
-                # Also save the generated response suggestion if applicable
-                if inbound_route in ["email", "whatsapp"] and 'response_suggestion' in locals():
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "response_suggestion"] = response_suggestion
-                
-                # Save any relevant FAQ that was found
-                if relevant_faq and faq_relevance_score >= 3:
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq"] = relevant_faq
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "faq_relevance_score"] = faq_relevance_score
-                    # Also save the FAQ answer if available
-                    if 'relevant_answer' in locals() and relevant_answer:
-                        st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq_answer"] = relevant_answer
-                
-                # Save to file again to ensure all classification fields are stored
-                save_inquiries_to_file()
+                # Add option to view inquiries after classification
+                if st.button("View All Inquiries", use_container_width=True):
+                    st.session_state["page"] = "inquiries"
+                    st.experimental_rerun()
         else:
-            st.warning("No scenario text found. Generate a scenario first.")
+            st.info("Generate a scenario first before classification.")
+            if st.button("Go to Generate Inquiry", use_container_width=True):
+                st.session_state["page"] = "generate"
+                st.experimental_rerun()
 else:
     st.info("Generate a scenario above before classification.")
 
@@ -2586,3 +2515,822 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
+
+# Helper function to show analytics content
+def show_analytics():
+    """
+    Display the Analytics Dashboard content
+    """
+    st.header("Analytics Dashboard")
+    
+    # Load inquiries data
+    df = st.session_state["inquiries"]
+    
+    if len(df) > 0:
+        # Convert timestamp to datetime for analysis
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        except:
+            pass
+        
+        # Tabs for different analysis views
+        tab1, tab2, tab3 = st.tabs(["Overview Metrics", "Classification Analysis", "Time Analysis"])
+        
+        with tab1:
+            st.subheader("Overview Metrics")
+            
+            # Summary metrics in columns
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Inquiries", len(df))
+            
+            with col2:
+                # Calculate open cases (not resolved or closed)
+                if 'case_status' in df.columns:
+                    open_cases = df[~df['case_status'].isin(['Resolved', 'Closed'])].shape[0]
+                    st.metric("Open Cases", open_cases)
+                else:
+                    st.metric("Open Cases", "N/A")
+            
+            with col3:
+                # High priority cases
+                if 'priority' in df.columns:
+                    high_priority = df[df['priority'] == 'High'].shape[0]
+                    st.metric("High Priority Cases", high_priority)
+                else:
+                    st.metric("High Priority Cases", "N/A")
+            
+            with col4:
+                # Calculate average response time
+                if 'estimated_response_time' in df.columns:
+                    # Extract number of hours from strings like "24 hours"
+                    try:
+                        df['hours'] = df['estimated_response_time'].str.extract('(\d+)').astype(float)
+                        avg_time = df['hours'].mean()
+                        st.metric("Avg. Response Time", f"{avg_time:.1f} hours")
+                    except:
+                        st.metric("Avg. Response Time", "N/A")
+                else:
+                    st.metric("Avg. Response Time", "N/A")
+            
+            # Case Status Distribution
+            if 'case_status' in df.columns:
+                st.subheader("Case Status Distribution")
+                status_counts = df['case_status'].value_counts().reset_index()
+                status_counts.columns = ['Status', 'Count']
+                
+                fig = px.pie(status_counts, values='Count', names='Status', 
+                             color_discrete_sequence=px.colors.sequential.Viridis)
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="white")
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # User Type Distribution
+            if 'user_type' in df.columns:
+                st.subheader("User Type Distribution")
+                user_counts = df['user_type'].value_counts().reset_index()
+                user_counts.columns = ['User Type', 'Count']
+                
+                fig = px.bar(user_counts, x='User Type', y='Count', 
+                           color='Count', color_continuous_scale='Viridis')
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=10, r=10, t=30, b=10),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="white"),
+                    xaxis=dict(tickangle=0)
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            st.subheader("Classification Analysis")
+            
+            # Classification Distribution
+            if 'classification' in df.columns:
+                st.subheader("Classification Types")
+                class_counts = df['classification'].value_counts().reset_index()
+                class_counts.columns = ['Classification', 'Count']
+                
+                fig = px.bar(class_counts, x='Classification', y='Count', 
+                           color='Count', color_continuous_scale='Viridis')
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=10, r=10, t=30, b=10),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="white"),
+                    xaxis=dict(tickangle=-45)
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Priority Distribution
+            if 'priority' in df.columns:
+                st.subheader("Priority Distribution")
+                
+                # Custom order for priorities
+                priority_order = ['Low', 'Medium', 'High']
+                df['priority_ordered'] = pd.Categorical(df['priority'], categories=priority_order, ordered=True)
+                
+                priority_counts = df['priority_ordered'].value_counts().reset_index()
+                priority_counts.columns = ['Priority', 'Count']
+                
+                # Sort by our custom order
+                priority_counts = priority_counts.sort_values('Priority')
+                
+                # Custom colors for priorities
+                colors = {'Low': '#69f0ae', 'Medium': '#ffab40', 'High': '#ff5252'}
+                
+                fig = px.pie(priority_counts, values='Count', names='Priority',
+                             color='Priority', color_discrete_map=colors)
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                fig.update_layout(
+                    height=350,
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color="white")
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No inquiries data available for analysis.")
+
+# Helper function to show inquiries content
+def show_inquiries():
+    """
+    Display the View Inquiries page content
+    """
+    st.header("View Inquiries")
+    
+    # Load inquiries from session state
+    df = st.session_state["inquiries"]
+    
+    if len(df) > 0:
+        # Sort inquiries by timestamp in descending order (most recent first)
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        except:
+            # If timestamp conversion fails, just use the existing order
+            pass
+        
+        # Display the most recent inquiry card first with full details
+        st.subheader("Most Recent Inquiry")
+        
+        # Get the most recent inquiry
+        recent_row = df.iloc[0]
+        
+        # Create a collapsible container for the most recent inquiry
+        with st.expander("View Most Recent Inquiry", expanded=True):
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            
+            # Display header with classification and priority
+            st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin-bottom: 10px;'>{recent_row['classification']} (Priority: {recent_row['priority']})</div>", unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['timestamp']}</div>", unsafe_allow_html=True)
+                
+                if recent_row['inbound_route']:
+                    st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route']}</div>", unsafe_allow_html=True)
+                
+                if recent_row['ivr_flow']:
+                    st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['ivr_flow']}</div>", unsafe_allow_html=True)
+                
+                if recent_row['ivr_selections']:
+                    st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['ivr_selections']}</div>", unsafe_allow_html=True)
+            
+            with col2:
+                if recent_row['user_type']:
+                    st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
+                
+                if recent_row['phone_email']:
+                    st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['phone_email']}</div>", unsafe_allow_html=True)
+                
+                if recent_row['membership_id']:
+                    st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['membership_id']}</div>", unsafe_allow_html=True)
+            
+            # Classification summary section
+            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+            
+            if recent_row['classification']:
+                st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['classification']}</div>", unsafe_allow_html=True)
+            
+            if recent_row['priority']:
+                st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['priority']}</div>", unsafe_allow_html=True)
+            
+            if recent_row['summary']:
+                st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['summary']}</div>", unsafe_allow_html=True)
+            
+            # Add FAQ suggestion and response suggestion
+            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
+            
+            # First search for relevant FAQ
+            faq_category = ""
+            # Try to parse the classification result to get related_faq_category
+            try:
+                # Check if we can find something related to faq_category in the summary
+                if "faq" in recent_row['summary'].lower():
+                    faq_category = recent_row['summary'].lower().split("faq")[1].strip().strip(".:,")
+            except:
+                pass
+                
+            relevant_faq, faq_answer, faq_score = find_relevant_faq(recent_row['scenario_text'], df_faq)
+            
+            # Only display FAQ if it meets the relevance threshold
+            if relevant_faq and faq_score >= 3:
+                st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'><strong>Question:</strong> {str(relevant_faq)}</div>", unsafe_allow_html=True)
+                
+                # If we have an answer, display it as well
+                if faq_answer:
+                    st.markdown(f"<div class='inquiry-detail'><strong>Answer:</strong> {str(faq_answer)}</div>", unsafe_allow_html=True)
+            
+            # Generate response suggestion for email or whatsapp
+            inbound_route = recent_row['inbound_route']
+            if inbound_route in ["email", "whatsapp"]:
+                # Recreate scenario structure from row data
+                scenario_dict = {
+                    "inbound_route": recent_row['inbound_route'],
+                    "scenario_text": recent_row['scenario_text'],
+                    "user_type": recent_row['user_type'],
+                    "account_details": {
+                        "name": recent_row['account_name'],
+                        "location": recent_row['account_location'],
+                        "latest_reviews": recent_row['account_reviews'],
+                        "latest_jobs": recent_row['account_jobs'],
+                        "project_cost": recent_row['project_cost'],
+                        "payment_status": recent_row['payment_status']
+                    }
+                }
+                
+                # Recreate classification structure
+                classification_dict = {
+                    "classification": recent_row['classification'],
+                    "priority": recent_row['priority'],
+                    "summary": recent_row['summary']
+                }
+                
+                try:
+                    response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
+                        st.session_state["generated_scenario"], 
+                        classification_result
+                    )
+                    response_card = f"""
+                    <div class='classification-card'>
+                        <div class='classification-header'>Suggested {inbound_route.capitalize()} Response</div>
+                        <div class='field-value' style='white-space: pre-wrap;'>{str(response_text)}</div>
+                    </div>
+                    """
+                    st.markdown(response_card, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"Could not generate response suggestion: {str(e)}")
+            
+            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+        
+        # Show previous inquiries in a collapsible expander
+        if len(df) > 1:
+            with st.expander("See More Inquiries"):
+                # Show the rest of the inquiries (excluding the most recent one)
+                for idx, row in df.iloc[1:].iterrows():
+                    # Use a header for each inquiry instead of a nested expander
+                    st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin: 20px 0 10px 0;'>Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
+                        
+                        if row['inbound_route']:
+                            st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                        
+                        if row['ivr_flow']:
+                            st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                        
+                        if row['ivr_selections']:
+                            st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
+                    
+                    with col2:
+                        if row['user_type']:
+                            st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
+                        
+                        if row['phone_email']:
+                            st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                        
+                        if row['membership_id']:
+                            st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+                    
+                    # Classification summary section only
+                    st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+                    
+                    if row['classification']:
+                        st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+                    
+                    if row['priority']:
+                        st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+                    
+                    if row['summary']:
+                        st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    else:
+        st.info("No inquiries logged yet. Generate and classify a scenario.")
+
+# Now display the content based on the current page
+if st.session_state["page"] == "generate":
+    st.header("Generate New Inquiry")
+    
+    # Call the existing code from the main section
+    # Select which inbound route to generate the scenario from
+    st.subheader("Select Inbound Route")
+    inbound_col1, inbound_col2 = st.columns(2)
+    
+    route_options = ["phone", "email", "whatsapp", "web_form"]
+    icons = ["☎️", "✉️", "📱", "🖥️"]
+    
+    # Create a visual selector for inbound routes
+    selected_route = None
+    for i, (route, icon) in enumerate(zip(route_options, icons)):
+        if i < 2:
+            with inbound_col1:
+                if st.button(f"{icon} {route.capitalize()}", key=f"route_{route}", use_container_width=True):
+                    selected_route = route
+        else:
+            with inbound_col2:
+                if st.button(f"{icon} {route.capitalize()}", key=f"route_{route}", use_container_width=True):
+                    selected_route = route
+    
+    # Display user type selector if a route is selected
+    if selected_route or "selected_route" in st.session_state:
+        if selected_route:
+            st.session_state["selected_route"] = selected_route
+        else:
+            selected_route = st.session_state.get("selected_route")
+        
+        st.subheader("Select User Type")
+        user_col1, user_col2 = st.columns(2)
+        
+        user_options = ["existing_homeowner", "prospective_homeowner", "existing_tradesperson", "prospective_tradesperson"]
+        user_friendly = ["Existing Homeowner", "Prospective Homeowner", "Existing Tradesperson", "Prospective Tradesperson"]
+        user_icons = ["🏠", "🔍", "🔧", "👷"]
+        
+        # Create a visual selector for user types
+        selected_user = None
+        for i, (user, friendly, icon) in enumerate(zip(user_options, user_friendly, user_icons)):
+            if i < 2:
+                with user_col1:
+                    if st.button(f"{icon} {friendly}", key=f"user_{user}", use_container_width=True):
+                        selected_user = user
+            else:
+                with user_col2:
+                    if st.button(f"{icon} {friendly}", key=f"user_{user}", use_container_width=True):
+                        selected_user = user
+        
+        # Generate button - only enabled if user type is selected
+        if selected_user or "selected_user" in st.session_state:
+            if selected_user:
+                st.session_state["selected_user"] = selected_user
+            else:
+                selected_user = st.session_state.get("selected_user")
+            
+            if st.button("🚀 Generate Scenario", type="primary", use_container_width=True):
+                with st.spinner("Generating scenario..."):
+                    # Generate a new scenario based on the selected options
+                    scenario = generate_scenario(selected_route, selected_user)
+                    st.session_state["generated_scenario"] = scenario
+                    
+                    # Reset classification result
+                    st.session_state["classified"] = False
+                    
+                    # After generating, switch to the classify tab
+                    st.session_state["page"] = "classify"
+                    st.experimental_rerun()
+
+elif st.session_state["page"] == "classify":
+    st.header("Classify Inquiry")
+    
+    # Check if we have a generated scenario
+    if "generated_scenario" in st.session_state and st.session_state["generated_scenario"]:
+        scenario = st.session_state["generated_scenario"]
+        scenario_text = scenario.get("scenario_text", "")
+        
+        # Display the generated scenario
+        st.subheader("Generated Scenario")
+        
+        # Display scenario in a container with better styling
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            # Display basic information
+            st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{scenario.get('inbound_route', 'Unknown').capitalize()}</div>", unsafe_allow_html=True)
+            
+            # Display IVR information if it's a phone route
+            if scenario.get("inbound_route") == "phone" and "ivr_flow" in scenario:
+                st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{scenario.get('ivr_flow', 'Unknown')}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                # Process IVR selections if they're in a list format
+                ivr_selections = scenario.get('ivr_selections', [])
+                if isinstance(ivr_selections, list):
+                    ivr_text = ", ".join(str(s) for s in ivr_selections)
+                else:
+                    ivr_text = str(ivr_selections)
+                st.markdown(f"<div class='inquiry-detail'>{ivr_text}</div>", unsafe_allow_html=True)
+                
+        with col2:
+            # Display contact and user type information
+            st.markdown("<div class='inquiry-label'>Contact:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'>{scenario.get('phone_email', 'Unknown')}</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+            user_type = scenario.get('user_type', 'Unknown')
+            # Make the user type more readable
+            user_type_display = user_type.replace('_', ' ').title()
+            st.markdown(f"<div class='inquiry-detail'>{user_type_display}</div>", unsafe_allow_html=True)
+            
+            # Display membership ID if available
+            if "membership_id" in scenario and scenario["membership_id"]:
+                st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{scenario.get('membership_id', 'Unknown')}</div>", unsafe_allow_html=True)
+        
+        # Display account information if available
+        if "account_details" in scenario and scenario["account_details"]:
+            account = scenario["account_details"]
+            if any(account.values()):  # Check if any account details exist
+                st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
+                
+                acc_col1, acc_col2 = st.columns(2)
+                
+                with acc_col1:
+                    if account.get("name"):
+                        st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{account.get('name')}</div>", unsafe_allow_html=True)
+                    
+                    if account.get("location"):
+                        st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{account.get('location')}</div>", unsafe_allow_html=True)
+                
+                with acc_col2:
+                    if account.get("latest_reviews"):
+                        st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{account.get('latest_reviews')}</div>", unsafe_allow_html=True)
+                    
+                    if account.get("latest_jobs"):
+                        st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{account.get('latest_jobs')}</div>", unsafe_allow_html=True)
+                
+                # Show project details if available
+                if account.get("project_cost") or account.get("payment_status"):
+                    st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
+                    
+                    details = []
+                    if account.get("project_cost"):
+                        details.append(f"Cost: {account.get('project_cost')}")
+                    if account.get("payment_status"):
+                        details.append(f"Status: {account.get('payment_status')}")
+                    
+                    st.markdown(f"<div class='inquiry-detail'>{' - '.join(details)}</div>", unsafe_allow_html=True)
+        
+        # Display scenario text
+        st.markdown("<div class='inquiry-section'>Scenario</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-detail'>{scenario_text}</div>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)  # Close info-container
+        
+        # Add classification button
+        if not st.session_state.get("classified", False):
+            if st.button("🧠 Classify Inquiry", type="primary", use_container_width=True):
+                with st.spinner("Classifying..."):
+                    # Call the classification function
+                    classification_result = classify_scenario(scenario_text)
+                    st.session_state["classification_result"] = classification_result
+                    st.session_state["classified"] = True
+                    
+                    # Store in inquiries dataset
+                    new_row = {
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "inbound_route": scenario.get("inbound_route", ""),
+                        "ivr_flow": scenario.get("ivr_flow", ""),
+                        "ivr_selections": self_process_ivr_selections(scenario.get("ivr_selections", "")),
+                        "user_type": scenario.get("user_type", ""),
+                        "phone_email": scenario.get("phone_email", ""),
+                        "membership_id": scenario.get("membership_id", ""),
+                        "scenario_text": scenario_text,
+                        "classification": classification_result.get("classification", ""),
+                        "department": classification_result.get("department", ""),
+                        "subdepartment": classification_result.get("subdepartment", ""),
+                        "priority": classification_result.get("priority", ""),
+                        "summary": classification_result.get("summary", ""),
+                        "related_faq_category": classification_result.get("related_faq_category", ""),
+                        "estimated_response_time": classification_result.get("estimated_response_time", ""),
+                        "case_status": "New",
+                        "agent_notes": ""
+                    }
+                    
+                    # Add account details if available
+                    if "account_details" in scenario and scenario["account_details"]:
+                        account = scenario["account_details"]
+                        new_row["account_name"] = account.get("name", "")
+                        new_row["account_location"] = account.get("location", "")
+                        new_row["account_reviews"] = account.get("latest_reviews", "")
+                        new_row["account_jobs"] = account.get("latest_jobs", "")
+                        new_row["project_cost"] = account.get("project_cost", "")
+                        new_row["payment_status"] = account.get("payment_status", "")
+                    else:
+                        # Add empty account fields
+                        new_row["account_name"] = ""
+                        new_row["account_location"] = ""
+                        new_row["account_reviews"] = ""
+                        new_row["account_jobs"] = ""
+                        new_row["project_cost"] = ""
+                        new_row["payment_status"] = ""
+                    
+                    # Add to the dataset
+                    st.session_state["inquiries"] = pd.concat(
+                        [st.session_state["inquiries"], pd.DataFrame([new_row])],
+                        ignore_index=True
+                    )
+                    
+                    # Set the current case ID to the most recent inquiry
+                    st.session_state["current_case_id"] = len(st.session_state["inquiries"]) - 1
+                    
+                    # Save to file
+                    save_inquiries_to_file()
+                    
+                    # Rerun to show classification results
+                    st.experimental_rerun()
+        
+        # Display classification results if available
+        if st.session_state.get("classified", False) and "classification_result" in st.session_state:
+            classification_result = st.session_state["classification_result"]
+            
+            st.subheader("Classification Results")
+            
+            # Display the classification card
+            st.markdown(f"""
+            <div class="classification-card">
+                <div class="classification-header">Classification Summary</div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Classification:</div>
+                    <div class='result-value'>
+                        <span class='badge' style='background-color: #4285F4;'>
+                            {classification_result.get("classification", "Unknown")}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Department:</div>
+                    <div class='result-value'>{classification_result.get("department", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Subdepartment:</div>
+                    <div class='result-value'>{classification_result.get("subdepartment", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Priority:</div>
+                    <div class='result-value'>
+                        <span class='badge' style='background-color: {
+                            "#ff5252" if classification_result.get("priority", "") == "High" else
+                            "#ffab40" if classification_result.get("priority", "") == "Medium" else
+                            "#69f0ae" if classification_result.get("priority", "") == "Low" else
+                            "#9e9e9e"
+                        };'>
+                            {classification_result.get("priority", "Unknown")}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Estimated Response Time:</div>
+                    <div class='result-value'>{classification_result.get("estimated_response_time", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Summary:</div>
+                    <div class='result-value'>{classification_result.get("summary", "No summary available")}</div>
+                </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Get relevant FAQ based on the classification result and scenario text
+                faq_category = classification_result.get("related_faq_category", "")
+                relevant_faq = None
+                faq_relevance_score = 0
+
+                # First try to use the model's suggested FAQ category
+                if faq_category and faq_category.lower() not in ["", "none", "n/a"]:
+                    # First check if Category column exists
+                    if "Category" in df_faq.columns:
+                        # Filter FAQ dataframe by the suggested category
+                        category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower(), na=False)]
+                        if not category_matches.empty:
+                            # Look for the best match within this category
+                            best_match = None
+                            best_score = 0
+                            
+                            for _, row in category_matches.iterrows():
+                                question = str(row.get("Question", "")).lower()
+                                scenario_lower = scenario_text.lower()
+                                # Count significant word matches
+                                score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                if score > best_score:
+                                    best_score = score
+                                    best_match = row["Question"]
+                                
+                                if best_match and best_score >= 2:  # Require at least 2 significant matches
+                                    relevant_faq = best_match
+                                    faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+                            else:
+                                # If Category column doesn't exist, try searching in Type column instead
+                                if "Type" in df_faq.columns:
+                                    category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
+                                    if not category_matches.empty:
+                                        # Same matching logic as above
+                                        best_match = None
+                                        best_score = 0
+                                        
+                                        for _, row in category_matches.iterrows():
+                                            question = str(row.get("Question", "")).lower()
+                                            scenario_lower = scenario_text.lower()
+                                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                            if score > best_score:
+                                                best_score = score
+                                                best_match = row["Question"]
+                                        
+                                        if best_match and best_score >= 2:
+                                            relevant_faq = best_match
+                                            faq_relevance_score = best_score + 2
+
+                # If no FAQ found via category or low relevance, use our keyword matching function
+                if not relevant_faq or faq_relevance_score < 3:
+                    keyword_faq, keyword_answer, keyword_score = find_relevant_faq(scenario_text, df_faq)
+                    if keyword_faq and keyword_score >= 3:  # Higher threshold for keyword matching
+                        # If we already have a FAQ but this one is more relevant, replace it
+                        if keyword_score > faq_relevance_score:
+                            relevant_faq = keyword_faq
+                            relevant_answer = keyword_answer
+                            faq_relevance_score = keyword_score
+
+                # Only display FAQ if we have a sufficiently relevant match
+                if relevant_faq and faq_relevance_score >= 3:
+                    faq_content = f"""
+                    <div class="classification-card">
+                        <div class="classification-header">Relevant FAQ</div>
+                        <div class="field-value"><strong>Question:</strong> {str(relevant_faq)}</div>
+                    """
+                    
+                    # If we have an answer, display it as well
+                    if 'relevant_answer' in locals() and relevant_answer:
+                        faq_content += f"""
+                        <div class="field-value"><strong>Answer:</strong> {str(relevant_answer)}</div>
+                        """
+                    
+                    faq_content += "</div>"
+                    st.markdown(faq_content, unsafe_allow_html=True)
+                
+                # Generate response suggestion for email or whatsapp
+                inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
+                if inbound_route in ["email", "whatsapp"]:
+                    try:
+                        response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
+                            st.session_state["generated_scenario"], 
+                            classification_result
+                        )
+                        response_card = f"""
+                        <div class='classification-card'>
+                            <div class='classification-header'>Suggested {inbound_route.capitalize()} Response</div>
+                            <div class='field-value' style='white-space: pre-wrap;'>{str(response_text)}</div>
+                        </div>
+                        """
+                        st.markdown(response_card, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Could not generate response suggestion: {str(e)}")
+
+                # After displaying the classification card, add the agent action area
+                st.markdown("""
+                <div class="classification-card">
+                    <div class="classification-header">Agent Actions</div>
+                """, unsafe_allow_html=True)
+
+                # Case status selection
+                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                selected_status = st.selectbox(
+                    "Update Case Status:",
+                    options=case_status_options,
+                    index=case_status_options.index("New") if st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"] == "New" 
+                    else case_status_options.index(st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"])
+                )
+
+                # Agent notes text area
+                agent_notes = st.text_area(
+                    "Agent Notes:",
+                    value=st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["agent_notes"],
+                    height=150,
+                    placeholder="Enter your notes about the case here..."
+                )
+
+                # Save button for agent updates
+                if st.button("Save Agent Updates", use_container_width=True):
+                    # Update the DataFrame with the new status and notes
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "case_status"] = selected_status
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "agent_notes"] = agent_notes
+                    
+                    # Save to file
+                    save_inquiries_to_file()
+                    
+                    st.success(f"Case {st.session_state['current_case_id']} updated - Status: {selected_status}")
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Add metrics for the classification tokens and cost
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    last_usage = st.session_state["token_usage"]["generations"][-1]
+                    response_time = last_usage["response_time"]
+                    st.metric("Response Time", f"{response_time:.2f}s")
+                
+                with col2:
+                    input_tokens = last_usage["input_tokens"] 
+                    input_cost = last_usage["input_cost"]
+                    st.metric("Input Tokens", f"{input_tokens} (${input_cost:.4f})")
+                
+                with col3:
+                    output_tokens = last_usage["output_tokens"]
+                    output_cost = last_usage["output_cost"]
+                    st.metric("Output Tokens", f"{output_tokens} (${output_cost:.4f})")
+                    
+                with col4:
+                    total_cost = last_usage["total_cost"]
+                    st.metric("Total Cost", f"${total_cost:.4f}")
+                
+                # Store all classification fields in the inquiries DataFrame
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "classification"] = classification_result.get("classification", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "department"] = classification_result.get("department", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "subdepartment"] = classification_result.get("subdepartment", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "priority"] = classification_result.get("priority", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "estimated_response_time"] = classification_result.get("estimated_response_time", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "summary"] = classification_result.get("summary", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "related_faq_category"] = classification_result.get("related_faq_category", "")
+                
+                # Also save the generated response suggestion if applicable
+                if inbound_route in ["email", "whatsapp"] and 'response_suggestion' in locals():
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "response_suggestion"] = response_suggestion
+                
+                # Save any relevant FAQ that was found
+                if relevant_faq and faq_relevance_score >= 3:
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq"] = relevant_faq
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "faq_relevance_score"] = faq_relevance_score
+                    # Also save the FAQ answer if available
+                    if 'relevant_answer' in locals() and relevant_answer:
+                        st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq_answer"] = relevant_answer
+                
+                # Save to file again to ensure all classification fields are stored
+                save_inquiries_to_file()
+        else:
+            st.warning("No scenario text found. Generate a scenario first.")
+else:
+    st.info("Generate a scenario above before classification.")
+
+elif st.session_state["page"] == "inquiries":
+    # Show the inquiries page
+    show_inquiries()
+    
+elif st.session_state["page"] == "analytics":
+    # Show the analytics page
+    show_analytics()
