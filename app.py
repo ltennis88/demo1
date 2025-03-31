@@ -1160,7 +1160,7 @@ def generate_response_suggestion(scenario, classification_result):
         prompt = prompt.replace("{{FAQ}}", faq_prompt)
         
         # Add the scenario at the appropriate placeholder
-        prompt = prompt.replace("{{SCENARIO}}", scenario)
+        prompt = prompt.replace("{{SCENARIO}}", scenario_text)
         
         # Token count already considered in the session state
         input_tokens = st.session_state.cached_response_prompt_tokens
@@ -1176,7 +1176,7 @@ def generate_response_suggestion(scenario, classification_result):
         
         {faq_prompt}
         
-        Inquiry: {scenario}
+        Inquiry: {scenario_text}
         
         Write a professional and helpful response that:
         1. Acknowledges the customer's concern
