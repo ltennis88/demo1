@@ -1718,50 +1718,77 @@ if st.session_state["generated_scenario"]:
                 elif new_row["priority"] == "Low":
                     priority_class = "priority-low"
                 
-                # Render the classification card
+                # Create classification section with Streamlit components instead of raw HTML
+                st.markdown("<h3>Classification Results</h3>", unsafe_allow_html=True)
+                
+                # Create a styled container for the classification results
                 st.markdown("""
-                <div class="classification-card">
-                    <div class="classification-header">Classification Results</div>
-                    
-                    <div class="classification-field">
-                        <div class="field-label">Classification:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    
-                    <div class="classification-field">
-                        <div class="field-label">Department:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    
-                    <div class="classification-field">
-                        <div class="field-label">Subdepartment:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    
-                    <div class="classification-field">
-                        <div class="field-label">Priority:</div>
-                        <div class="field-value"><span class="priority-{}">{}</span></div>
-                    </div>
-                    
-                    <div class="classification-field">
-                        <div class="field-label">Estimated Response Time:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    
-                    <div class="classification-field">
-                        <div class="field-label">Summary:</div>
-                        <div class="field-value">{}</div>
+                <style>
+                .styled-container {
+                    background-color: #1E1E1E;
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                    border: 1px solid #424242;
+                }
+                .result-row {
+                    display: flex;
+                    margin-bottom: 12px;
+                }
+                .result-label {
+                    width: 220px;
+                    font-weight: bold;
+                    color: #64B5F6;
+                }
+                .result-value {
+                    flex-grow: 1;
+                    background-color: #2C2C2C;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Start the styled container
+                st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
+                
+                # Create each classification field with proper formatting
+                st.markdown(f"""
+                <div class='result-row'>
+                    <div class='result-label'>Classification:</div>
+                    <div class='result-value'>{classification_result.get("classification", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Department:</div>
+                    <div class='result-value'>{classification_result.get("department", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Subdepartment:</div>
+                    <div class='result-value'>{classification_result.get("subdepartment", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Priority:</div>
+                    <div class='result-value'>
+                        <span class='priority-{classification_result.get("priority", "medium").lower()}'>
+                            {classification_result.get("priority", "Medium")}
+                        </span>
                     </div>
                 </div>
-                """.format(
-                    classification_result.get("classification", "Unknown"),
-                    classification_result.get("department", "Unknown"),
-                    classification_result.get("subdepartment", "Unknown"),
-                    classification_result.get("priority", "medium").lower(),
-                    classification_result.get("priority", "Medium"),
-                    classification_result.get("estimated_response_time", "Unknown"),
-                    classification_result.get("summary", "No summary available")
-                ), unsafe_allow_html=True)
+                
+                <div class='result-row'>
+                    <div class='result-label'>Estimated Response Time:</div>
+                    <div class='result-value'>{classification_result.get("estimated_response_time", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Summary:</div>
+                    <div class='result-value'>{classification_result.get("summary", "No summary available")}</div>
+                </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 # Get relevant FAQ based on the classification result and scenario text
                 faq_category = classification_result.get("related_faq_category", "")
