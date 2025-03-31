@@ -1522,76 +1522,6 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 ###############################################################################
 # 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
 ###############################################################################
-def find_relevant_faq(scenario_text, faq_dataframe):
-    """Find the most relevant FAQ for a given scenario using semantic search."""
-    try:
-        # Use cached base context for the scenario prompt
-        base_context = build_base_context()
-        
-        # Get the optimized FAQ dictionary from session state
-        faq_dict = st.session_state.get('faq_dict', {})
-        if not faq_dict:
-            _, faq_dict = load_faq_csv()
-            
-        # First try quick keyword matching
-        scenario_keywords = set(word.lower() for word in str(scenario_text).split())
-        best_match = None
-        best_score = 0
-        
-        try:
-            # Try semantic search with OpenAI
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Extract key topics from this customer scenario."},
-                    {"role": "user", "content": scenario_text}
-                ],
-                temperature=0,
-                max_tokens=150
-            )
-            
-            # Extract key topics from the response
-            key_topics = response.choices[0].message.content
-            
-            # Cache the key topics for this scenario
-            if 'faq_key_topics' not in st.session_state:
-                st.session_state['faq_key_topics'] = {}
-            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
-            
-            # Score FAQs in parallel
-            with ThreadPoolExecutor() as executor:
-                scores = list(executor.map(
-                    lambda faq: score_faq_relevance(key_topics, faq),
-                    faq_dict.values()
-                ))
-            
-            # Find best match
-            best_score = max(scores) if scores else 0
-            if best_score >= 7:
-                best_idx = scores.index(best_score)
-                best_match = list(faq_dict.keys())[best_idx]
-                return best_match, faq_dict[best_match], best_score
-                
-        except Exception as e:
-            st.error(f"Error in semantic search: {str(e)}")
-            
-        # If semantic search fails or no good match, try keyword matching
-        for question, answer in faq_dict.items():
-            faq_keywords = set(word.lower() for word in str(question).split())
-            common_words = scenario_keywords & faq_keywords
-            if len(common_words) > best_score:
-                best_score = len(common_words)
-                best_match = question
-        
-        if best_match and best_score > 0:
-            return best_match, faq_dict[best_match], best_score
-            
-        return None, None, 0
-        
-    except Exception as e:
-        st.error(f"Error in FAQ matching: {str(e)}")
-        return None, None, 0
-
 def score_faq_relevance(key_topics, faq_entry):
     """Score a single FAQ's relevance - runs in parallel"""
     try:
@@ -1623,12 +1553,83 @@ def score_faq_relevance(key_topics, faq_entry):
         )
         
         try:
-            relevance_score = float(score_response.choices[0].message.content.strip())
-            return relevance_score, faq_entry['question'], faq_entry['answer']
-        except ValueError:
-            return 0, None, None
+            # Extract just the score as a float
+            relevance_score = float(score_response['choices'][0]['message']['content'].strip())
+            return relevance_score
+        except (ValueError, KeyError, TypeError):
+            return 0
     except Exception:
-        return 0, None, None
+        return 0
+
+def find_relevant_faq(scenario_text, faq_dataframe):
+    """Find the most relevant FAQ for a given scenario using semantic search."""
+    try:
+        # Use cached base context for the scenario prompt
+        base_context = build_base_context()
+        
+        # Get the optimized FAQ dictionary from session state
+        faq_dict = st.session_state.get('faq_dict', {})
+        if not faq_dict:
+            _, faq_dict = load_faq_csv()
+            
+        # First try quick keyword matching
+        scenario_keywords = set(word.lower() for word in str(scenario_text).split())
+        best_match = None
+        best_score = 0
+        best_answer = None
+        
+        try:
+            # Try semantic search with OpenAI
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Extract key topics from this customer scenario."},
+                    {"role": "user", "content": str(scenario_text)}
+                ],
+                temperature=0,
+                max_tokens=150
+            )
+            
+            # Extract key topics from the response
+            key_topics = response['choices'][0]['message']['content']
+            
+            # Cache the key topics for this scenario
+            if 'faq_key_topics' not in st.session_state:
+                st.session_state['faq_key_topics'] = {}
+            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+            
+            # Score each FAQ
+            for question, faq_data in faq_dict.items():
+                score = score_faq_relevance(key_topics, faq_data)
+                if score > best_score:
+                    best_score = score
+                    best_match = question
+                    best_answer = faq_data.get('answer', '')
+            
+            if best_match and best_score >= 7:
+                return best_match, best_answer, best_score
+                
+        except Exception as e:
+            st.error(f"Error in semantic search: {str(e)}")
+            
+        # If semantic search fails or no good match, try keyword matching
+        for question, faq_data in faq_dict.items():
+            faq_keywords = set(word.lower() for word in str(question).split())
+            common_words = scenario_keywords & faq_keywords
+            score = len(common_words)
+            if score > best_score:
+                best_score = score
+                best_match = question
+                best_answer = faq_data.get('answer', '')
+        
+        if best_match and best_score > 0:
+            return best_match, best_answer, best_score
+            
+        return None, None, 0
+        
+    except Exception as e:
+        st.error(f"Error in FAQ matching: {str(e)}")
+        return None, None, 0
 
 ###############################################################################
 # RESPONSE SUGGESTION HELPER FUNCTIONS
