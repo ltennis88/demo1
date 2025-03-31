@@ -2275,21 +2275,22 @@ if st.session_state["generated_scenario"]:
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     last_usage = st.session_state["token_usage"]["generations"][-1]
-                    response_time = last_usage["response_time"]
+                    response_time = last_usage.get("response_time", 0)
                     st.metric("Response Time", f"{response_time:.2f}s")
                 
                 with col2:
-                    input_tokens = last_usage["input_tokens"] 
-                    input_cost = last_usage["input_cost"]
+                    # Handle both token usage data structures
+                    input_tokens = last_usage.get("input_tokens", last_usage.get("cached_input_tokens", 0) + last_usage.get("non_cached_input_tokens", 0))
+                    input_cost = last_usage.get("input_cost", last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0))
                     st.metric("Input Tokens", f"{input_tokens} (${input_cost:.4f})")
                 
                 with col3:
-                    output_tokens = last_usage["output_tokens"]
-                    output_cost = last_usage["output_cost"]
+                    output_tokens = last_usage.get("output_tokens", 0)
+                    output_cost = last_usage.get("output_cost", 0)
                     st.metric("Output Tokens", f"{output_tokens} (${output_cost:.4f})")
                     
                 with col4:
-                    total_cost = last_usage["total_cost"]
+                    total_cost = last_usage.get("total_cost", 0)
                     st.metric("Total Cost", f"${total_cost:.4f}")
                 
                 # Store all classification fields in the inquiries DataFrame
@@ -2302,7 +2303,7 @@ if st.session_state["generated_scenario"]:
                 st.session_state["inquiries"].at[st.session_state["current_case_id"], "related_faq_category"] = classification_result.get("related_faq_category", "")
                 
                 # Also save the generated response suggestion if applicable
-                if inbound_route in ["email", "whatsapp"] and 'response_suggestion' in locals():
+                if inbound_route in ["email", "whatsapp", "webform"] and 'response_suggestion' in locals():
                     st.session_state["inquiries"].at[st.session_state["current_case_id"], "response_suggestion"] = response_suggestion
                 
                 # Save any relevant FAQ that was found
