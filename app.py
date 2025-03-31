@@ -171,9 +171,9 @@ st.title("Checkatrade Contact Center AI Assistant")
 # Create horizontal navigation with buttons
 st.markdown("""
 <div class="nav-container">
-    <a href="#" onclick="parent.location.hash=''; return false;" class="nav-button active">🏠 Main Dashboard</a>
-    <a href="#view-inquiries" onclick="parent.location.hash='view-inquiries'; return false;" class="nav-button">📋 View Inquiries</a>
-    <a href="#analytics" onclick="parent.location.hash='analytics'; return false;" class="nav-button">📊 Analytics Dashboard</a>
+    <a href="/" class="nav-button active">🏠 Main Dashboard</a>
+    <a href="1_📋_View_Inquiries" class="nav-button">📋 View Inquiries</a>
+    <a href="2_📊_Dashboard" class="nav-button">📊 Analytics Dashboard</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -252,26 +252,22 @@ def save_inquiries_to_file():
         # Convert DataFrame to JSON and save with nice formatting
         json_data = df_copy.to_dict(orient="records")
         
-        # Log instead of using sidebar which might not be initialized yet
+        # Save to file locally first - this will always work
         print(f"Saving {len(json_data)} inquiries to file")
-        
         with open("inquiries.json", "w") as f:
             json.dump(json_data, f, indent=2)
         
-        # Execute Git commands and log results
-        git_add = os.system('git add inquiries.json')
-        print(f"Git add exit code: {git_add}")
+        # Show a success message in the UI
+        st.success(f"Successfully saved {len(json_data)} inquiries to local file.")
         
-        git_commit = os.system('git commit -m "Updated inquiries database with new entries"')
-        print(f"Git commit exit code: {git_commit}")
+        # Note: GitHub integration is disabled in this demo
+        # In a production app, you would need to use a GitHub API token
+        # and proper authentication to push data to GitHub
         
-        git_push = os.system('git push origin main')
-        print(f"Git push exit code: {git_push}")
-        
-        print("Inquiries saved to file and pushed to GitHub!")
         return True
     except Exception as e:
         print(f"Failed to save inquiries to file: {str(e)}")
+        st.error(f"Failed to save inquiries to file: {str(e)}")
         return False
 
 if "inquiries" not in st.session_state:

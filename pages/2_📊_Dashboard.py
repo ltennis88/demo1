@@ -90,9 +90,9 @@ st.title("Analytics Dashboard")
 # Create horizontal navigation with buttons
 st.markdown("""
 <div class="nav-container">
-    <a href="#" onclick="parent.location.hash=''; return false;" class="nav-button">🏠 Main Dashboard</a>
-    <a href="#view-inquiries" onclick="parent.location.hash='view-inquiries'; return false;" class="nav-button">📋 View Inquiries</a>
-    <a href="#analytics" onclick="parent.location.hash='analytics'; return false;" class="nav-button active">📊 Analytics Dashboard</a>
+    <a href="/" class="nav-button">🏠 Main Dashboard</a>
+    <a href="1_📋_View_Inquiries" class="nav-button">📋 View Inquiries</a>
+    <a href="2_📊_Dashboard" class="nav-button active">📊 Analytics Dashboard</a>
 </div>
 """, unsafe_allow_html=True)
 
