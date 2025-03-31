@@ -364,17 +364,50 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     # For random user type, we'll randomize it ourselves to ensure true randomness
     should_randomize_user_type = selected_user_type is None
     
-    # Build a more diverse prompt by specifying diversity requirements
-    diversity_instructions = """
-    IMPORTANT: Ensure true randomness and diversity in scenario generation:
-    1. Randomize user_type among all four options (don't always use existing_homeowner)
-    2. Base the scenario_text on different topics from the FAQ/taxonomy data provided
-    3. Don't repeatedly use the Home Health Check report issue
-    4. Create a wide variety of realistic customer inquiries that reflect different service needs
+    # Add strict validation rules for scenario generation
+    validation_rules = """
+    STRICT SCENARIO VALIDATION:
+    
+    1. For EXISTING TRADESPERSON scenarios:
+       - Scenario MUST be about: membership management, profile updates, customer reviews, or business operations
+       - Account details MUST show reviews RECEIVED from customers
+       - Latest jobs MUST be work THEY did for others
+       - NEVER generate scenarios about them seeking services or hiring other tradespeople
+       Example scenarios:
+       * "Need to update my insurance certificate for my membership renewal"
+       * "How do I respond to the customer review I received yesterday?"
+       * "Having trouble uploading new photos to my business profile"
+    
+    2. For PROSPECTIVE TRADESPERSON scenarios:
+       - Scenario MUST be about: joining process, membership benefits, or application requirements
+       - NO account details or membership ID should be included
+       - NEVER generate scenarios about them seeking services
+       Example scenarios:
+       * "What documents do I need to submit for my membership application?"
+       * "Can you explain the vetting process for new tradespeople?"
+       * "What are the membership fees and payment options?"
+    
+    3. For EXISTING HOMEOWNER scenarios:
+       - Scenario MUST be about: finding services, leaving reviews, or discussing work done FOR them
+       - Account details MUST show reviews THEY gave about work done FOR them
+       - Latest jobs MUST be work done FOR them by tradespeople
+       Example scenarios:
+       * "Want to leave a review for the plumber who fixed my bathroom"
+       * "The electrician hasn't completed the rewiring job they started"
+       * "Need to find a reliable roofer in my area"
+    
+    4. For PROSPECTIVE HOMEOWNER scenarios:
+       - Scenario MUST be about: finding tradespeople or understanding Checkatrade's service
+       - NO account details should be included
+       - NEVER reference past jobs or reviews
+       Example scenarios:
+       * "How do I find a reliable plumber through Checkatrade?"
+       * "What checks do you do on your tradespeople?"
+       * "Do you cover my area for building work?"
     """
     
     # Start with base prompt
-    user_content = scenario_generator_prompt_strict + diversity_instructions
+    user_content = scenario_generator_prompt_strict + validation_rules
     
     # Add route and user type instructions
     if selected_route and selected_user_type:
