@@ -1262,8 +1262,14 @@ def classify_scenario(text):
     # Start timing
     start_time = time.time()
     
+    # Load FAQ data
+    faq_df = load_faq_csv()
+    
+    # Build comprehensive context including guarantee terms
+    context = build_context(faq_df, text)
+    
     # Enhanced classification prompt with departments and subdepartments
-    enhanced_classification_prompt = classification_prompt_template.replace("{SCENARIO}", text)
+    enhanced_classification_prompt = classification_prompt_template.replace("{SCENARIO}", context)
     enhanced_classification_prompt += """
     
     Please also identify:
@@ -1562,88 +1568,33 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     return None, None, 0
 
 def generate_response_suggestion(scenario, classification_result):
-    """Generate a response suggestion based on classification and FAQ matching"""
     # Load FAQ data
-    faq_data = load_faq_csv()
+    faq_df = load_faq_csv()
     
-    # Extract scenario text from the scenario object if it's a dictionary
-    scenario_text = scenario.get("scenario_text", "") if isinstance(scenario, dict) else str(scenario)
+    # Build comprehensive context including guarantee terms
+    context = build_context(faq_df, scenario)
     
-    # Find the most relevant FAQ
-    try:
-        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_text, faq_data)
-    except Exception as e:
-        st.error(f"Error finding relevant FAQ: {str(e)}")
-        relevant_faq, faq_answer, faq_relevance = None, None, 0
+    # Update the prompt to consider guarantee information
+    prompt = f"""You are a Checkatrade customer service expert. Using the provided context, generate a helpful response to the customer scenario.
+    Consider all relevant information from FAQs, membership terms, and guarantee terms when crafting your response.
     
-    # Start with scenario tone and urgency analysis
-    scenario_tone = str(classification_result.get("tone", "neutral"))
-    scenario_urgency = str(classification_result.get("urgency", "medium"))
-    user_type = str(classification_result.get("user_type", "homeowner"))
-    priority = str(classification_result.get("priority", "medium"))
+    Context:
+    {context}
     
-    # Check if there's a related FAQ that we can use
-    faq_prompt = ""
-    if relevant_faq and faq_relevance >= 3:
-        faq_answer_str = str(faq_answer) if faq_answer else "No specific answer available - please address the question based on general policies."
-        faq_prompt = f"""
-        Include information from this relevant FAQ:
-        Question: {str(relevant_faq)}
-        Answer: {faq_answer_str}
-        
-        When referencing this FAQ in your response, include both the question and answer where appropriate.
-        """
+    Classification:
+    {json.dumps(classification_result, indent=2)}
     
-    # Generate response with cached prompt template
-    if "cached_response_prompt" in st.session_state and st.session_state.cached_response_prompt:
-        # Use cached prompt
-        prompt = st.session_state.cached_response_prompt
-        
-        # Modify the cached prompt to include our specific details
-        prompt = prompt.replace("{{USER_TYPE}}", user_type)
-        prompt = prompt.replace("{{TONE}}", scenario_tone)
-        prompt = prompt.replace("{{URGENCY}}", scenario_urgency)
-        prompt = prompt.replace("{{PRIORITY}}", priority)
-        prompt = prompt.replace("{{FAQ}}", faq_prompt)
-        
-        # Add the scenario at the appropriate placeholder
-        prompt = prompt.replace("{{SCENARIO}}", scenario_text)
-        
-        # Token count already considered in the session state
-        input_tokens = st.session_state.cached_response_prompt_tokens
-    else:
-        # Create prompt from scratch using a template
-        prompt = f"""
-        As a Customer Support Agent for Checkatrade, create a response to the following inquiry.
-        
-        User Type: {user_type}
-        Tone of Inquiry: {scenario_tone}
-        Urgency Level: {scenario_urgency}
-        Priority Level: {priority}
-        
-        {faq_prompt}
-        
-        Inquiry: {scenario_text}
-        
-        Write a professional and helpful response that:
-        1. Acknowledges the customer's concern
-        2. Provides specific, actionable information to resolve their issue
-        3. Includes any relevant policy details or next steps
-        4. Maintains a supportive and solution-oriented tone
-        5. If the inquiry involves a complaint about a tradesperson, explain that Checkatrade takes quality seriously and outline the specific steps you'll take to investigate
-        6. If a relevant FAQ is provided, reference BOTH the question and answer from the FAQ in your response
-        7. Ends with a clear call to action or next steps
-        
-        Format the response in a clean, professional style suitable for customer communication. 
-        Don't use placeholder text or generic responses - be specific to their situation.
-        """
-        
-        # Get token count for new prompt
-        input_tokens = len(prompt) // 4  # Approximate token count
-        
-        # Cache this prompt for future use
-        st.session_state.cached_response_prompt = prompt
-        st.session_state.cached_response_prompt_tokens = input_tokens
+    Instructions:
+    1. Be professional and empathetic
+    2. Address all aspects of the customer's query
+    3. Include specific details from relevant terms or policies
+    4. Provide clear next steps if applicable
+    5. Keep the response concise but informative
+    
+    Generate the response:"""
+    
+    # Start timing
+    start_time = time.time()
     
     # Generate the response using the OpenAI API
     try:
@@ -2799,3 +2750,35 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
+
+@st.cache_data
+def load_guarantee_terms():
+    """Load the guarantee terms from file."""
+    try:
+        with open("guarantee_terms.txt", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        st.error("Guarantee terms file not found")
+        return ""
+
+def build_context(df, scenario_text):
+    """Build context from FAQ and terms for classification and response."""
+    faq_context = build_faq_context(df)
+    membership_terms = load_membership_terms()
+    guarantee_terms = load_guarantee_terms()
+    
+    # Combine all context sources
+    full_context = f"""
+    FAQ Information:
+    {faq_context}
+    
+    Membership Terms:
+    {membership_terms}
+    
+    Guarantee Terms:
+    {guarantee_terms}
+    
+    Customer Scenario:
+    {scenario_text}
+    """
+    return full_context
