@@ -250,25 +250,27 @@ def save_inquiries_to_file():
         # Convert DataFrame to JSON and save with nice formatting
         json_data = df_copy.to_dict(orient="records")
         
-        # Add debug output to see what's being saved
-        st.sidebar.write(f"Saving {len(json_data)} inquiries to file")
+        # Log instead of using sidebar which might not be initialized yet
+        print(f"Saving {len(json_data)} inquiries to file")
         
         with open("inquiries.json", "w") as f:
             json.dump(json_data, f, indent=2)
         
-        # Add debug for Git commands    
+        # Execute Git commands and log results
         git_add = os.system('git add inquiries.json')
-        st.sidebar.write(f"Git add exit code: {git_add}")
+        print(f"Git add exit code: {git_add}")
         
         git_commit = os.system('git commit -m "Updated inquiries database with new entries"')
-        st.sidebar.write(f"Git commit exit code: {git_commit}")
+        print(f"Git commit exit code: {git_commit}")
         
         git_push = os.system('git push origin main')
-        st.sidebar.write(f"Git push exit code: {git_push}")
+        print(f"Git push exit code: {git_push}")
         
-        st.sidebar.success("Inquiries saved to file and pushed to GitHub!")
+        print("Inquiries saved to file and pushed to GitHub!")
+        return True
     except Exception as e:
-        st.sidebar.error(f"Failed to save inquiries to file: {str(e)}")
+        print(f"Failed to save inquiries to file: {str(e)}")
+        return False
 
 if "inquiries" not in st.session_state:
     # Try to load dummy data first
