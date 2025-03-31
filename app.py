@@ -283,7 +283,7 @@ REFER TO THE FOLLOWING DEFINITIONS:
          • If user_type is prospective_homeowner, the text must only ask general questions about how Checkatrade vets tradespeople, and must not reference completed jobs or reviews.
          • If user_type is existing_homeowner, the text must reference work that was done for them (passively) and any review they left.
          • If user_type is existing_tradesperson, the text must reference work they have completed (actively) or a customer review they received.
-   - The ivr_flow and any IVR selections must match the context implied by the user_type. For example, if the ivr_flow is “Homeowner Inquiry,” the user_type must be either prospective_homeowner or existing_homeowner.
+   - The ivr_flow and any IVR selections must match the context implied by the user_type. For example, if the ivr_flow is "Homeowner Inquiry," the user_type must be either prospective_homeowner or existing_homeowner.
    - There must be no mention of a job, review, or complaint in the scenario_text if the user is prospective.
    - Only existing tradespeople may have a membership_id; all other user types must have an empty membership_id.
    - Account details must be empty for any prospective user (both homeowner and tradesperson).
@@ -394,15 +394,32 @@ def validate_scenario_rules(scenario_data):
             if not any(latest_reviews.lower().startswith(word) for word in ["received", "customer gave", "client rated"]):
                 return False, "Tradesperson review must start with 'Received', 'Customer gave', or 'Client rated'"
     
-    # Check job description format
+    # Check job description format with improved validation
     latest_jobs = account_details.get("latest_jobs", "")
     if latest_jobs:
+        # Define active and passive verbs
+        active_verbs = ["completed", "installed", "fixed", "repaired", "built", "constructed", "fitted", "mounted", "assembled"]
+        passive_verbs = ["had", "got", "received", "was", "were", "been"]
+        
+        # For homeowners, check for active verbs (should be passive)
         if "homeowner" in user_type:
-            if any(word in latest_jobs.lower() for word in ["completed", "installed", "fixed", "repaired"]):
-                return False, "Homeowner job description should be passive"
+            active_verb_count = sum(1 for verb in active_verbs if verb in latest_jobs.lower())
+            if active_verb_count > 0:
+                return False, "Homeowner job description should be passive (e.g., 'Had kitchen renovated' not 'Completed kitchen renovation')"
+            
+            # Check if it starts with a passive verb
+            if not any(latest_jobs.lower().startswith(verb) for verb in passive_verbs):
+                return False, "Homeowner job description should start with a passive verb (e.g., 'Had', 'Got', 'Received')"
+        
+        # For tradespeople, check for passive verbs (should be active)
         elif "tradesperson" in user_type:
-            if not any(word in latest_jobs.lower() for word in ["completed", "installed", "fixed", "repaired"]):
-                return False, "Tradesperson job description should be active"
+            passive_verb_count = sum(1 for verb in passive_verbs if verb in latest_jobs.lower())
+            if passive_verb_count > 0:
+                return False, "Tradesperson job description should be active (e.g., 'Completed kitchen renovation' not 'Had kitchen renovated')"
+            
+            # Check if it starts with an active verb
+            if not any(latest_jobs.lower().startswith(verb) for verb in active_verbs):
+                return False, "Tradesperson job description should start with an active verb (e.g., 'Completed', 'Installed', 'Fixed')"
     
     return True, ""
 
@@ -438,6 +455,12 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         },
         "scenario_text": "string describing the contact reason"
     }
+
+    IMPORTANT JOB DESCRIPTION RULES:
+    - For homeowners: Use passive voice (e.g., "Had kitchen renovated by a plumber")
+    - For tradespeople: Use active voice (e.g., "Completed kitchen renovation with custom tiling")
+    - Homeowner jobs must start with passive verbs like "Had", "Got", "Received"
+    - Tradesperson jobs must start with active verbs like "Completed", "Installed", "Fixed"
 
     DO NOT include any additional fields or commentary.
     ALL fields must be present exactly as shown above.
@@ -521,7 +544,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                         retry_count += 1
                         continue
                     else:
-                        # If we've hit max retries, return an error scenario
+                        # If we've hit max retries, return an error scenario with more specific error message
                         return {
                             "inbound_route": "error",
                             "ivr_flow": "",
