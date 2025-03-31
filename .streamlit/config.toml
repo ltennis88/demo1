@@ -8,6 +8,7 @@ primaryColor = "#007bff"
 backgroundColor = "#121212"
 secondaryBackgroundColor = "#1E1E1E"
 textColor = "#FFFFFF"
+font = "sans serif"
 
 [browser]
 gatherUsageStats = false
@@ -15,9 +16,19 @@ gatherUsageStats = false
 [ui]
 hideTopBar = false
 hideSidebarNav = true
+hideSidebar = true
 
 [theme.base]
 base="dark"
 
 [layout]
 contentWidth = 1200
+
+[runner]
+fastReruns = true
+
+[client]
+showErrorDetails = true
+
+[logger]
+level = "error"

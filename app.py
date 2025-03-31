@@ -107,7 +107,12 @@ if "cached_response_prompt_tokens" not in st.session_state:
 st.set_page_config(
     layout="wide", 
     page_title="Contact Center AI Assistant",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
 
 # Setup API key
