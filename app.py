@@ -1944,6 +1944,9 @@ if st.session_state["generated_scenario"]:
                             break
                     
                     if classification_data:
+                        # Calculate total input cost
+                        total_input_cost = classification_data['cached_input_cost'] + classification_data['non_cached_input_cost']
+                        
                         # Display classification metrics
                         st.markdown("### Classification Metrics")
                         st.markdown("<div class='info-container'>", unsafe_allow_html=True)
@@ -1957,23 +1960,30 @@ if st.session_state["generated_scenario"]:
                         
                         with metric_col2:
                             st.metric(
-                                "Input Tokens",
-                                f"{classification_data['input_tokens']:,}",
-                                f"${classification_data['input_cost']:.4f}"
+                                "Cached Input Tokens",
+                                f"{classification_data['cached_input_tokens']:,}",
+                                f"${classification_data['cached_input_cost']:.4f}"
                             )
                         
                         with metric_col3:
+                            st.metric(
+                                "Non-Cached Input Tokens",
+                                f"{classification_data['non_cached_input_tokens']:,}",
+                                f"${classification_data['non_cached_input_cost']:.4f}"
+                            )
+                        
+                        with metric_col4:
                             st.metric(
                                 "Output Tokens",
                                 f"{classification_data['output_tokens']:,}",
                                 f"${classification_data['output_cost']:.4f}"
                             )
                         
-                        with metric_col4:
-                            st.metric(
-                                "Total Cost",
-                                f"${classification_data['total_cost']:.4f}"
-                            )
+                        # Add total cost summary
+                        st.markdown("<div class='inquiry-section'>Total Costs</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-label'>Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${classification_data['output_cost']:.4f}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-label'>Total Cost: ${classification_data['total_cost']:.4f}</div>", unsafe_allow_html=True)
                         st.markdown("</div>", unsafe_allow_html=True)
                 
                 # Determine priority class
