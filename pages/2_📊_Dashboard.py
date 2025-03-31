@@ -252,10 +252,10 @@ if len(df) > 0:
     st.header("Data Exports")
     if len(df) > 0:
         csv_data = df.to_csv(index=False)
-        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
+        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="dashboard_csv_download")
 
         json_data = df.to_json(orient="records")
-        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json")
+        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="dashboard_json_download")
     else:
         st.write("No data to export yet.")
 else:
