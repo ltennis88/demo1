@@ -2279,13 +2279,20 @@ with st.expander("View Analytics Dashboard"):
     with colC:
         user_type_counts = df["user_type"].value_counts()
         
+        # Convert value_counts to DataFrame for plotly
+        user_type_df = pd.DataFrame({
+            'User Type': user_type_counts.index,
+            'Count': user_type_counts.values
+        })
+        
         # Create horizontal bar chart using plotly express
         fig3 = px.bar(
-            x=user_type_counts.values,
-            y=user_type_counts.index,
+            user_type_df,
+            x='Count',
+            y='User Type',
             orientation='h',
             title="User Type Distribution",
-            text=user_type_counts.values,
+            text='Count',
             color_discrete_sequence=["#4285F4"]
         )
         
@@ -2303,37 +2310,37 @@ with st.expander("View Analytics Dashboard"):
         
         st.plotly_chart(fig3, use_container_width=True)
         
-        with colD:
-            route_counts = df["inbound_route"].value_counts()
-            
-            # Create color mapping for routes
-            route_colors = {
-                "phone": "#4285F4",     # Blue for phone
-                "email": "#DB4437",     # Red for email
-                "whatsapp": "#0F9D58",  # Green for whatsapp
-                "web_form": "#F4B400"   # Yellow for web form
-            }
-            
-            # Create a pie chart using plotly express
-            fig4 = px.pie(
-                values=route_counts.values,
-                names=route_counts.index,
-                title="Inbound Route Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=route_colors
-            )
-            
-            # Customize
-            fig4.update_traces(textinfo='percent+label')
-            fig4.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig4, use_container_width=True)
+    with colD:
+        route_counts = df["inbound_route"].value_counts()
+        
+        # Create color mapping for routes
+        route_colors = {
+            "phone": "#4285F4",     # Blue for phone
+            "email": "#DB4437",     # Red for email
+            "whatsapp": "#0F9D58",  # Green for whatsapp
+            "web_form": "#F4B400"   # Yellow for web form
+        }
+        
+        # Create a pie chart using plotly express
+        fig4 = px.pie(
+            values=route_counts.values,
+            names=route_counts.index,
+            title="Inbound Route Distribution",
+            hole=0.4,  # Makes it a donut chart
+            color_discrete_map=route_colors
+        )
+        
+        # Customize
+        fig4.update_traces(textinfo='percent+label')
+        fig4.update_layout(
+            legend=dict(orientation="h", y=-0.1),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white")
+        )
+        
+        st.plotly_chart(fig4, use_container_width=True)
 
         # Common topics/themes from summaries
         st.subheader("Common Topics & Themes")
