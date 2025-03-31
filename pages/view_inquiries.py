@@ -102,47 +102,117 @@ def show_inquiries():
                 st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['scenario_text']}</div>", unsafe_allow_html=True)
             
-            # Classification Summary section
-            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+            # Classification Results section with styled card
+            st.markdown("<div class='inquiry-section'>Classification Results</div>", unsafe_allow_html=True)
             
-            # Create a styled container for the classification info using native Streamlit components
-            with st.container():
-                # Set priority color
-                priority_color = "#ffab40"  # default medium
-                if recent_row['priority'] == "High":
-                    priority_color = "#ff5252"
-                elif recent_row['priority'] == "Low":
-                    priority_color = "#69f0ae"
+            # Add CSS for classification card layout similar to the screenshot
+            st.markdown("""
+            <style>
+            .classification-results-card {
+                background-color: #121212;
+                border-radius: 10px;
+                padding: 20px;
+                border: 1px solid #333;
+                margin-bottom: 20px;
+            }
+            .classification-field-row {
+                display: flex;
+                margin-bottom: 12px;
+            }
+            .classification-label {
+                width: 180px;
+                font-weight: bold;
+                color: #e0e0e0;
+            }
+            .classification-value {
+                flex-grow: 1;
+                background-color: #1E1E1E;
+                padding: 10px;
+                border-radius: 4px;
+            }
+            .priority-high {
+                color: #ff5252;
+                font-weight: bold;
+            }
+            .priority-medium {
+                color: #ffab40;
+                font-weight: bold;
+            }
+            .priority-low {
+                color: #69f0ae;
+                font-weight: bold;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Start classification card
+            st.markdown("<div class='classification-results-card'>", unsafe_allow_html=True)
+            
+            # Classification field
+            st.markdown("""
+            <div class='classification-field-row'>
+                <div class='classification-label'>Classification:</div>
+                <div class='classification-value'>{}</div>
+            </div>
+            """.format(recent_row['classification']), unsafe_allow_html=True)
+            
+            # Department field
+            st.markdown("""
+            <div class='classification-field-row'>
+                <div class='classification-label'>Department:</div>
+                <div class='classification-value'>{}</div>
+            </div>
+            """.format(recent_row['department']), unsafe_allow_html=True)
+            
+            # Subdepartment field
+            st.markdown("""
+            <div class='classification-field-row'>
+                <div class='classification-label'>Subdepartment:</div>
+                <div class='classification-value'>{}</div>
+            </div>
+            """.format(recent_row['subdepartment']), unsafe_allow_html=True)
+            
+            # Priority field with appropriate class
+            priority_class = "priority-medium"
+            if recent_row['priority'] == "High":
+                priority_class = "priority-high"
+            elif recent_row['priority'] == "Low":
+                priority_class = "priority-low"
                 
-                # Classification details in 2 columns
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("**Classification:**")
-                    st.text(recent_row['classification'])
-                    
-                    st.markdown("**Department:**")
-                    st.text(recent_row['department'])
-                    
-                    st.markdown("**Subdepartment:**")
-                    st.text(recent_row['subdepartment'])
-                
-                with col2:
-                    st.markdown("**Priority:**")
-                    # Use markdown for colored text
-                    st.markdown(f"<span style='color:{priority_color};font-weight:bold;'>{recent_row['priority']}</span>", unsafe_allow_html=True)
-                    
-                    st.markdown("**Estimated Response Time:**")
-                    st.text(recent_row['estimated_response_time'])
-                
-                # Summary in full width
-                st.markdown("**Summary:**")
-                st.text(recent_row['summary'])
-                
-                # Related FAQ category if available
-                if 'related_faq_category' in recent_row and recent_row['related_faq_category']:
-                    st.markdown("**Related FAQ Category:**")
-                    st.text(recent_row['related_faq_category'])
+            st.markdown("""
+            <div class='classification-field-row'>
+                <div class='classification-label'>Priority:</div>
+                <div class='classification-value'><span class='{}'>{}</span></div>
+            </div>
+            """.format(priority_class, recent_row['priority']), unsafe_allow_html=True)
+            
+            # Estimated Response Time field
+            st.markdown("""
+            <div class='classification-field-row'>
+                <div class='classification-label'>Estimated Response Time:</div>
+                <div class='classification-value'>{}</div>
+            </div>
+            """.format(recent_row['estimated_response_time']), unsafe_allow_html=True)
+            
+            # Summary field
+            st.markdown("""
+            <div class='classification-field-row'>
+                <div class='classification-label'>Summary:</div>
+                <div class='classification-value'>{}</div>
+            </div>
+            """.format(recent_row['summary']), unsafe_allow_html=True)
+            
+            # Related FAQ category if available
+            if 'related_faq_category' in recent_row and recent_row['related_faq_category']:
+                st.markdown("""
+                <div class='classification-field-row'>
+                    <div class='classification-label'>Related FAQ Category:</div>
+                    <div class='classification-value'>{}</div>
+                </div>
+                """.format(recent_row['related_faq_category']), unsafe_allow_html=True)
+            
+            # End classification card
+            st.markdown("</div>", unsafe_allow_html=True)
             
             # Case Management section
             st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
@@ -201,11 +271,10 @@ def show_inquiries():
         # Show previous inquiries
         if len(df) > 1:
             st.subheader("Previous Inquiries")
-            with st.expander("See More Inquiries", expanded=True):
-                for idx, row in df.iloc[1:].iterrows():
-                    st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin: 20px 0 10px 0;'>Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})</div>", unsafe_allow_html=True)
-                    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-                    
+            
+            for idx, row in df.iloc[1:].iterrows():
+                # Create an expander for each previous inquiry
+                with st.expander(f"Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})", expanded=False):
                     col1, col2 = st.columns(2)
                     
                     with col1:
@@ -215,14 +284,6 @@ def show_inquiries():
                         if row['inbound_route']:
                             st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
                             st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
-                        
-                        if row['ivr_flow']:
-                            st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
-                        
-                        if row['ivr_selections']:
-                            st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
                     
                     with col2:
                         if row['user_type']:
@@ -232,12 +293,109 @@ def show_inquiries():
                         if row['phone_email']:
                             st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
                             st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
-                        
-                        if row['membership_id']:
-                            st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
                     
-                    # Display relevant data
+                    # Show scenario text if available
+                    if row['scenario_text']:
+                        st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+                    
+                    # Classification results in same format as main inquiry
+                    st.markdown("<div class='inquiry-section'>Classification Results</div>", unsafe_allow_html=True)
+                    
+                    # Start classification card
+                    st.markdown("<div class='classification-results-card'>", unsafe_allow_html=True)
+                    
+                    # Classification field
+                    st.markdown("""
+                    <div class='classification-field-row'>
+                        <div class='classification-label'>Classification:</div>
+                        <div class='classification-value'>{}</div>
+                    </div>
+                    """.format(row['classification']), unsafe_allow_html=True)
+                    
+                    # Department field
+                    st.markdown("""
+                    <div class='classification-field-row'>
+                        <div class='classification-label'>Department:</div>
+                        <div class='classification-value'>{}</div>
+                    </div>
+                    """.format(row['department']), unsafe_allow_html=True)
+                    
+                    # Subdepartment field
+                    st.markdown("""
+                    <div class='classification-field-row'>
+                        <div class='classification-label'>Subdepartment:</div>
+                        <div class='classification-value'>{}</div>
+                    </div>
+                    """.format(row['subdepartment']), unsafe_allow_html=True)
+                    
+                    # Priority field with appropriate class
+                    priority_class = "priority-medium"
+                    if row['priority'] == "High":
+                        priority_class = "priority-high"
+                    elif row['priority'] == "Low":
+                        priority_class = "priority-low"
+                        
+                    st.markdown("""
+                    <div class='classification-field-row'>
+                        <div class='classification-label'>Priority:</div>
+                        <div class='classification-value'><span class='{}'>{}</span></div>
+                    </div>
+                    """.format(priority_class, row['priority']), unsafe_allow_html=True)
+                    
+                    # Estimated Response Time field
+                    st.markdown("""
+                    <div class='classification-field-row'>
+                        <div class='classification-label'>Estimated Response Time:</div>
+                        <div class='classification-value'>{}</div>
+                    </div>
+                    """.format(row['estimated_response_time']), unsafe_allow_html=True)
+                    
+                    # Summary field
+                    st.markdown("""
+                    <div class='classification-field-row'>
+                        <div class='classification-label'>Summary:</div>
+                        <div class='classification-value'>{}</div>
+                    </div>
+                    """.format(row['summary']), unsafe_allow_html=True)
+                    
+                    # End classification card
                     st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Case Management for this inquiry
+                    case_status = row.get('case_status', 'New')
+                    
+                    # Update case button for this inquiry
+                    with st.expander("Update Case", expanded=False):
+                        # Case status selection
+                        case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                        selected_status = st.selectbox(
+                            "Update Case Status:",
+                            options=case_status_options,
+                            index=case_status_options.index(case_status) if case_status in case_status_options else 0,
+                            key=f"status_{idx}"
+                        )
+                        
+                        # Agent notes text area
+                        agent_notes = st.text_area(
+                            "Agent Notes:",
+                            value=row.get('agent_notes', ''),
+                            height=150,
+                            placeholder="Enter your notes about the case here...",
+                            key=f"notes_{idx}"
+                        )
+                        
+                        # Save button for agent updates
+                        if st.button("Save Updates", key=f"save_{idx}"):
+                            # Update the parent session state DataFrame
+                            st.session_state["inquiries"].at[idx, "case_status"] = selected_status
+                            st.session_state["inquiries"].at[idx, "agent_notes"] = agent_notes
+                            
+                            # Save changes to file
+                            from app import save_inquiries_to_file
+                            save_inquiries_to_file()
+                            
+                            st.success(f"Case {idx} updated - Status: {selected_status}")
+                            st.experimental_rerun()
     else:
         st.info("No inquiries found. Generate and classify some scenarios first.") 
