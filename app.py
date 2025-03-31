@@ -41,11 +41,19 @@ html, body, [class*="css"] {
     max-width: 95% !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
+    margin-left: 0 !important;
 }
 
-/* Adjust top-level elements to prevent shifting */
+/* Push content leftwards and increase width */
 section[data-testid="stSidebar"] ~ .css-1d391kg {
-    width: auto !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 1rem !important;
+}
+
+/* Container styling for better use of space */
+.stApp > div:not([data-testid="stSidebar"]) {
+    margin-left: 0 !important;
 }
 
 /* Sidebar content styling */
@@ -211,6 +219,76 @@ div.stApp {
     margin-bottom: 20px;
     display: flex;
     flex-wrap: wrap;
+}
+
+/* Utility classes for cards and containers */
+.info-container {
+    background-color: #2C2C2C;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #424242;
+}
+.inquiry-label {
+    font-weight: bold;
+    color: #64B5F6;
+    margin-bottom: 5px;
+}
+.inquiry-detail {
+    background-color: #1E1E1E;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin-bottom: 12px;
+}
+.inquiry-section {
+    font-weight: bold;
+    font-size: 16px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: #90CAF9;
+    border-bottom: 1px solid #424242;
+    padding-bottom: 5px;
+}
+.priority-high {
+    color: #F44336;
+    font-weight: bold;
+}
+.priority-medium {
+    color: #FFA726;
+    font-weight: bold;
+}
+.priority-low {
+    color: #4CAF50;
+    font-weight: bold;
+}
+/* Style for classification styling */
+.classification-card {
+    background-color: #2C2C2C;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #424242;
+}
+.classification-header {
+    font-weight: bold;
+    font-size: 16px;
+    color: #90CAF9;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #424242;
+    padding-bottom: 5px;
+}
+.field-label {
+    font-weight: bold;
+    color: #64B5F6;
+    margin-bottom: 5px;
+}
+.field-value {
+    background-color: #1E1E1E;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin-bottom: 12px;
+    font-family: monospace;
+    white-space: pre-wrap;
 }
 </style>
 """, unsafe_allow_html=True)
