@@ -328,8 +328,21 @@ def show_inquiries():
                     # Case Management for this inquiry
                     case_status = row.get('case_status', 'New')
                     
-                    # Update case button for this inquiry
-                    with st.expander("Update Case", expanded=False):
+                    # Show case status
+                    st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
+                    status_color = "#64B5F6"  # Default blue
+                    if case_status == "Resolved" or case_status == "Closed":
+                        status_color = "#4CAF50"  # Green
+                    elif case_status == "In Progress":
+                        status_color = "#FFA726"  # Orange
+                    elif case_status == "Awaiting Customer" or case_status == "Awaiting Tradesperson":
+                        status_color = "#FFD54F"  # Amber
+                    
+                    st.markdown("<div class='inquiry-label'>Current Status:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail' style='color: {status_color}; font-weight: bold;'>{case_status}</div>", unsafe_allow_html=True)
+                    
+                    # Replace expander with a simple UI using columns and a button to toggle visibility
+                    if st.button(f"📝 Update Case #{idx}", key=f"toggle_{idx}"):
                         # Case status selection
                         case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
                         selected_status = st.selectbox(
@@ -360,5 +373,10 @@ def show_inquiries():
                             
                             st.success(f"Case {idx} updated - Status: {selected_status}")
                             st.experimental_rerun()
+                    
+                    # Display existing agent notes if any
+                    if row.get('agent_notes'):
+                        st.markdown("<div class='inquiry-label'>Agent Notes:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{row.get('agent_notes', '')}</div>", unsafe_allow_html=True)
     else:
         st.info("No inquiries found. Generate and classify some scenarios first.") 
