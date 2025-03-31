@@ -1259,7 +1259,12 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # If we have matching categories, find FAQs in those categories
     if matching_categories:
         for category, category_match_count in matching_categories:
-            matched_rows = faq_dataframe[faq_dataframe["Category"].str.lower().str.contains(category.lower())]
+            # Look for matches in both the main category and subcategory columns
+            matched_rows = faq_dataframe[
+                faq_dataframe.iloc[:, 0].str.lower().str.contains(category.lower()) |  # Main category
+                faq_dataframe.iloc[:, 1].str.lower().str.contains(category.lower())    # Subcategory
+            ]
+            
             if not matched_rows.empty:
                 # Find the FAQ that best matches specific words in the scenario
                 best_match = None
