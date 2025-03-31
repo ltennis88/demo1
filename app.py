@@ -814,24 +814,15 @@ with col1:
     st.markdown("<div class='inquiry-label'>Customer Type:</div>", unsafe_allow_html=True)
     user_random = st.checkbox("Random Type", value=True, key="user_random")
 
-# Enable user type options only if Random is not selected
-user_disabled = user_random
-
 with col2:
-    # Create a horizontal layout for user type selection
-    if not user_disabled:
-        # Simplify user type selection to 3 options
-        user_type = st.radio(
-            "Select customer type:",
-            options=["Existing Homeowner", "Existing Tradesperson", "Unknown/New Contact"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-        
-        # Display the selected type
-        st.markdown(f"<div style='text-align: center; margin-top: 5px;'><b>Selected:</b> {user_type}</div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div style='padding: 23px;'></div>", unsafe_allow_html=True)
+    # Create a horizontal layout for user type selection - always show but disable if random is checked
+    user_type = st.radio(
+        "Select customer type:",
+        options=["Existing Homeowner", "Existing Tradesperson", "Unknown/New Contact"],
+        horizontal=True,
+        label_visibility="collapsed",
+        disabled=user_random  # Disable the radio buttons when Random Type is checked
+    )
 
 # Map the selection to the correct user_type value
 selected_user_type = None
