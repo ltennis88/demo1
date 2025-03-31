@@ -2946,82 +2946,83 @@ with st.expander("View Analytics Dashboard"):
 def update_analytics():
     """Update the analytics display with token usage and costs"""
     if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-        with st.expander("📊 Analytics", expanded=True):
-            last_usage = st.session_state["token_usage"]["generations"][-1]
+        last_usage = st.session_state["token_usage"]["generations"][-1]
+        
+        # Calculate total input cost from cached and non-cached
+        total_input_cost = last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0)
+        total_cost = total_input_cost + last_usage.get("output_cost", 0)
+        
+        st.markdown("### 📊 Analytics")
+        
+        # Display current metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
+        with col2:
+            st.metric("Total Tokens", last_usage.get("total_tokens", 0))
+        with col3:
+            st.metric("Total Cost", f"${total_cost:.4f}")
+        
+        # Detailed token breakdown
+        st.markdown("#### Current Usage Breakdown")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Input Tokens:**")
+            st.markdown(f"- Cached: {last_usage.get('cached_input_tokens', 0):,} (${last_usage.get('cached_input_cost', 0):.4f})")
+            st.markdown(f"- Non-cached: {last_usage.get('non_cached_input_tokens', 0):,} (${last_usage.get('non_cached_input_cost', 0):.4f})")
+            st.markdown(f"- Total Input: {last_usage.get('cached_input_tokens', 0) + last_usage.get('non_cached_input_tokens', 0):,} (${total_input_cost:.4f})")
+        with col2:
+            st.markdown("**Output Tokens:**")
+            st.markdown(f"- Total: {last_usage.get('output_tokens', 0):,} (${last_usage.get('output_cost', 0):.4f})")
+        
+        # Show historical data if available
+        if len(st.session_state["token_usage"]["generations"]) > 1:
+            st.markdown("#### Historical Usage")
             
-            # Calculate total input cost from cached and non-cached
-            total_input_cost = last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0)
-            total_cost = total_input_cost + last_usage.get("output_cost", 0)
+            # Prepare data for plotting
+            df_history = pd.DataFrame(st.session_state["token_usage"]["generations"])
+            df_history['timestamp'] = pd.to_datetime(df_history['timestamp'])
             
-            # Display current metrics
+            # Calculate total costs correctly
+            df_history['total_input_cost'] = df_history['cached_input_cost'].fillna(0) + df_history['non_cached_input_cost'].fillna(0)
+            df_history['total_cost'] = df_history['total_input_cost'] + df_history['output_cost'].fillna(0)
+            
+            # Token usage over time
+            fig_tokens = px.line(df_history, 
+                               x='timestamp', 
+                               y=['cached_input_tokens', 'non_cached_input_tokens', 'output_tokens'],
+                               title='Token Usage Over Time',
+                               labels={
+                                   'cached_input_tokens': 'Cached Input',
+                                   'non_cached_input_tokens': 'Non-cached Input',
+                                   'output_tokens': 'Output'
+                               })
+            st.plotly_chart(fig_tokens)
+            
+            # Costs over time
+            fig_costs = px.line(df_history, 
+                              x='timestamp', 
+                              y=['total_input_cost', 'output_cost', 'total_cost'],
+                              title='Costs Over Time',
+                              labels={
+                                  'total_input_cost': 'Total Input Cost',
+                                  'output_cost': 'Output Cost',
+                                  'total_cost': 'Total Cost'
+                              })
+            st.plotly_chart(fig_costs)
+            
+            # Summary statistics
+            st.markdown("#### Summary Statistics")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
+                avg_response_time = df_history['response_time'].mean()
+                st.metric("Average Response Time", f"{avg_response_time:.2f}s")
             with col2:
-                st.metric("Total Tokens", last_usage.get("total_tokens", 0))
+                total_cost_sum = df_history['total_cost'].sum()
+                st.metric("Total Cost (All Sessions)", f"${total_cost_sum:.4f}")
             with col3:
-                st.metric("Total Cost", f"${total_cost:.4f}")
-            
-            # Detailed token breakdown
-            st.write("\n### Current Usage Breakdown")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("Input Tokens:")
-                st.write(f"- Cached: {last_usage.get('cached_input_tokens', 0):,} (${last_usage.get('cached_input_cost', 0):.4f})")
-                st.write(f"- Non-cached: {last_usage.get('non_cached_input_tokens', 0):,} (${last_usage.get('non_cached_input_cost', 0):.4f})")
-                st.write(f"- Total Input: {last_usage.get('cached_input_tokens', 0) + last_usage.get('non_cached_input_tokens', 0):,} (${total_input_cost:.4f})")
-            with col2:
-                st.write("Output Tokens:")
-                st.write(f"- Total: {last_usage.get('output_tokens', 0):,} (${last_usage.get('output_cost', 0):.4f})")
-            
-            # Show historical data if available
-            if len(st.session_state["token_usage"]["generations"]) > 1:
-                st.write("\n### Historical Usage")
-                
-                # Prepare data for plotting
-                df_history = pd.DataFrame(st.session_state["token_usage"]["generations"])
-                df_history['timestamp'] = pd.to_datetime(df_history['timestamp'])
-                
-                # Calculate total costs correctly
-                df_history['total_input_cost'] = df_history['cached_input_cost'].fillna(0) + df_history['non_cached_input_cost'].fillna(0)
-                df_history['total_cost'] = df_history['total_input_cost'] + df_history['output_cost'].fillna(0)
-                
-                # Token usage over time
-                fig_tokens = px.line(df_history, 
-                                   x='timestamp', 
-                                   y=['cached_input_tokens', 'non_cached_input_tokens', 'output_tokens'],
-                                   title='Token Usage Over Time',
-                                   labels={
-                                       'cached_input_tokens': 'Cached Input',
-                                       'non_cached_input_tokens': 'Non-cached Input',
-                                       'output_tokens': 'Output'
-                                   })
-                st.plotly_chart(fig_tokens)
-                
-                # Costs over time
-                fig_costs = px.line(df_history, 
-                                  x='timestamp', 
-                                  y=['total_input_cost', 'output_cost', 'total_cost'],
-                                  title='Costs Over Time',
-                                  labels={
-                                      'total_input_cost': 'Total Input Cost',
-                                      'output_cost': 'Output Cost',
-                                      'total_cost': 'Total Cost'
-                                  })
-                st.plotly_chart(fig_costs)
-                
-                # Summary statistics
-                st.write("\n### Summary Statistics")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    avg_response_time = df_history['response_time'].mean()
-                    st.metric("Average Response Time", f"{avg_response_time:.2f}s")
-                with col2:
-                    total_cost_sum = df_history['total_cost'].sum()
-                    st.metric("Total Cost (All Sessions)", f"${total_cost_sum:.4f}")
-                with col3:
-                    avg_cost = df_history['total_cost'].mean()
-                    st.metric("Average Cost per Request", f"${avg_cost:.4f}")
+                avg_cost = df_history['total_cost'].mean()
+                st.metric("Average Cost per Request", f"${avg_cost:.4f}")
     else:
         st.info("No analytics data available yet. Generate some responses to see usage statistics.")
 
