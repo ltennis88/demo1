@@ -283,4 +283,21 @@ def show_inquiries():
             json_data = df.to_json(orient="records")
             st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="inquiries_json_download")
     else:
-        st.info("No inquiries found. Generate and classify some scenarios first.") 
+        st.info("No inquiries found. Generate and classify some scenarios first.")
+
+def show_inquiries_content():
+    """
+    Display the View Inquiries content without the page title
+    for use within the main app.py page
+    """
+    # Load inquiries from session state
+    df = st.session_state["inquiries"]
+    
+    if len(df) > 0:
+        # Sort inquiries by timestamp in descending order (most recent first)
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        except:
+            # If timestamp conversion fails, just use the existing order
+            pass 

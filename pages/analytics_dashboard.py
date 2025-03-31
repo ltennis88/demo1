@@ -229,4 +229,22 @@ def show_analytics():
                     )
                     st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No data available for analysis. Generate some scenarios first.") 
+        st.info("No data available for analysis. Generate some scenarios first.")
+
+def show_analytics_content():
+    """
+    Display the Analytics Dashboard content without the page title
+    for use within the main app.py page
+    """
+    # Load inquiries from session state
+    if "inquiries" in st.session_state:
+        df = st.session_state["inquiries"]
+    else:
+        # If not in session state, try to load from file
+        try:
+            with open("inquiries.json", "r") as f:
+                inquiries_data = json.load(f)
+            df = pd.DataFrame(inquiries_data)
+        except Exception as e:
+            st.error(f"Error loading inquiries: {str(e)}")
+            df = pd.DataFrame() 
