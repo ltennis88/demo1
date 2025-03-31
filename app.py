@@ -457,14 +457,236 @@ if st.session_state["section"] == "main":
     st.header("Generate New Inquiry")
 elif st.session_state["section"] == "inquiries":
     st.header("View Inquiries")
-    # Import functions but display in same page
-    from pages.view_inquiries import show_inquiries_content
-    show_inquiries_content()
+    # Display inquiries directly in main app
+    df = st.session_state["inquiries"]
+    if len(df) > 0:
+        # Sort inquiries by timestamp in descending order (most recent first)
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        except:
+            # If timestamp conversion fails, just use the existing order
+            pass
+        
+        # Display all inquiries in a collapsible container
+        for idx, row in df.iterrows():
+            # Use a header for each inquiry instead of a nested expander
+            with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
+                st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
+                    
+                    if 'inbound_route' in row and row['inbound_route']:
+                        st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                    
+                    if 'ivr_flow' in row and row['ivr_flow']:
+                        st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                    
+                    if 'ivr_selections' in row and row['ivr_selections']:
+                        st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
+                
+                with col2:
+                    if 'user_type' in row and row['user_type']:
+                        st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
+                    
+                    if 'phone_email' in row and row['phone_email']:
+                        st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                    
+                    if 'membership_id' in row and row['membership_id']:
+                        st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+                
+                # Classification summary section only
+                st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+                
+                if 'classification' in row and row['classification']:
+                    st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+                
+                if 'priority' in row and row['priority']:
+                    st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+                
+                if 'summary' in row and row['summary']:
+                    st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+                
+                # Show scenario text
+                if 'scenario_text' in row and row['scenario_text']:
+                    st.markdown("<div class='inquiry-section'>Scenario Details</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    else:
+        st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
 elif st.session_state["section"] == "analytics":
     st.header("Analytics Dashboard")
-    # Import functions but display in same page
-    from pages.analytics_dashboard import show_analytics_content
-    show_analytics_content()
+    # Display analytics directly in main app
+    df = st.session_state["inquiries"]
+    if len(df) > 0:
+        st.subheader("Summary Analytics")
+        
+        # Row 1: Classification and Priority distribution
+        colA, colB = st.columns(2)
+        with colA:
+            classification_counts = df["classification"].value_counts()
+            
+            # Create pie chart with plotly express
+            fig1 = px.pie(
+                values=classification_counts.values,
+                names=classification_counts.index,
+                title="Classification Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
+            )
+            
+            # Customize
+            fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
+            fig1.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with colB:
+            priority_counts = df["priority"].value_counts()
+            
+            # Create color mapping for priorities
+            priority_colors = {
+                "High": "#DB4437",    # Red for high
+                "Medium": "#F4B400",  # Yellow for medium
+                "Low": "#0F9D58"      # Green for low
+            }
+            
+            # Create a pie chart using plotly express
+            fig2 = px.pie(
+                values=priority_counts.values,
+                names=priority_counts.index,
+                title="Priority Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=priority_colors
+            )
+            
+            # Customize
+            fig2.update_traces(textinfo='percent+label')
+            fig2.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
+        
+        # Row 2: User type and Route distribution 
+        colC, colD = st.columns(2)
+        with colC:
+            user_type_counts = df["user_type"].value_counts()
+            
+            # Convert value_counts to DataFrame for plotly
+            user_type_df = pd.DataFrame({
+                'User Type': user_type_counts.index,
+                'Count': user_type_counts.values
+            })
+            
+            # Create horizontal bar chart using plotly express
+            fig3 = px.bar(
+                user_type_df,
+                x='Count',
+                y='User Type',
+                orientation='h',
+                title="User Type Distribution",
+                text='Count',
+                color_discrete_sequence=["#4285F4"]
+            )
+            
+            # Customize
+            fig3.update_layout(
+                xaxis_title="Count",
+                yaxis_title="",
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="#444"),
+                yaxis=dict(gridcolor="#444")
+            )
+            
+            st.plotly_chart(fig3, use_container_width=True)
+        
+        with colD:
+            route_counts = df["inbound_route"].value_counts()
+            
+            # Create color mapping for routes
+            route_colors = {
+                "phone": "#4285F4",     # Blue for phone
+                "email": "#DB4437",     # Red for email
+                "whatsapp": "#0F9D58",  # Green for whatsapp
+                "web_form": "#F4B400"   # Yellow for web form
+            }
+            
+            # Create a pie chart using plotly express
+            fig4 = px.pie(
+                values=route_counts.values,
+                names=route_counts.index,
+                title="Inbound Route Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=route_colors
+            )
+            
+            # Customize
+            fig4.update_traces(textinfo='percent+label')
+            fig4.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig4, use_container_width=True)
+        
+        # Token Usage Analytics
+        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+            st.subheader("Token Usage Analytics")
+            
+            # Create DataFrame from token usage data
+            df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
+            
+            # Show total tokens and costs
+            col1, col2 = st.columns(2)
+            with col1:
+                total_input_tokens = df_tokens["input_tokens"].sum()
+                total_input_cost = df_tokens["input_cost"].sum()
+                total_output_tokens = df_tokens["output_tokens"].sum()
+                total_output_cost = df_tokens["output_cost"].sum()
+                
+                st.metric("Total Input Tokens", f"{total_input_tokens} (${total_input_cost:.4f})")
+                st.metric("Total Output Tokens", f"{total_output_tokens} (${total_output_cost:.4f})")
+            
+            with col2:
+                total_tokens = total_input_tokens + total_output_tokens
+                total_cost = total_input_cost + total_output_cost
+                
+                st.metric("Total Tokens", f"{total_tokens}")
+                st.metric("Total Cost", f"${total_cost:.4f}")
+    else:
+        st.info("No data available for analytics. Generate scenarios and classifications to see analytics.")
 
 ###############################################################################
 # 3) LOAD FAQ / TAXONOMY DATA
