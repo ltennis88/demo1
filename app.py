@@ -1401,18 +1401,44 @@ def extract_specific_details(scenario_text):
 ###############################################################################
 # 9) STREAMLIT APP UI
 ###############################################################################
+# Dashboard Main Page
 st.title("Contact Center AI Assistant")
 
-# -----------------------------------------------------------------------------
-# SCENARIO GENERATION
-# -----------------------------------------------------------------------------
+# Add horizontal navigation buttons
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(
+        """<a href="/" style="text-decoration: none;">
+        <div style="background-color: #4285F4; padding: 10px; border-radius: 5px; text-align: center; margin: 5px 0px;">
+        🏠 Main Dashboard
+        </div></a>""",
+        unsafe_allow_html=True
+    )
+with col2:
+    st.markdown(
+        """<a href="/View_Inquiries" style="text-decoration: none;">
+        <div style="background-color: #3c4043; padding: 10px; border-radius: 5px; text-align: center; margin: 5px 0px;">
+        📋 View Inquiries
+        </div></a>""",
+        unsafe_allow_html=True
+    )
+with col3:
+    st.markdown(
+        """<a href="/Analytics_Dashboard" style="text-decoration: none;">
+        <div style="background-color: #3c4043; padding: 10px; border-radius: 5px; text-align: center; margin: 5px 0px;">
+        📊 Analytics Dashboard
+        </div></a>""",
+        unsafe_allow_html=True
+    )
+
+# Generate New Inquiry Section
 st.header("Generate New Inquiry")
 
-# Create columns for the route selection mode
+# Route Selection
+st.markdown("<div class='inquiry-label'>Route Selection:</div>", unsafe_allow_html=True)
 col1, col2, col3, col4, col5 = st.columns([1, 0.75, 0.75, 0.75, 0.75])
 
 with col1:
-    st.markdown("<div class='inquiry-label'>Route Selection:</div>", unsafe_allow_html=True)
     route_selection = st.radio(
         label="Route",
         options=["Random", "Phone", "Email", "WhatsApp", "Web Form"],
