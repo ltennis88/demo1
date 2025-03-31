@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+from app import find_relevant_faq, generate_response_suggestion, df_faq, save_inquiries_to_file
 
 def show_inquiries():
     """
@@ -102,162 +103,82 @@ def show_inquiries():
                 st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['scenario_text']}</div>", unsafe_allow_html=True)
             
-            # Classification results section
-            st.markdown("<div class='inquiry-section'>Classification Results</div>", unsafe_allow_html=True)
+            # Classification summary section
+            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
             
-            # Create a styled container for the classification results
-            st.markdown("""
-            <style>
-            .styled-container {
-                background-color: #1E1E1E;
-                border-radius: 10px;
-                padding: 20px;
-                margin-bottom: 20px;
-                border: 1px solid #424242;
-            }
-            .result-row {
-                display: flex;
-                margin-bottom: 12px;
-            }
-            .result-label {
-                width: 220px;
-                font-weight: bold;
-                color: #64B5F6;
-            }
-            .result-value {
-                flex-grow: 1;
-                background-color: #2C2C2C;
-                padding: 5px 10px;
-                border-radius: 4px;
-            }
-            .priority-high {
-                color: #ff5252;
-                font-weight: bold;
-            }
-            .priority-medium {
-                color: #ffab40;
-                font-weight: bold;
-            }
-            .priority-low {
-                color: #69f0ae;
-                font-weight: bold;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+            if recent_row['classification']:
+                st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['classification']}</div>", unsafe_allow_html=True)
             
-            # Start the styled container
-            st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
+            if recent_row['priority']:
+                st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['priority']}</div>", unsafe_allow_html=True)
             
-            # Create each classification field with proper formatting
-            st.markdown(f"""
-            <div class='result-row'>
-                <div class='result-label'>Classification:</div>
-                <div class='result-value'>{recent_row.get("classification", "Unknown")}</div>
-            </div>
+            if recent_row['summary']:
+                st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['summary']}</div>", unsafe_allow_html=True)
             
-            <div class='result-row'>
-                <div class='result-label'>Department:</div>
-                <div class='result-value'>{recent_row.get("department", "Unknown")}</div>
-            </div>
+            # Add FAQ suggestion and response suggestion
+            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
             
-            <div class='result-row'>
-                <div class='result-label'>Subdepartment:</div>
-                <div class='result-value'>{recent_row.get("subdepartment", "Unknown")}</div>
-            </div>
-            
-            <div class='result-row'>
-                <div class='result-label'>Priority:</div>
-                <div class='result-value'>
-                    <span class='priority-{recent_row.get("priority", "medium").lower()}'>
-                        {recent_row.get("priority", "Medium")}
-                    </span>
-                </div>
-            </div>
-            
-            <div class='result-row'>
-                <div class='result-label'>Estimated Response Time:</div>
-                <div class='result-value'>{recent_row.get("estimated_response_time", "Unknown")}</div>
-            </div>
-            
-            <div class='result-row'>
-                <div class='result-label'>Summary:</div>
-                <div class='result-value'>{recent_row.get("summary", "No summary available")}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Add related FAQ category if available
-            if recent_row.get('related_faq_category'):
-                st.markdown(f"""
-                <div class='result-row'>
-                    <div class='result-label'>Related FAQ Category:</div>
-                    <div class='result-value'>{recent_row.get("related_faq_category", "")}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Close the container
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            # Case Management section
-            st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
-            
-            # Show current case status with color coding
-            case_status = recent_row.get('case_status', 'New')
-            status_color = "#64B5F6"  # Default blue
-            if case_status == "Resolved" or case_status == "Closed":
-                status_color = "#4CAF50"  # Green
-            elif case_status == "In Progress":
-                status_color = "#FFA726"  # Orange
-            elif case_status == "Awaiting Customer" or case_status == "Awaiting Tradesperson":
-                status_color = "#FFD54F"  # Amber
-            
-            st.markdown("<div class='inquiry-label'>Case Status:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-detail' style='color: {status_color}; font-weight: bold;'>{case_status}</div>", unsafe_allow_html=True)
-            
-            # Allow agent to update case status and notes
-            with st.expander("Update Case", expanded=False):
-                # Case status selection
-                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
-                selected_status = st.selectbox(
-                    "Update Case Status:",
-                    options=case_status_options,
-                    index=case_status_options.index(case_status) if case_status in case_status_options else 0
-                )
+            # First search for relevant FAQ
+            faq_category = ""
+            # Try to parse the classification result to get related_faq_category
+            try:
+                # Check if we can find something related to faq_category in the summary
+                if "faq" in recent_row['summary'].lower():
+                    faq_category = recent_row['summary'].lower().split("faq")[1].strip().strip(".:,")
+            except:
+                pass
                 
-                # Agent notes text area
-                agent_notes = st.text_area(
-                    "Agent Notes:",
-                    value=recent_row.get('agent_notes', ''),
-                    height=150,
-                    placeholder="Enter your notes about the case here..."
-                )
+            relevant_faq, faq_score = find_relevant_faq(recent_row['scenario_text'], df_faq)
+            
+            # Only display FAQ if it meets the relevance threshold
+            if relevant_faq and faq_score >= 3:
+                st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
+            
+            # Generate response suggestion for email or whatsapp
+            inbound_route = recent_row['inbound_route']
+            if inbound_route in ["email", "whatsapp"]:
+                # Recreate scenario structure from row data
+                scenario_dict = {
+                    "inbound_route": recent_row['inbound_route'],
+                    "scenario_text": recent_row['scenario_text'],
+                    "user_type": recent_row['user_type'],
+                    "account_details": {
+                        "name": recent_row['account_name'],
+                        "location": recent_row['account_location'],
+                        "latest_reviews": recent_row['account_reviews'],
+                        "latest_jobs": recent_row['account_jobs'],
+                        "project_cost": recent_row['project_cost'],
+                        "payment_status": recent_row['payment_status']
+                    }
+                }
                 
-                # Save button for agent updates
-                if st.button("Save Updates"):
-                    # Update the DataFrame with the new status and notes
-                    st.session_state["inquiries"].at[df.index[0], "case_status"] = selected_status
-                    st.session_state["inquiries"].at[df.index[0], "agent_notes"] = agent_notes
-                    
-                    # Save to file
-                    from app import save_inquiries_to_file
-                    save_inquiries_to_file()
-                    
-                    st.success(f"Case updated - Status: {selected_status}")
-                    st.experimental_rerun()
+                # Recreate classification structure
+                classification_dict = {
+                    "classification": recent_row['classification'],
+                    "priority": recent_row['priority'],
+                    "summary": recent_row['summary']
+                }
+                
+                response_suggestion = generate_response_suggestion(scenario_dict, classification_dict)
+                
+                st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
             
-            # Display existing agent notes if any
-            if recent_row.get('agent_notes'):
-                st.markdown("<div class='inquiry-label'>Current Agent Notes:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{recent_row.get('agent_notes', '')}</div>", unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
         
-        # Show previous inquiries
+        # Show previous inquiries in a collapsible expander
         if len(df) > 1:
-            st.subheader("Previous Inquiries")
-            
-            for idx, row in df.iloc[1:].iterrows():
-                # Create an expander for each previous inquiry
-                with st.expander(f"Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})", expanded=False):
+            with st.expander("See More Inquiries"):
+                # Show the rest of the inquiries (excluding the most recent one)
+                for idx, row in df.iloc[1:].iterrows():
+                    # Use a header for each inquiry instead of a nested expander
+                    st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin: 20px 0 10px 0;'>Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                    
                     col1, col2 = st.columns(2)
                     
                     with col1:
@@ -267,6 +188,14 @@ def show_inquiries():
                         if row['inbound_route']:
                             st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
                             st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                        
+                        if row['ivr_flow']:
+                            st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                        
+                        if row['ivr_selections']:
+                            st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
                     
                     with col2:
                         if row['user_type']:
@@ -276,121 +205,82 @@ def show_inquiries():
                         if row['phone_email']:
                             st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
                             st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                        
+                        if row['membership_id']:
+                            st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
                     
-                    # Show scenario text if available
+                    # Account details section - only show if there's actual account info
+                    has_account_info = (row['account_name'] or row['account_location'] or 
+                                       row['account_reviews'] or row['account_jobs'] or
+                                       row['membership_id'])
+                    
+                    if has_account_info:
+                        st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
+                        
+                        if row['account_name']:
+                            st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_name']}</div>", unsafe_allow_html=True)
+                        
+                        if row['membership_id']:
+                            st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+                        
+                        if row['account_location']:
+                            st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_location']}</div>", unsafe_allow_html=True)
+                        
+                        if row['account_reviews']:
+                            st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_reviews']}</div>", unsafe_allow_html=True)
+                        
+                        if row['account_jobs']:
+                            st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>{row['account_jobs']}</div>", unsafe_allow_html=True)
+                        
+                        # Show project cost and payment status side by side if available
+                        if row['project_cost'] or row['payment_status']:
+                            st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail'>Project Cost: {row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {row['payment_status']}</div>", unsafe_allow_html=True)
+                    
+                    # Scenario text section
                     if row['scenario_text']:
                         st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
                     
-                    # Classification results in same format as main inquiry
-                    st.markdown("<div class='inquiry-section'>Classification Results</div>", unsafe_allow_html=True)
+                    # Classification summary section
+                    st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
                     
-                    # Start the styled container
-                    st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
+                    if row['classification']:
+                        st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
                     
-                    # Create each classification field with proper formatting
-                    st.markdown(f"""
-                    <div class='result-row'>
-                        <div class='result-label'>Classification:</div>
-                        <div class='result-value'>{row.get("classification", "Unknown")}</div>
-                    </div>
+                    if row['priority']:
+                        st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
                     
-                    <div class='result-row'>
-                        <div class='result-label'>Department:</div>
-                        <div class='result-value'>{row.get("department", "Unknown")}</div>
-                    </div>
+                    if row['summary']:
+                        st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
                     
-                    <div class='result-row'>
-                        <div class='result-label'>Subdepartment:</div>
-                        <div class='result-value'>{row.get("subdepartment", "Unknown")}</div>
-                    </div>
+                    # Add FAQ suggestion
+                    relevant_faq, faq_score = find_relevant_faq(row['scenario_text'], df_faq)
                     
-                    <div class='result-row'>
-                        <div class='result-label'>Priority:</div>
-                        <div class='result-value'>
-                            <span class='priority-{row.get("priority", "medium").lower()}'>
-                                {row.get("priority", "Medium")}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <div class='result-row'>
-                        <div class='result-label'>Estimated Response Time:</div>
-                        <div class='result-value'>{row.get("estimated_response_time", "Unknown")}</div>
-                    </div>
-                    
-                    <div class='result-row'>
-                        <div class='result-label'>Summary:</div>
-                        <div class='result-value'>{row.get("summary", "No summary available")}</div>
-                    </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Display relevant FAQ if available
-                    if row.get('relevant_faq'):
+                    # Only display FAQ if it meets the relevance threshold
+                    if relevant_faq and faq_score >= 3:
                         st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
                         st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row.get('relevant_faq')}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
                     
-                    # Display response suggestion if available for email or whatsapp
-                    if row.get('response_suggestion') and row.get('inbound_route') in ["email", "whatsapp"]:
-                        if not row.get('relevant_faq'):
-                            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
-                        
-                        inbound_route = row.get('inbound_route')
-                        st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{row.get('response_suggestion')}</div>", unsafe_allow_html=True)
-                    
-                    # Display Agent Actions section
-                    st.markdown("<div class='inquiry-section'>Agent Actions</div>", unsafe_allow_html=True)
-                    
-                    # Display case status if available
-                    if row.get('case_status'):
-                        st.markdown("<div class='inquiry-label'>Case Status:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row.get('case_status')}</div>", unsafe_allow_html=True)
-                    
-                    # Display existing agent notes if any
-                    if row.get('agent_notes'):
-                        st.markdown("<div class='inquiry-label'>Agent Notes:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{row.get('agent_notes', '')}</div>", unsafe_allow_html=True)
-                    
-                    # Allow updating the case status and notes
-                    with st.expander("Update Case"):
-                        # Create a form for updating case status and notes
-                        with st.form(key=f"update_case_{idx}"):
-                            # Case status selection
-                            case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
-                            updated_status = st.selectbox(
-                                "Update Case Status:",
-                                options=case_status_options,
-                                index=case_status_options.index(row.get('case_status', "New")),
-                                key=f"status_{idx}"
-                            )
-                            
-                            # Agent notes text area
-                            updated_notes = st.text_area(
-                                "Agent Notes:",
-                                value=row.get('agent_notes', ''),
-                                height=150,
-                                placeholder="Enter your notes about the case here...",
-                                key=f"notes_{idx}"
-                            )
-                            
-                            # Submit button
-                            submit_button = st.form_submit_button("Save Updates", use_container_width=True)
-                            
-                            if submit_button:
-                                # Update the DataFrame with the new status and notes
-                                st.session_state["inquiries"].at[idx, "case_status"] = updated_status
-                                st.session_state["inquiries"].at[idx, "agent_notes"] = updated_notes
-                                
-                                # Save to file
-                                from app import save_inquiries_to_file
-                                save_inquiries_to_file()
-                                
-                                st.success(f"Case {idx} updated - Status: {updated_status}")
-                                st.experimental_rerun()
-                    
-                st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+                    st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+        
+        # Data export controls
+        st.subheader("Data Exports")
+        if len(df) > 0:
+            csv_data = df.to_csv(index=False)
+            st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="inquiries_csv_download")
+            
+            json_data = df.to_json(orient="records")
+            st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="inquiries_json_download")
     else:
         st.info("No inquiries found. Generate and classify some scenarios first.") 
