@@ -227,32 +227,32 @@ Below is the reference FAQ/taxonomy data:
 STRICT USER TYPE RULES – THESE MUST BE FOLLOWED EXACTLY:
 
 Prospective Homeowner:
-
     Allowed Actions: Inquire about finding reliable tradespeople, ask questions about the vetting process, and request information about account creation.
     Forbidden Actions: Leaving reviews, complaining about work quality, or referencing any past/completed jobs.
     Forbidden Phrases: "my account", "my review", "poor quality", "not satisfied", "completed job", "past work".
     Valid Example: "I'm planning to buy a home soon and would like to know how you verify your tradespeople before I create an account."
+    Account Details: Must be empty (no name, location, reviews, jobs, etc.)
 
 Existing Homeowner:
-
     Allowed Actions: Complain about work quality, leave reviews, and discuss jobs that were completed for them.
     Forbidden Actions: Asking about membership fees, discussing business profiles, or offering trade services.
     Forbidden Phrases: "my business", "insurance details", "trade license", "my customers".
     Valid Example: "I recently had my kitchen renovated by a plumber and want to leave a review about the work."
+    Account Details: Must include name, location, reviews they gave, jobs done for them, and project details.
 
 Prospective Tradesperson:
-
     Allowed Actions: Inquire about the joining process, ask about membership costs, and request details on application requirements and the vetting process.
     Forbidden Actions: Discussing customer reviews, complaining about work quality, or referencing work performed in a home.
     Forbidden Phrases: "my review", "poor quality", "not satisfied", "in my home", "I hired".
     Valid Example: "What documents do I need to submit for my membership application and what are the associated costs?"
+    Account Details: Must be empty (no name, location, reviews, jobs, etc.)
 
 Existing Tradesperson:
-
     Allowed Actions: Ask about membership renewal, update business details, or respond to customer reviews.
     Forbidden Actions: Complaining about work done for them, leaving reviews for others, or requesting services as if they were a homeowner.
     Forbidden Phrases: "I hired", "done for me", "my home", "my property", "not satisfied with", "poor quality".
     Valid Example: "I need to update my public liability insurance details and respond to a recent customer review."
+    Account Details: Must include name, location, reviews received from customers, jobs they completed, and project details.
 
 CRITICAL VALIDATION RULES: 
 
