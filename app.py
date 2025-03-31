@@ -670,8 +670,8 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         output_tokens = response["usage"]["completion_tokens"]
         total_tokens = response["usage"]["total_tokens"]
         
-        # Calculate costs
-        input_cost = calculate_token_cost(input_tokens, "input")
+        # Calculate costs - since we're using cached prompts, use the cached_input rate
+        input_cost = calculate_token_cost(input_tokens, "cached_input")
         output_cost = calculate_token_cost(output_tokens, "output")
         total_cost = input_cost + output_cost
         
@@ -688,7 +688,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
             "output_cost": output_cost,
             "total_cost": total_cost,
             "response_time": response_time,
-        "operation": "generation"
+            "operation": "generation"
         }
         
         st.session_state["token_usage"]["generations"].append(usage_data)
@@ -743,7 +743,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     except Exception as e:
             return {
                 "inbound_route": "error",
-            "ivr_flow": "",
+                "ivr_flow": "",
                 "ivr_selections": [],
                 "user_type": selected_user_type,
                 "phone_email": "",
@@ -810,8 +810,8 @@ def classify_scenario(text):
     output_tokens = response["usage"]["completion_tokens"]
     total_tokens = response["usage"]["total_tokens"]
     
-    # Calculate costs
-    input_cost = calculate_token_cost(input_tokens, "input")
+    # Calculate costs - since we're using cached prompts, use the cached_input rate
+    input_cost = calculate_token_cost(input_tokens, "cached_input")
     output_cost = calculate_token_cost(output_tokens, "output")
     total_cost = input_cost + output_cost
     
@@ -1496,52 +1496,47 @@ if st.session_state["generated_scenario"]:
                 # Save to file
                 save_inquiries_to_file()
                 
-                # Create a detailed classification display
-                st.markdown("""
-                <style>
-                .classification-card {
-                    background-color: #1E1E1E;
-                    border-radius: 10px;
-                    padding: 15px;
-                    margin-bottom: 20px;
-                    border: 1px solid #424242;
-                }
-                .classification-header {
-                    font-size: 18px;
-                    font-weight: bold;
-                    margin-bottom: 15px;
-                    color: white;
-                    border-bottom: 1px solid #555;
-                    padding-bottom: 8px;
-                }
-                .classification-field {
-                    margin-bottom: 12px;
-                }
-                .field-label {
-                    font-weight: bold;
-                    color: #64B5F6;
-                    margin-bottom: 3px;
-                }
-                .field-value {
-                    padding: 5px 10px;
-                    background-color: #2C2C2C;
-                    border-radius: 4px;
-                    color: white;
-                }
-                .priority-high {
-                    color: #ff5252;
-                    font-weight: bold;
-                }
-                .priority-medium {
-                    color: #ffab40;
-                    font-weight: bold;
-                }
-                .priority-low {
-                    color: #69f0ae;
-                    font-weight: bold;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # Get the most recent classification data
+                if st.session_state["token_usage"]["generations"]:
+                    # Find the most recent classification operation
+                    classification_data = None
+                    for data in reversed(st.session_state["token_usage"]["generations"]):
+                        if data.get("operation") == "classification":
+                            classification_data = data
+                            break
+                    
+                    if classification_data:
+                        # Display classification metrics
+                        st.markdown("### Classification Metrics")
+                        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                        
+                        with metric_col1:
+                            st.metric(
+                                "Response Time",
+                                f"{classification_data['response_time']:.2f}s"
+                            )
+                        
+                        with metric_col2:
+                            st.metric(
+                                "Input Tokens",
+                                f"{classification_data['input_tokens']:,}",
+                                f"${classification_data['input_cost']:.4f}"
+                            )
+                        
+                        with metric_col3:
+                            st.metric(
+                                "Output Tokens",
+                                f"{classification_data['output_tokens']:,}",
+                                f"${classification_data['output_cost']:.4f}"
+                            )
+                        
+                        with metric_col4:
+                            st.metric(
+                                "Total Cost",
+                                f"${classification_data['total_cost']:.4f}"
+                            )
+                        st.markdown("</div>", unsafe_allow_html=True)
                 
                 # Determine priority class
                 priority_class = "priority-medium"
