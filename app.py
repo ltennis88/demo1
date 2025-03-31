@@ -36,6 +36,18 @@ html, body, [class*="css"] {
     max-width: 12rem !important;
 }
 
+/* Fix main content layout */
+.main .block-container {
+    max-width: 95% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* Adjust top-level elements to prevent shifting */
+section[data-testid="stSidebar"] ~ .css-1d391kg {
+    width: auto !important;
+}
+
 /* Sidebar content styling */
 [data-testid="stSidebar"] {
     background-color: #1E1E1E !important;
