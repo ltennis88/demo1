@@ -1659,6 +1659,20 @@ def generate_response_suggestion(scenario, classification_result):
     # Find relevant FAQ with improved matching
     try:
         relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
+        
+        # Display FAQ if relevant
+        if relevant_faq and faq_answer and faq_relevance >= 7:
+            st.markdown("### Relevant FAQ")
+            st.markdown(f"""
+            <div style="background-color: #1E1E1E; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                <div style="margin-bottom: 10px;">
+                    <strong>Question:</strong> {relevant_faq}
+                </div>
+                <div class="field-value">
+                    <strong>Answer:</strong> {faq_answer}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error finding relevant FAQ: {str(e)}")
         relevant_faq, faq_answer, faq_relevance = None, None, 0
@@ -2872,3 +2886,36 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
+
+def update_analytics():
+    """Update the analytics display with token usage and costs"""
+    if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+        last_usage = st.session_state["token_usage"]["generations"][-1]
+        
+        # Calculate total input cost from cached and non-cached
+        total_input_cost = last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Response Time", f"{last_usage['response_time']:.2f}s")
+        with col2:
+            st.metric("Total Tokens", last_usage["total_tokens"])
+        with col3:
+            st.metric("Total Cost", f"${(total_input_cost + last_usage['output_cost']):.4f}")
+        
+        # Detailed token breakdown
+        st.write("Token Usage Breakdown:")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("Input Tokens:")
+            st.write(f"- Cached: {last_usage['cached_input_tokens']} (${last_usage['cached_input_cost']:.4f})")
+            st.write(f"- Non-cached: {last_usage['non_cached_input_tokens']} (${last_usage['non_cached_input_cost']:.4f})")
+        with col2:
+            st.write("Output Tokens:")
+            st.write(f"- Total: {last_usage['output_tokens']} (${last_usage['output_cost']:.4f})")
+        
+        # Add a summary section
+        st.write("\nCost Summary:")
+        st.write(f"- Total Input Cost: ${total_input_cost:.4f}")
+        st.write(f"- Total Output Cost: ${last_usage['output_cost']:.4f}")
+        st.write(f"- Overall Total: ${(total_input_cost + last_usage['output_cost']):.4f}")
