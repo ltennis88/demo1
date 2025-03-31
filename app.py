@@ -1124,8 +1124,11 @@ def generate_response_suggestion(scenario, classification_result):
     # Load FAQ data
     faq_data = load_faq_csv()
     
+    # Extract scenario text from the scenario object if it's a dictionary
+    scenario_text = scenario.get("scenario_text", "") if isinstance(scenario, dict) else scenario
+    
     # Find the most relevant FAQ
-    relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, faq_data)
+    relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_text, faq_data)
     
     # Start with scenario tone and urgency analysis
     scenario_tone = classification_result.get("tone", "neutral")
@@ -1943,10 +1946,10 @@ if len(df) > 0:
                 "summary": recent_row['summary']
             }
             
-            response_suggestion = generate_response_suggestion(scenario_dict, classification_dict)
+            response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(scenario_dict, classification_dict)
             
             st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_text}</div>", unsafe_allow_html=True)
         
         st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     
