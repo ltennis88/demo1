@@ -1,12 +1,23 @@
 [server]
 headless = true
 enableXsrfProtection = false
+enableCORS = false
 
 [theme]
-primaryColor = "#1E88E5"
+primaryColor = "#007bff"
 backgroundColor = "#121212"
+secondaryBackgroundColor = "#1E1E1E"
 textColor = "#FFFFFF"
+
+[browser]
+gatherUsageStats = false
 
 [ui]
 hideTopBar = false
 hideSidebarNav = true
+
+[theme.base]
+base="dark"
+
+[layout]
+contentWidth = 1200

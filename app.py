@@ -10,20 +10,41 @@ import os
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="collapsed", 
-                 menu_items=None)
+st.set_page_config(
+    layout="wide", 
+    page_title="Contact Center AI Assistant", 
+    initial_sidebar_state="collapsed", 
+    menu_items=None
+)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Add global CSS for better UI
+# Add custom CSS to force layout to be truly left-aligned and wide
 st.markdown("""
 <style>
-/* Force dark theme */
-html, body, [class*="css"] {
+/* Force dark theme and remove padding */
+body {
     color: white !important;
     background-color: #121212 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-/* Reduce sidebar width */
+/* Override Streamlit container dimensions */
+.main > .block-container {
+    max-width: 100% !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    padding-top: 0 !important;
+}
+
+/* Make full-width main area */
+section.main {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Set sidebar to fixed width */
 [data-testid="stSidebar"] {
     width: 12rem !important;
     min-width: 12rem !important;
@@ -32,178 +53,10 @@ html, body, [class*="css"] {
     border-right: 1px solid #424242 !important;
 }
 
-[data-testid="stSidebar"] > div:first-child {
-    width: 12rem !important;
-    min-width: 12rem !important;
-    max-width: 12rem !important;
-}
-
-/* Fix main content layout */
-.main .block-container {
-    max-width: 95% !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-}
-
-/* Push content leftwards */
-.css-1d391kg {
+/* Fix column width for content */
+.row-widget {
     width: 100% !important;
-    padding-left: 1rem !important;
-}
-
-/* More compact sidebar content */
-[data-testid="stSidebar"] .block-container {
-    padding-top: 2rem !important;
-}
-
-/* Improve sidebar headings */
-[data-testid="stSidebar"] h1, 
-[data-testid="stSidebar"] h2, 
-[data-testid="stSidebar"] h3 {
-    font-size: 1.2rem !important;
-    margin-top: 1rem !important;
-    margin-bottom: 0.75rem !important;
-    color: #64B5F6 !important;
-}
-
-/* Common styles for detail items */
-.agent-detail, .inquiry-detail {
-    margin-bottom: 12px;
-    padding: 8px 12px;
-    color: white;
-    background-color: #2C2C2C;
-    border-radius: 5px;
-}
-
-/* Common styles for labels */
-.agent-label, .inquiry-label {
-    font-weight: bold;
-    margin-bottom: 4px;
-    color: #e0e0e0;
-}
-
-/* Common styles for section headers */
-.agent-section, .inquiry-section {
-    margin-top: 20px;
-    margin-bottom: 12px;
-    font-size: 18px;
-    font-weight: bold;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #757575;
-    color: #64B5F6;
-}
-
-/* Additional container styling */
-.info-container {
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 8px;
-    border: 1px solid #424242;
-    background-color: #1E1E1E !important;
-}
-
-/* Topic tag styling */
-.tag-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.topic-tag {
-    display: inline-block;
-    padding: 6px 12px;
-    background-color: #2979FF;
-    color: white !important;
-    border-radius: 20px;
-    font-size: 14px;
-    margin: 5px;
-    font-weight: 500;
-}
-
-/* Override Streamlit's default text color */
-.element-container, .stMarkdown, .stText, .stSubheader {
-    color: white !important;
-}
-
-/* Override header colors */
-h1, h2, h3, h4, h5, h6 {
-    color: white !important;
-}
-
-/* Override text colors */
-p, div, span, li, label {
-    color: white !important;
-}
-
-/* Add styles for charts and expanders */
-.stExpander {
-    border: 1px solid #424242 !important;
-    background-color: #1E1E1E !important;
-}
-
-/* Dark theme for buttons */
-.stButton>button {
-    background-color: #333 !important;
-    color: white !important;
-    border: 1px solid #555 !important;
-}
-
-.stButton>button:hover {
-    background-color: #444 !important;
-    border: 1px solid #777 !important;
-}
-
-/* Set background color to dark */
-.main .block-container, .appview-container {
-    background-color: #121212 !important;
-}
-
-/* Override streamlit radio buttons and checkboxes */
-.stRadio > div, .stCheckbox > div {
-    color: white !important;
-}
-
-/* Make select boxes dark */
-.stSelectbox > div > div {
-    background-color: #333 !important;
-    color: white !important;
-}
-
-/* Dark header */
-header {
-    background-color: #121212 !important;
-}
-
-/* Force dark theme for all elements */
-div.stApp {
-    background-color: #121212 !important;
-}
-
-.nav-button {
-    background-color: #121212;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 5px;
-    margin-right: 10px;
-    text-decoration: none;
-    display: inline-block;
-    border: 2px solid #555;
-    font-weight: 500;
-}
-.nav-button.active {
-    background-color: transparent;
-    border: 2px solid #0087CC;
-    color: #0087CC;
-}
-.nav-button:hover:not(.active) {
-    background-color: #1E1E1E;
-    border-color: #0087CC;
-    color: #0087CC;
-}
-.nav-container {
-    margin-bottom: 20px;
-    display: flex;
-    flex-wrap: wrap;
+    max-width: 100% !important;
 }
 
 /* Utility classes for cards and containers */
@@ -246,7 +99,6 @@ div.stApp {
     color: #4CAF50;
     font-weight: bold;
 }
-/* Style for classification styling */
 .classification-card {
     background-color: #2C2C2C;
     border-radius: 8px;
@@ -274,51 +126,6 @@ div.stApp {
     margin-bottom: 12px;
     font-family: monospace;
     white-space: pre-wrap;
-}
-
-/* Override entire layout structure */
-.css-18e3th9 {
-    padding-top: 1rem;
-    padding-bottom: 10rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-}
-
-/* Force main content to take full width */
-.css-1d391kg {
-    width: 100% !important;
-    padding-left: 0 !important;
-}
-
-/* Reset flex layout from Streamlit */
-.css-1y4p8pa {
-    margin-left: 0 !important;
-    max-width: 100% !important;
-}
-
-/* Fix main content layout */
-.main .block-container {
-    max-width: 95% !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-    margin-left: 0 !important;
-}
-
-/* Push content leftwards and increase width */
-section[data-testid="stSidebar"] ~ .css-1d391kg {
-    width: 100% !important;
-    margin-left: 0 !important;
-    padding-left: 1rem !important;
-}
-
-/* Container styling for better use of space */
-.stApp > div:not([data-testid="stSidebar"]) {
-    margin-left: 0 !important;
-}
-
-/* Override Streamlit's default column spacing */
-.row-widget.stRadio > div {
-    flex-direction: column;
 }
 </style>
 """, unsafe_allow_html=True)
