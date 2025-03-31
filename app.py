@@ -725,8 +725,8 @@ elif st.session_state["section"] == "analytics":
 @st.cache_data
 def load_faq_csv():
     """
-    Loads the CSV file with FAQ/taxonomy data.
-    Expected columns: Type, Category, Question.
+    Loads the CSV file with FAQ/taxonomy data and converts it to an optimized dictionary structure.
+    Returns both the DataFrame (for backward compatibility) and the optimized dictionary.
     """
     try:
         # First try with semicolon delimiter
@@ -742,19 +742,59 @@ def load_faq_csv():
         
         if missing_columns:
             st.error(f"CSV file is missing required columns: {', '.join(missing_columns)}")
-            return pd.DataFrame(columns=required_columns + ["Answer"])
+            return pd.DataFrame(columns=required_columns + ["Answer"]), {}
             
         # If no Answer column exists, add an empty one
         if "Answer" not in df.columns:
             df["Answer"] = ""
         
-        return df
+        # Create optimized dictionary structure
+        faq_dict = {
+            'by_question': {},  # For direct question lookups
+            'by_category': {},  # Group FAQs by category
+            'by_type': {},      # Group FAQs by type
+            'all_faqs': []      # List of all FAQ dictionaries
+        }
+        
+        # Populate the dictionary structure
+        for _, row in df.iterrows():
+            faq_entry = {
+                'question': row['Question'],
+                'answer': row['Answer'],
+                'type': row['Type'],
+                'category': row['Category']
+            }
+            
+            # Add to all_faqs list
+            faq_dict['all_faqs'].append(faq_entry)
+            
+            # Index by question for direct lookups
+            faq_dict['by_question'][row['Question']] = faq_entry
+            
+            # Group by category
+            category = row['Category']
+            if category not in faq_dict['by_category']:
+                faq_dict['by_category'][category] = []
+            faq_dict['by_category'][category].append(faq_entry)
+            
+            # Group by type
+            faq_type = row['Type']
+            if faq_type not in faq_dict['by_type']:
+                faq_dict['by_type'][faq_type] = []
+            faq_dict['by_type'][faq_type].append(faq_entry)
+        
+        # Store the dictionary in session state for global access
+        st.session_state['faq_dict'] = faq_dict
+        
+        return df, faq_dict
+        
     except Exception as e:
         error_message = f"Error loading faq_taxonomy.csv: {str(e)}. Please ensure the file exists and is in plain text CSV format."
         st.error(error_message)
         print(error_message)  # Also log to console for debugging
-        # Return empty DataFrame with the expected columns
-        return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
+        # Return empty DataFrame and dictionary
+        return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"]), {}
+
 @st.cache_data
 def load_membership_terms():
     """
@@ -784,26 +824,27 @@ def load_guarantee_terms():
         return ""
 
 @st.cache_data
-def build_faq_context(df):
+def build_faq_context(faq_dict):
     """
-    Converts each row of the CSV into a bullet point.
-    Expected columns: Type, Category, Question.
+    Converts FAQ dictionary into a bullet point format for context building.
+    Uses the optimized dictionary structure.
     """
-    if df.empty:
+    if not faq_dict or not faq_dict.get('all_faqs'):
         return "No FAQ/taxonomy data available."
+    
     lines = []
-    for _, row in df.iterrows():
-        typ = str(row.get("Type", ""))
-        cat = str(row.get("Category", ""))
-        ques = str(row.get("Question", ""))
+    for faq in faq_dict['all_faqs']:
+        typ = str(faq['type'])
+        cat = str(faq['category'])
+        ques = str(faq['question'])
         lines.append(f"- Type: {typ} | Category: {cat} | Q: {ques}")
     return "\n".join(lines)
 
 @st.cache_data
 def build_base_context():
     """Cache the base context that doesn't change per request"""
-    faq_df = load_faq_csv()
-    faq_context = build_faq_context(faq_df)
+    faq_df, faq_dict = load_faq_csv()
+    faq_context = build_faq_context(faq_dict)
     membership_terms = load_membership_terms()
     guarantee_terms = load_guarantee_terms()
     
@@ -831,7 +872,7 @@ def build_context(df, scenario_text):
     """
     return full_context
 
-df_faq = load_faq_csv()
+df_faq, faq_dict = load_faq_csv()
 membership_terms = load_membership_terms()
 guarantee_terms = load_guarantee_terms()
 
@@ -893,7 +934,7 @@ def save_inquiries_to_file():
 ###############################################################################
 # 5) BUILD FAQ CONTEXT STRING FROM CSV
 ###############################################################################
-faq_context = build_faq_context(df_faq)
+faq_context = build_faq_context(faq_dict)
 
 ###############################################################################
 # 6) SCENARIO GENERATION PROMPTS
@@ -1308,6 +1349,12 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # Use cached base context for the scenario prompt
     base_context = build_base_context()
     
+    # Get the optimized FAQ dictionary from session state
+    faq_dict = st.session_state.get('faq_dict', {})
+    if not faq_dict:
+        # If dictionary not found, reload FAQ data
+        _, faq_dict = load_faq_csv()
+    
     scenario_prompt = f"""
     Given this customer scenario and context:
     
@@ -1342,7 +1389,8 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         best_score = 0
         best_answer = None
         
-        for _, row in faq_dataframe.iterrows():
+        # Use the all_faqs list from the optimized dictionary
+        for faq_entry in faq_dict['all_faqs']:
             try:
                 faq_prompt = f"""
                 Compare these two texts and rate their relevance on a scale of 0-10:
@@ -1351,9 +1399,9 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 {key_topics}
                 
                 FAQ Question:
-                {row['Question']}
-                FAQ Category: {row.get('Category', 'N/A')}
-                FAQ Type: {row.get('Type', 'N/A')}
+                {faq_entry['question']}
+                FAQ Category: {faq_entry['category']}
+                FAQ Type: {faq_entry['type']}
                 
                 Only respond with a number 0-10, where:
                 0 = Completely unrelated
@@ -1375,8 +1423,8 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                     relevance_score = float(score_response.choices[0].message.content.strip())
                     if relevance_score > best_score:
                         best_score = relevance_score
-                        best_match = row['Question']
-                        best_answer = row.get('Answer', '')
+                        best_match = faq_entry['question']
+                        best_answer = faq_entry['answer']
                 except ValueError:
                     continue
             except Exception as e:
@@ -1400,7 +1448,7 @@ def classify_scenario(text):
         start_time = time.time()
         
         # Load FAQ data
-        faq_df = load_faq_csv()
+        faq_df, faq_dict = load_faq_csv()
         
         # Build comprehensive context including guarantee terms
         context = build_context(faq_df, text)
@@ -1421,7 +1469,7 @@ def classify_scenario(text):
            For Finance: "Billing", "Refunds", "Financial Disputes"
            For Legal: "Contract Issues", "Guarantee Claims", "Compliance"
         
-        Return the enhanced JSON with these additional fields:
+        Return ONLY a valid JSON object with these fields (no other text):
         {
           "classification": "...",
           "department": "...",
@@ -1429,14 +1477,14 @@ def classify_scenario(text):
           "priority": "High|Medium|Low",
           "summary": "...",
           "related_faq_category": "...",
-          "estimated_response_time": "..." // E.g. "24 hours", "48 hours", "1 week" based on priority
+          "estimated_response_time": "..."
         }
         """
         
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You classify inbound queries for Checkatrade."},
+                {"role": "system", "content": "You are a classification system that only returns valid JSON objects."},
                 {"role": "user", "content": enhanced_classification_prompt}
             ],
             temperature=0.5,
@@ -1485,8 +1533,22 @@ def classify_scenario(text):
         
         # Parse the classification response
         try:
-            classification_data = json.loads(response["choices"][0]["message"]["content"].strip())
+            response_text = response["choices"][0]["message"]["content"].strip()
+            if not response_text:
+                raise json.JSONDecodeError("Empty response", "", 0)
+                
+            classification_data = json.loads(response_text)
+            
+            # Validate required fields
+            required_fields = ["classification", "department", "subdepartment", "priority", 
+                             "summary", "related_faq_category", "estimated_response_time"]
+            missing_fields = [field for field in required_fields if field not in classification_data]
+            
+            if missing_fields:
+                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+                
             return classification_data
+            
         except json.JSONDecodeError as e:
             st.error(f"Error parsing classification JSON: {str(e)}")
             return {
