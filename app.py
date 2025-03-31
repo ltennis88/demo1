@@ -1142,7 +1142,9 @@ def generate_response_suggestion(scenario, classification_result):
         faq_prompt = f"""
         Include information from this relevant FAQ:
         Question: {relevant_faq}
-        Answer: {faq_answer}
+        Answer: {faq_answer if faq_answer else "No specific answer available - please address the question based on general policies."}
+        
+        When referencing this FAQ in your response, include both the question and answer where appropriate.
         """
     
     # Generate response with cached prompt template
@@ -1182,7 +1184,8 @@ def generate_response_suggestion(scenario, classification_result):
         3. Includes any relevant policy details or next steps
         4. Maintains a supportive and solution-oriented tone
         5. If the inquiry involves a complaint about a tradesperson, explain that Checkatrade takes quality seriously and outline the specific steps you'll take to investigate
-        6. Ends with a clear call to action or next steps
+        6. If a relevant FAQ is provided, reference BOTH the question and answer from the FAQ in your response
+        7. Ends with a clear call to action or next steps
         
         Format the response in a clean, professional style suitable for customer communication. 
         Don't use placeholder text or generic responses - be specific to their situation.
@@ -2058,6 +2061,41 @@ if len(df) > 0:
                     # If we have an answer, display it as well
                     if faq_answer:
                         st.markdown(f"<div class='inquiry-detail'><strong>Answer:</strong> {faq_answer}</div>", unsafe_allow_html=True)
+                
+                # Generate response suggestion for email or whatsapp if the section doesn't exist yet
+                inbound_route = row['inbound_route']
+                if inbound_route in ["email", "whatsapp"]:
+                    # Only display the response suggestion section if it hasn't been displayed yet
+                    if not st.session_state.get(f"response_suggestion_displayed_{idx}", False):
+                        # Recreate scenario structure from row data
+                        scenario_dict = {
+                            "inbound_route": row['inbound_route'],
+                            "scenario_text": row['scenario_text'],
+                            "user_type": row['user_type'],
+                            "account_details": {
+                                "name": row['account_name'],
+                                "location": row['account_location'],
+                                "latest_reviews": row['account_reviews'],
+                                "latest_jobs": row['account_jobs'],
+                                "project_cost": row['project_cost'],
+                                "payment_status": row['payment_status']
+                            }
+                        }
+                        
+                        # Recreate classification structure
+                        classification_dict = {
+                            "classification": row['classification'],
+                            "priority": row['priority'],
+                            "summary": row['summary']
+                        }
+                        
+                        response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(scenario_dict, classification_dict)
+                        
+                        st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{response_text}</div>", unsafe_allow_html=True)
+                        
+                        # Mark this response suggestion as displayed
+                        st.session_state[f"response_suggestion_displayed_{idx}"] = True
                 
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 else:
