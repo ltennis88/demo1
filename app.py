@@ -13,6 +13,103 @@ import re
 from collections import Counter
 
 ###############################################################################
+# Helper Functions
+###############################################################################
+def update_analytics(section="main"):
+    """Update analytics display."""
+    if "token_usage" not in st.session_state or not st.session_state["token_usage"]["generations"]:
+        st.info("No analytics data available yet. Generate some responses to see analytics.")
+        return
+
+    st.header("Analytics Dashboard")
+    
+    # Get the token usage data
+    token_data = st.session_state["token_usage"]
+    
+    # Calculate total costs and tokens with backward compatibility
+    total_input_tokens = sum(
+        (gen.get("cached_input_tokens", 0) + gen.get("non_cached_input_tokens", 0)) 
+        if ("cached_input_tokens" in gen or "non_cached_input_tokens" in gen)
+        else gen.get("input_tokens", 0)
+        for gen in token_data["generations"]
+    )
+    
+    total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
+    
+    total_input_cost = sum(
+        (gen.get("cached_input_cost", 0) + gen.get("non_cached_input_cost", 0))
+        if ("cached_input_cost" in gen or "non_cached_input_cost" in gen)
+        else gen.get("input_cost", 0)
+        for gen in token_data["generations"]
+    )
+    
+    total_output_cost = sum(gen.get("output_cost", 0) for gen in token_data["generations"])
+    total_cost = total_input_cost + total_output_cost
+    
+    # Display summary metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Cost", f"${total_cost:.4f}")
+    with col2:
+        st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+    with col3:
+        st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+    
+    # Display cost breakdown
+    st.subheader("Cost Breakdown")
+    col4, col5 = st.columns(2)
+    with col4:
+        st.metric("Input Cost", f"${total_input_cost:.4f}")
+    with col5:
+        st.metric("Output Cost", f"${total_output_cost:.4f}")
+    
+    # Display average response time
+    response_times = [gen.get("response_time", 0) for gen in token_data["generations"]]
+    if response_times:
+        avg_response_time = sum(response_times) / len(response_times)
+        st.metric("Average Response Time", f"{avg_response_time:.2f}s")
+    
+    # Display inquiries data if available
+    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+        df = st.session_state["inquiries"]
+        
+        # Classification distribution
+        st.subheader("Classification Distribution")
+        if "classification" in df.columns and not df["classification"].isna().all():
+            classification_counts = df["classification"].value_counts()
+            for classification, count in classification_counts.items():
+                if pd.notna(classification):  # Skip NaN values
+                    percentage = (count / len(df)) * 100
+                    st.text(f"{classification}: {count} ({percentage:.1f}%)")
+        
+        # Priority distribution
+        st.subheader("Priority Distribution")
+        if "priority" in df.columns and not df["priority"].isna().all():
+            priority_counts = df["priority"].value_counts()
+            for priority, count in priority_counts.items():
+                if pd.notna(priority):  # Skip NaN values
+                    percentage = (count / len(df)) * 100
+                    st.text(f"{priority}: {count} ({percentage:.1f}%)")
+        
+        # Common topics analysis
+        st.subheader("Common Topics & Themes")
+        if "summary" in df.columns and not df["summary"].isna().all():
+            summaries = " ".join(df["summary"].fillna("")).lower()
+            words = re.findall(r'\b\w+\b', summaries)
+            word_counts = Counter(words)
+            
+            # Filter out common stop words and short words
+            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+            themes = [(word, count) for word, count in word_counts.most_common(10) 
+                     if word not in stop_words and len(word) > 3]
+            
+            if themes:  # Only display if we have themes
+                for word, count in themes:
+                    st.text(f"{word.title()}: {count}")
+            else:
+                st.text("No common themes found yet")
+
+###############################################################################
 # 1) EARLY INITIALIZATION - To prevent SessionInfo errors
 ###############################################################################
 # Initialize all session state variables at the very beginning
@@ -2262,7 +2359,23 @@ df = st.session_state["inquiries"]
 if len(df) > 0:
     # Analytics in expander
     with st.expander("View Analytics Dashboard", expanded=False):
-        update_analytics("main")  # All analytics now in expander
+        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+            st.subheader("Analytics Overview")
+            # Display basic metrics without the full update_analytics function
+            token_data = st.session_state["token_usage"]
+            total_cost = sum(gen.get("total_cost", 0) for gen in token_data["generations"])
+            total_input_tokens = sum(gen.get("input_tokens", 0) for gen in token_data["generations"])
+            total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Cost", f"${total_cost:.4f}")
+            with col2:
+                st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+            with col3:
+                st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+        else:
+            st.info("No analytics data available yet. Generate some responses to see analytics.")
     
     # Recent Inquiries Section
     st.subheader("Recent Inquiries")
@@ -2315,40 +2428,18 @@ else:
     st.write("No data to export yet.")
 
 # -----------------------------------------------------------------------------
-# ANALYTICS
+# ANALYTICS FUNCTIONS
 # -----------------------------------------------------------------------------
-def update_analytics(section="main"):
-    """Update analytics display."""
-    if "token_usage" not in st.session_state or not st.session_state["token_usage"]["generations"]:
-        st.info("No analytics data available yet. Generate some responses to see analytics.")
-        return
+# Function definition moved to top of file
 
-    st.header("Analytics Dashboard")
-    
-    # Get the token usage data
+# Update all calls to update_analytics to include a section identifier
+if st.session_state.get("token_usage", {}).get("generations"):
+    # Display basic metrics
     token_data = st.session_state["token_usage"]
-    
-    # Calculate total costs and tokens with backward compatibility
-    total_input_tokens = sum(
-        (gen.get("cached_input_tokens", 0) + gen.get("non_cached_input_tokens", 0)) 
-        if ("cached_input_tokens" in gen or "non_cached_input_tokens" in gen)
-        else gen.get("input_tokens", 0)
-        for gen in token_data["generations"]
-    )
-    
+    total_cost = sum(gen.get("total_cost", 0) for gen in token_data["generations"])
+    total_input_tokens = sum(gen.get("input_tokens", 0) for gen in token_data["generations"])
     total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
     
-    total_input_cost = sum(
-        (gen.get("cached_input_cost", 0) + gen.get("non_cached_input_cost", 0))
-        if ("cached_input_cost" in gen or "non_cached_input_cost" in gen)
-        else gen.get("input_cost", 0)
-        for gen in token_data["generations"]
-    )
-    
-    total_output_cost = sum(gen.get("output_cost", 0) for gen in token_data["generations"])
-    total_cost = total_input_cost + total_output_cost
-    
-    # Display summary metrics
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total Cost", f"${total_cost:.4f}")
@@ -2356,427 +2447,8 @@ def update_analytics(section="main"):
         st.metric("Total Input Tokens", f"{total_input_tokens:,}")
     with col3:
         st.metric("Total Output Tokens", f"{total_output_tokens:,}")
-    
-    # Display cost breakdown
-    st.subheader("Cost Breakdown")
-    col4, col5 = st.columns(2)
-    with col4:
-        st.metric("Input Cost", f"${total_input_cost:.4f}")
-    with col5:
-        st.metric("Output Cost", f"${total_output_cost:.4f}")
-    
-    # Display average response time
-    response_times = [gen.get("response_time", 0) for gen in token_data["generations"]]
-    if response_times:
-        avg_response_time = sum(response_times) / len(response_times)
-        st.metric("Average Response Time", f"{avg_response_time:.2f}s")
-    
-    # Display inquiries data if available
-    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
-        df = st.session_state["inquiries"]
-        
-        # Classification distribution
-        st.subheader("Classification Distribution")
-        if "classification" in df.columns and not df["classification"].isna().all():
-            classification_counts = df["classification"].value_counts()
-            for classification, count in classification_counts.items():
-                if pd.notna(classification):  # Skip NaN values
-                    percentage = (count / len(df)) * 100
-                    st.text(f"{classification}: {count} ({percentage:.1f}%)")
-        
-        # Priority distribution
-        st.subheader("Priority Distribution")
-        if "priority" in df.columns and not df["priority"].isna().all():
-            priority_counts = df["priority"].value_counts()
-            for priority, count in priority_counts.items():
-                if pd.notna(priority):  # Skip NaN values
-                    percentage = (count / len(df)) * 100
-                    st.text(f"{priority}: {count} ({percentage:.1f}%)")
-        
-        # Common topics analysis
-        st.subheader("Common Topics & Themes")
-        if "summary" in df.columns and not df["summary"].isna().all():
-            summaries = " ".join(df["summary"].fillna("")).lower()
-            words = re.findall(r'\b\w+\b', summaries)
-            word_counts = Counter(words)
-            
-            # Filter out common stop words and short words
-            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
-            themes = [(word, count) for word, count in word_counts.most_common(10) 
-                     if word not in stop_words and len(word) > 3]
-            
-            if themes:  # Only display if we have themes
-                for word, count in themes:
-                    st.text(f"{word.title()}: {count}")
-            else:
-                st.text("No common themes found yet")
 
-    # Then show summary charts with expanded information
-    with st.expander("View Analytics Dashboard"):
-        st.subheader("Summary Analytics")
-        
-        # Row 1: Classification and Priority distribution
-        colA, colB = st.columns(2)
-        with colA:
-            classification_counts = df["classification"].value_counts()
-            
-            # Create pie chart with plotly express
-            fig1 = px.pie(
-                values=classification_counts.values,
-                names=classification_counts.index,
-                title="Classification Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
-            )
-            
-            # Customize
-            fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
-            fig1.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig1, use_container_width=True)
-            
-            # Show classification breakdown as text too
-            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-            for classification, count in classification_counts.items():
-                percentage = (count / len(df)) * 100
-                st.markdown(f"<div class='inquiry-label'>{classification}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-        with colB:
-            priority_counts = df["priority"].value_counts()
-            
-            # Create color mapping for priorities
-            priority_colors = {
-                "High": "#DB4437",    # Red for high
-                "Medium": "#F4B400",  # Yellow for medium
-                "Low": "#0F9D58"      # Green for low
-            }
-            
-            # Create a pie chart using plotly express
-            fig2 = px.pie(
-                values=priority_counts.values,
-                names=priority_counts.index,
-                title="Priority Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=priority_colors
-            )
-            
-            # Customize
-            fig2.update_traces(textinfo='percent+label')
-            fig2.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig2, use_container_width=True)
-        
-        # Row 2: User type and Route distribution 
-        colC, colD = st.columns(2)
-        with colC:
-            user_type_counts = df["user_type"].value_counts()
-            
-            # Convert value_counts to DataFrame for plotly
-            user_type_df = pd.DataFrame({
-                'User Type': user_type_counts.index,
-                'Count': user_type_counts.values
-            })
-            
-            # Create horizontal bar chart using plotly express
-            fig3 = px.bar(
-                user_type_df,
-                x='Count',
-                y='User Type',
-                orientation='h',
-                title="User Type Distribution",
-                text='Count',
-                color_discrete_sequence=["#4285F4"]
-            )
-            
-            # Customize
-            fig3.update_layout(
-                xaxis_title="Count",
-                yaxis_title="",
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                xaxis=dict(gridcolor="#444"),
-                yaxis=dict(gridcolor="#444")
-            )
-            
-            st.plotly_chart(fig3, use_container_width=True)
-            
-            with colD:
-                route_counts = df["inbound_route"].value_counts()
-                
-                # Create color mapping for routes
-                route_colors = {
-                    "phone": "#4285F4",     # Blue for phone
-                    "email": "#DB4437",     # Red for email
-                    "whatsapp": "#0F9D58",  # Green for whatsapp
-                    "web_form": "#F4B400"   # Yellow for web form
-                }
-                
-                # Create a pie chart using plotly express
-                fig4 = px.pie(
-                    values=route_counts.values,
-                    names=route_counts.index,
-                    title="Inbound Route Distribution",
-                    hole=0.4,  # Makes it a donut chart
-                    color_discrete_map=route_colors
-                )
-                
-                # Customize
-                fig4.update_traces(textinfo='percent+label')
-                fig4.update_layout(
-                    legend=dict(orientation="h", y=-0.1),
-                    height=300,
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    font=dict(color="white")
-                )
-                
-                st.plotly_chart(fig4, use_container_width=True)
-
-        # Common topics/themes from summaries
-        st.subheader("Common Topics & Themes")
-        topics_container = st.container()
-        with topics_container:
-            # Extract keywords from summaries to create topic tags
-            all_summaries = " ".join(df["summary"].dropna())
-            
-            # Display a word cloud-like representation with the most common words
-            common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
-                           "technical", "login", "access", "website", "app", "mobile", "payment",
-                           "renewal", "subscription", "complaint", "feedback", "review", "rating",
-                           "tradesperson", "homeowner", "service", "quality", "delay"]
-            
-            # Create a container with improved styling for a horizontal tag layout
-            st.markdown("""
-            <div class='info-container'>
-                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
-            """, unsafe_allow_html=True)
-            
-            # Filter to only show words that appear in the summaries
-            matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
-            
-            # Generate random counts for demo purposes
-            for word in matching_words:
-                count = random.randint(1, len(df))
-                if count > 0:
-                    # Calculate opacity based on count (more frequent = more opaque)
-                    opacity = min(0.5 + (count / len(df)), 1.0)
-                    # Create the tag with improved styling
-                    st.markdown(f"""
-                        <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
-                             color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
-                             opacity: {opacity}; margin-bottom: 10px;">
-                            {word.title()} ({count})
-                        </div>
-                    """, unsafe_allow_html=True)
-            
-            st.markdown("""
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # Add new Token Usage Analytics section
-    st.subheader("Token Usage Analytics")
-    
-    if st.session_state["token_usage"]["generations"]:
-        # Create DataFrame from token usage data
-        df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
-        df_tokens['timestamp'] = pd.to_datetime(df_tokens['timestamp'])
-        
-        # Split data by operation, handling case where operation field might not exist
-        if 'operation' in df_tokens.columns:
-            scenario_data = df_tokens[df_tokens['operation'].isna()]  # Scenario generation doesn't have operation field
-            classification_data = df_tokens[df_tokens['operation'] == 'classification']
-        else:
-            # If operation field doesn't exist, treat all data as scenario generation
-            scenario_data = df_tokens
-            classification_data = pd.DataFrame()
-        
-        # Calculate averages for scenario generation
-        if not scenario_data.empty:
-            st.markdown("### Scenario Generation Metrics")
-            avg_response_time_scenario = scenario_data['response_time'].mean()
-            avg_input_tokens_scenario = scenario_data['input_tokens'].mean()
-            avg_output_tokens_scenario = scenario_data['output_tokens'].mean()
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    "Average Response Time",
-                    f"{avg_response_time_scenario:.2f}s",
-                    f"Total: {scenario_data['response_time'].sum():.2f}s"
-                )
-            
-            with col2:
-                st.metric(
-                    "Average Input Tokens",
-                    f"{avg_input_tokens_scenario:,.0f}",
-                    f"Total: {scenario_data['input_tokens'].sum():,}"
-                )
-            
-            with col3:
-                st.metric(
-                    "Average Output Tokens",
-                    f"{avg_output_tokens_scenario:,.0f}",
-                    f"Total: {scenario_data['output_tokens'].sum():,}"
-                )
-        
-        # Calculate averages for classification
-        if not classification_data.empty:
-            st.markdown("### Classification Metrics")
-            avg_response_time_class = classification_data['response_time'].mean()
-            avg_cached_tokens = classification_data['cached_input_tokens'].mean()
-            avg_non_cached_tokens = classification_data['non_cached_input_tokens'].mean()
-            avg_output_tokens_class = classification_data['output_tokens'].mean()
-            
-            # Calculate total input cost for display
-            total_input_cost = classification_data['cached_input_cost'].sum() + classification_data['non_cached_input_cost'].sum()
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric(
-                    "Average Response Time",
-                    f"{avg_response_time_class:.2f}s",
-                    f"Total: {classification_data['response_time'].sum():.2f}s"
-                )
-            
-            with col2:
-                st.metric(
-                    "Avg Cached Input Tokens",
-                    f"{avg_cached_tokens:,.0f}",
-                    f"${classification_data['cached_input_cost'].sum():.4f}"
-                )
-            
-            with col3:
-                st.metric(
-                    "Avg Non-Cached Input Tokens",
-                    f"{avg_non_cached_tokens:,.0f}",
-                    f"${classification_data['non_cached_input_cost'].sum():.4f}"
-                )
-            
-            with col4:
-                st.metric(
-                    "Average Output Tokens",
-                    f"{avg_output_tokens_class:,.0f}",
-                    f"${classification_data['output_cost'].sum():.4f}"
-                )
-
-            # Add total cost summary
-            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-            st.markdown("<div class='inquiry-section'>Total Costs</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${classification_data['output_cost'].sum():.4f}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Total Cost: ${classification_data['total_cost'].sum():.4f}</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Create line charts for token usage over time
-        st.markdown("### Token Usage Over Time")
-        
-        # Scenario Generation Chart
-        if not scenario_data.empty:
-            fig_scenario = px.line(
-                scenario_data,
-                x='timestamp',
-                y=['input_tokens', 'output_tokens'],
-                title='Scenario Generation Token Usage',
-                labels={'value': 'Tokens', 'timestamp': 'Time'}
-            )
-            
-            fig_scenario.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                xaxis=dict(gridcolor="#444"),
-                yaxis=dict(gridcolor="#444")
-            )
-            
-            st.plotly_chart(fig_scenario, use_container_width=True)
-        
-        # Classification Chart
-        if not classification_data.empty:
-            fig_class = px.line(
-                classification_data,
-                x='timestamp',
-                y=['input_tokens', 'output_tokens'],
-                title='Classification Token Usage',
-                labels={'value': 'Tokens', 'timestamp': 'Time'}
-            )
-            
-            fig_class.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                xaxis=dict(gridcolor="#444"),
-                yaxis=dict(gridcolor="#444")
-            )
-            
-            st.plotly_chart(fig_class, use_container_width=True)
-        
-        # Display cost breakdown
-        st.markdown("### Cost Breakdown")
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        
-        # Scenario Generation Costs
-        if not scenario_data.empty:
-            st.markdown("<div class='inquiry-section'>Scenario Generation</div>", unsafe_allow_html=True)
-            scenario_input_cost = scenario_data['input_cost'].sum()
-            scenario_output_cost = scenario_data['output_cost'].sum()
-            scenario_total_cost = scenario_data['total_cost'].sum()
-            
-            st.markdown(f"<div class='inquiry-label'>Input Cost: ${scenario_input_cost:.4f}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Output Cost: ${scenario_output_cost:.4f}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Total Cost: ${scenario_total_cost:.4f}</div>", unsafe_allow_html=True)
-        
-        # Classification Costs
-        if not classification_data.empty:
-            st.markdown("<div class='inquiry-section'>Classification</div>", unsafe_allow_html=True)
-            class_input_cost = classification_data['input_cost'].sum()
-            class_output_cost = classification_data['output_cost'].sum()
-            class_total_cost = classification_data['total_cost'].sum()
-            
-            st.markdown(f"<div class='inquiry-label'>Input Cost: ${class_input_cost:.4f}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Output Cost: ${class_output_cost:.4f}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-label'>Total Cost: ${class_total_cost:.4f}</div>", unsafe_allow_html=True)
-        
-        # Overall Totals
-        st.markdown("<div class='inquiry-section'>Overall Totals</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='inquiry-label'>Total Input Cost: ${df_tokens['input_cost'].sum():.4f}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${df_tokens['output_cost'].sum():.4f}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='inquiry-label'>Total Cost: ${st.session_state['token_usage']['total_cost']:.4f}</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        st.info("No token usage data available yet. Generate some scenarios to see analytics.")
-
-# Update all calls to update_analytics to include a section identifier
-if st.session_state.get("token_usage", {}).get("generations"):
-    update_analytics("main")  # Main section analytics
-
-# In response generation section
-if st.button("Generate Response"):
-    with st.spinner("Generating response..."):
-        response_text = generate_response_suggestion(scenario_dict, classification_dict)
-        st.markdown("### Generated Response")
-        st.markdown(response_text)
-        
-        # Display analytics with unique section identifier
-        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-            update_analytics("response")
+    # ... existing code ...
 
 def extract_key_topics(scenario_text):
     """Extract key topics from the scenario using OpenAI."""
