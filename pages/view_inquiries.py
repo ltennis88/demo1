@@ -323,72 +323,74 @@ def show_inquiries():
                         <div class='result-label'>Summary:</div>
                         <div class='result-value'>{row.get("summary", "No summary available")}</div>
                     </div>
+                    </div>
                     """, unsafe_allow_html=True)
                     
-                    # Add related FAQ category if available
-                    if row.get('related_faq_category'):
-                        st.markdown(f"""
-                        <div class='result-row'>
-                            <div class='result-label'>Related FAQ Category:</div>
-                            <div class='result-value'>{row.get("related_faq_category", "")}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                    # Display relevant FAQ if available
+                    if row.get('relevant_faq'):
+                        st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
+                        st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row.get('relevant_faq')}</div>", unsafe_allow_html=True)
                     
-                    # Close the container
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Case Management for this inquiry
-                    case_status = row.get('case_status', 'New')
-                    
-                    # Show case status
-                    st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
-                    status_color = "#64B5F6"  # Default blue
-                    if case_status == "Resolved" or case_status == "Closed":
-                        status_color = "#4CAF50"  # Green
-                    elif case_status == "In Progress":
-                        status_color = "#FFA726"  # Orange
-                    elif case_status == "Awaiting Customer" or case_status == "Awaiting Tradesperson":
-                        status_color = "#FFD54F"  # Amber
-                    
-                    st.markdown("<div class='inquiry-label'>Current Status:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail' style='color: {status_color}; font-weight: bold;'>{case_status}</div>", unsafe_allow_html=True)
-                    
-                    # Replace expander with a simple UI using columns and a button to toggle visibility
-                    if st.button(f"📝 Update Case #{idx}", key=f"toggle_{idx}"):
-                        # Case status selection
-                        case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
-                        selected_status = st.selectbox(
-                            "Update Case Status:",
-                            options=case_status_options,
-                            index=case_status_options.index(case_status) if case_status in case_status_options else 0,
-                            key=f"status_{idx}"
-                        )
+                    # Display response suggestion if available for email or whatsapp
+                    if row.get('response_suggestion') and row.get('inbound_route') in ["email", "whatsapp"]:
+                        if not row.get('relevant_faq'):
+                            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
                         
-                        # Agent notes text area
-                        agent_notes = st.text_area(
-                            "Agent Notes:",
-                            value=row.get('agent_notes', ''),
-                            height=150,
-                            placeholder="Enter your notes about the case here...",
-                            key=f"notes_{idx}"
-                        )
-                        
-                        # Save button for agent updates
-                        if st.button("Save Updates", key=f"save_{idx}"):
-                            # Update the parent session state DataFrame
-                            st.session_state["inquiries"].at[idx, "case_status"] = selected_status
-                            st.session_state["inquiries"].at[idx, "agent_notes"] = agent_notes
-                            
-                            # Save changes to file
-                            from app import save_inquiries_to_file
-                            save_inquiries_to_file()
-                            
-                            st.success(f"Case {idx} updated - Status: {selected_status}")
-                            st.experimental_rerun()
+                        inbound_route = row.get('inbound_route')
+                        st.markdown(f"<div class='inquiry-label'>Suggested {inbound_route.capitalize()} Response:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{row.get('response_suggestion')}</div>", unsafe_allow_html=True)
+                    
+                    # Display Agent Actions section
+                    st.markdown("<div class='inquiry-section'>Agent Actions</div>", unsafe_allow_html=True)
+                    
+                    # Display case status if available
+                    if row.get('case_status'):
+                        st.markdown("<div class='inquiry-label'>Case Status:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row.get('case_status')}</div>", unsafe_allow_html=True)
                     
                     # Display existing agent notes if any
                     if row.get('agent_notes'):
                         st.markdown("<div class='inquiry-label'>Agent Notes:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{row.get('agent_notes', '')}</div>", unsafe_allow_html=True)
+                    
+                    # Allow updating the case status and notes
+                    with st.expander("Update Case"):
+                        # Create a form for updating case status and notes
+                        with st.form(key=f"update_case_{idx}"):
+                            # Case status selection
+                            case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                            updated_status = st.selectbox(
+                                "Update Case Status:",
+                                options=case_status_options,
+                                index=case_status_options.index(row.get('case_status', "New")),
+                                key=f"status_{idx}"
+                            )
+                            
+                            # Agent notes text area
+                            updated_notes = st.text_area(
+                                "Agent Notes:",
+                                value=row.get('agent_notes', ''),
+                                height=150,
+                                placeholder="Enter your notes about the case here...",
+                                key=f"notes_{idx}"
+                            )
+                            
+                            # Submit button
+                            submit_button = st.form_submit_button("Save Updates", use_container_width=True)
+                            
+                            if submit_button:
+                                # Update the DataFrame with the new status and notes
+                                st.session_state["inquiries"].at[idx, "case_status"] = updated_status
+                                st.session_state["inquiries"].at[idx, "agent_notes"] = updated_notes
+                                
+                                # Save to file
+                                from app import save_inquiries_to_file
+                                save_inquiries_to_file()
+                                
+                                st.success(f"Case {idx} updated - Status: {updated_status}")
+                                st.experimental_rerun()
+                    
+                st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
         st.info("No inquiries found. Generate and classify some scenarios first.") 

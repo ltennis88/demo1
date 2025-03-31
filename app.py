@@ -1733,6 +1733,48 @@ if st.session_state["generated_scenario"]:
                     st.success(f"Case {st.session_state['current_case_id']} updated - Status: {selected_status}")
 
                 st.markdown("</div>", unsafe_allow_html=True)
+
+                # Add metrics for the classification tokens and cost
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    last_usage = st.session_state["token_usage"]["generations"][-1]
+                    response_time = last_usage["response_time"]
+                    st.metric("Response Time", f"{response_time:.2f}s")
+                
+                with col2:
+                    input_tokens = last_usage["input_tokens"] 
+                    input_cost = last_usage["input_cost"]
+                    st.metric("Input Tokens", f"{input_tokens} (${input_cost:.4f})")
+                
+                with col3:
+                    output_tokens = last_usage["output_tokens"]
+                    output_cost = last_usage["output_cost"]
+                    st.metric("Output Tokens", f"{output_tokens} (${output_cost:.4f})")
+                    
+                with col4:
+                    total_cost = last_usage["total_cost"]
+                    st.metric("Total Cost", f"${total_cost:.4f}")
+                
+                # Store all classification fields in the inquiries DataFrame
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "classification"] = classification_result.get("classification", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "department"] = classification_result.get("department", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "subdepartment"] = classification_result.get("subdepartment", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "priority"] = classification_result.get("priority", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "estimated_response_time"] = classification_result.get("estimated_response_time", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "summary"] = classification_result.get("summary", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "related_faq_category"] = classification_result.get("related_faq_category", "")
+                
+                # Also save the generated response suggestion if applicable
+                if inbound_route in ["email", "whatsapp"] and 'response_suggestion' in locals():
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "response_suggestion"] = response_suggestion
+                
+                # Save any relevant FAQ that was found
+                if relevant_faq and faq_relevance_score >= 3:
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq"] = relevant_faq
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "faq_relevance_score"] = faq_relevance_score
+                    
+                # Save to file again to ensure all classification fields are stored
+                save_inquiries_to_file()
         else:
             st.warning("No scenario text found. Generate a scenario first.")
 else:
