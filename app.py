@@ -1718,41 +1718,49 @@ if st.session_state["generated_scenario"]:
                     priority_class = "priority-low"
                 
                 # Render the classification card
-                st.markdown(f"""
+                st.markdown("""
                 <div class="classification-card">
                     <div class="classification-header">Classification Results</div>
                     
                     <div class="classification-field">
                         <div class="field-label">Classification:</div>
-                        <div class="field-value">{new_row["classification"]}</div>
+                        <div class="field-value">{}</div>
                     </div>
                     
                     <div class="classification-field">
                         <div class="field-label">Department:</div>
-                        <div class="field-value">{new_row["department"]}</div>
+                        <div class="field-value">{}</div>
                     </div>
                     
                     <div class="classification-field">
                         <div class="field-label">Subdepartment:</div>
-                        <div class="field-value">{new_row["subdepartment"]}</div>
+                        <div class="field-value">{}</div>
                     </div>
                     
                     <div class="classification-field">
                         <div class="field-label">Priority:</div>
-                        <div class="field-value"><span class="{priority_class}">{new_row["priority"]}</span></div>
+                        <div class="field-value"><span class="priority-{}">{}</span></div>
                     </div>
                     
                     <div class="classification-field">
                         <div class="field-label">Estimated Response Time:</div>
-                        <div class="field-value">{new_row["estimated_response_time"]}</div>
+                        <div class="field-value">{}</div>
                     </div>
                     
                     <div class="classification-field">
                         <div class="field-label">Summary:</div>
-                        <div class="field-value">{new_row["summary"]}</div>
+                        <div class="field-value">{}</div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """.format(
+                    classification_result.get("classification", "Unknown"),
+                    classification_result.get("department", "Unknown"),
+                    classification_result.get("subdepartment", "Unknown"),
+                    classification_result.get("priority", "medium").lower(),
+                    classification_result.get("priority", "Medium"),
+                    classification_result.get("estimated_response_time", "Unknown"),
+                    classification_result.get("summary", "No summary available")
+                ), unsafe_allow_html=True)
                 
                 # Get relevant FAQ based on the classification result and scenario text
                 faq_category = classification_result.get("related_faq_category", "")
