@@ -20,30 +20,6 @@ if "generated_scenario" not in st.session_state:
 if "current_case_id" not in st.session_state:
     st.session_state["current_case_id"] = None
 
-# Define token cost constants
-TOKEN_COSTS = {
-    "input": 0.15,      # $0.15 per 1M tokens
-    "cached_input": 0.075,  # $0.075 per 1M tokens
-    "output": 0.60      # $0.60 per 1M tokens
-}
-
-# Initialize token usage tracking
-if "token_usage" not in st.session_state:
-    st.session_state["token_usage"] = {
-        "total_input_tokens": 0,
-        "total_output_tokens": 0,
-        "total_cost": 0,
-        "response_times": [],
-        "generations": []
-    }
-
-# Initialize cached values
-if "cached_response_prompt" not in st.session_state:
-    st.session_state["cached_response_prompt"] = ""
-    
-if "cached_response_prompt_tokens" not in st.session_state:
-    st.session_state["cached_response_prompt_tokens"] = 0
-
 # Initialize inquiries early to avoid issues
 if "inquiries" not in st.session_state:
     # Create a placeholder until we can properly load in the full initialization section
@@ -54,6 +30,75 @@ if "inquiries" not in st.session_state:
         "account_location", "account_reviews", "account_jobs", "project_cost", 
         "payment_status", "estimated_response_time", "agent_notes", "case_status"
     ])
+
+# Initialize generated_scenario variable to avoid SessionInfo errors
+if "generated_scenario" not in st.session_state:
+    st.session_state["generated_scenario"] = {
+        "inbound_route": "",
+        "scenario_text": "",
+        "user_type": "",
+        "account_details": {
+            "name": "",
+            "location": "",
+            "latest_reviews": "",
+            "latest_jobs": "",
+            "project_cost": "",
+            "payment_status": ""
+        }
+    }
+
+# Initialize classification variable to avoid SessionInfo errors
+if "classification_result" not in st.session_state:
+    st.session_state["classification_result"] = {
+        "classification": "",
+        "department": "",
+        "subdepartment": "",
+        "priority": "",
+        "summary": "",
+        "related_faq_category": "",
+        "estimated_response_time": ""
+    }
+
+# Initialize other session state variables used throughout the app
+for key in ["current_case_id", "page", "classified", "token_usage", "csv_loaded", "inquiries_loaded"]:
+    if key not in st.session_state:
+        st.session_state[key] = None
+
+# Set default values for specific variables
+if st.session_state["token_usage"] is None:
+    st.session_state["token_usage"] = {
+        "generations": [],
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_cost": 0,
+        "response_times": []
+    }
+
+if st.session_state["page"] is None:
+    st.session_state["page"] = "generate"
+
+if st.session_state["classified"] is None:
+    st.session_state["classified"] = False
+
+if st.session_state["csv_loaded"] is None:
+    st.session_state["csv_loaded"] = False
+
+if st.session_state["inquiries_loaded"] is None:
+    st.session_state["inquiries_loaded"] = False
+
+# Define token cost constants
+TOKEN_COSTS = {
+    "input": 0.15,      # $0.15 per 1M tokens
+    "cached_input": 0.075,  # $0.075 per 1M tokens
+    "output": 0.60      # $0.60 per 1M tokens
+}
+
+# Initialize cached values
+if "cached_response_prompt" not in st.session_state:
+    st.session_state["cached_response_prompt"] = ""
+    
+if "cached_response_prompt_tokens" not in st.session_state:
+    st.session_state["cached_response_prompt_tokens"] = 0
 
 ###############################################################################
 # 2) PAGE CONFIGURATION & OPENAI SETUP
@@ -1829,33 +1874,35 @@ if st.session_state["generated_scenario"]:
 
                 # Only display FAQ if we have a sufficiently relevant match
                 if relevant_faq and faq_relevance_score >= 3:
-                    st.markdown("""
+                    faq_content = f"""
                     <div class="classification-card">
                         <div class="classification-header">Relevant FAQ</div>
-                        <div class="field-value"><strong>Question:</strong> """ + relevant_faq + """</div>
-                    """, unsafe_allow_html=True)
+                        <div class="field-value"><strong>Question:</strong> {str(relevant_faq)}</div>
+                    """
                     
                     # If we have an answer, display it as well
                     if 'relevant_answer' in locals() and relevant_answer:
-                        st.markdown("""
-                        <div class="field-value"><strong>Answer:</strong> """ + relevant_answer + """</div>
-                        """, unsafe_allow_html=True)
+                        faq_content += f"""
+                        <div class="field-value"><strong>Answer:</strong> {str(relevant_answer)}</div>
+                        """
                     
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    faq_content += "</div>"
+                    st.markdown(faq_content, unsafe_allow_html=True)
                 
                 # Generate response suggestion for email or whatsapp
                 inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
                 if inbound_route in ["email", "whatsapp"]:
-                    response_suggestion = generate_response_suggestion(
-                        st.session_state["generated_scenario"], 
-                        classification_result
-                    )
-                    st.markdown("""
-                    <div class="classification-card">
-                        <div class="classification-header">Suggested """ + inbound_route.capitalize() + """ Response</div>
-                        <div class="field-value" style="white-space: pre-wrap;">""" + response_suggestion + """</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    try:
+                        response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
+                            st.session_state["generated_scenario"], 
+                            st.session_state["classification_result"]
+                        )
+                        st.markdown(f"<div class='classification-card'>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='classification-header'>Suggested {inbound_route.capitalize()} Response</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='field-value' style='white-space: pre-wrap;'>{response_text}</div>", unsafe_allow_html=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Could not generate response suggestion: {str(e)}")
 
                 # After displaying the classification card, add the agent action area
                 st.markdown("""
