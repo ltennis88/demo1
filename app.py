@@ -733,113 +733,113 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         user_content += f"\n\nForce inbound_route to '{selected_route}'."
     
     # Always specify the user type now, since we either have it from input or randomly selected it
-    user_content += f"\n\nForce user_type to '{selected_user_type}'."
+        user_content += f"\n\nForce user_type to '{selected_user_type}'."
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
-                {"role": "user", "content": user_content}
-            ],
-            temperature=1.0,
-            max_tokens=500
-        )
-        
-        # Calculate token usage and costs
-        input_tokens = response["usage"]["prompt_tokens"]
-        output_tokens = response["usage"]["completion_tokens"]
-        total_tokens = response["usage"]["total_tokens"]
-        
-        # Calculate costs
-        input_cost = calculate_token_cost(input_tokens, "input")
-        output_cost = calculate_token_cost(output_tokens, "output")
-        total_cost = input_cost + output_cost
-        
-        # Calculate response time
-        response_time = time.time() - start_time
-        
-        # Store usage data
-        usage_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "input_cost": input_cost,
-            "output_cost": output_cost,
-            "total_cost": total_cost,
-            "response_time": response_time,
-            "operation": "generation"
-        }
-        
-        st.session_state["token_usage"]["generations"].append(usage_data)
-        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-        st.session_state["token_usage"]["total_cost"] += total_cost
-        st.session_state["token_usage"]["response_times"].append(response_time)
-        
-        raw_reply = response["choices"][0]["message"]["content"].strip()
-        
         try:
-            scenario_data = json.loads(raw_reply)
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
+                    {"role": "user", "content": user_content}
+                ],
+                temperature=1.0,
+                max_tokens=500
+            )
             
-            # Ensure account details match the user type
-            if "prospective" in selected_user_type:
-                scenario_data["account_details"] = {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
+            # Calculate token usage and costs
+            input_tokens = response["usage"]["prompt_tokens"]
+            output_tokens = response["usage"]["completion_tokens"]
+            total_tokens = response["usage"]["total_tokens"]
+            
+            # Calculate costs
+            input_cost = calculate_token_cost(input_tokens, "input")
+            output_cost = calculate_token_cost(output_tokens, "output")
+            total_cost = input_cost + output_cost
+            
+            # Calculate response time
+            response_time = time.time() - start_time
+            
+            # Store usage data
+            usage_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+                "input_cost": input_cost,
+                "output_cost": output_cost,
+                "total_cost": total_cost,
+                "response_time": response_time,
+            "operation": "generation"
+            }
+            
+            st.session_state["token_usage"]["generations"].append(usage_data)
+            st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+            st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+            st.session_state["token_usage"]["total_cost"] += total_cost
+            st.session_state["token_usage"]["response_times"].append(response_time)
+            
+            raw_reply = response["choices"][0]["message"]["content"].strip()
+            
+            try:
+                scenario_data = json.loads(raw_reply)
+                
+                # Ensure account details match the user type
+                if "prospective" in selected_user_type:
+                    scenario_data["account_details"] = {
+                        "name": "",
+                        "surname": "",
+                        "location": "",
+                        "latest_reviews": "",
+                        "latest_jobs": "",
+                        "project_cost": "",
+                        "payment_status": ""
+                    }
+                    scenario_data["membership_id"] = ""
+                
+                # Force the user type to match what was selected/randomized
+                scenario_data["user_type"] = selected_user_type
+                
+                return scenario_data
+                
+            except Exception as e:
+                return {
+                    "inbound_route": "error",
+                    "ivr_flow": "",
+                    "ivr_selections": [],
+                    "user_type": selected_user_type,
+                    "phone_email": "",
+                    "membership_id": "",
+                    "account_details": {
+                        "name": "",
+                        "surname": "",
+                        "location": "",
+                        "latest_reviews": "",
+                        "latest_jobs": "",
+                        "project_cost": "",
+                        "payment_status": ""
+                    },
+                    "scenario_text": f"Error parsing scenario JSON: {str(e)}"
                 }
-                scenario_data["membership_id"] = ""
-            
-            # Force the user type to match what was selected/randomized
-            scenario_data["user_type"] = selected_user_type
-            
-            return scenario_data
             
         except Exception as e:
-            return {
-                "inbound_route": "error",
-                "ivr_flow": "",
-                "ivr_selections": [],
-                "user_type": selected_user_type,
-                "phone_email": "",
-                "membership_id": "",
-                "account_details": {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
-                },
-                "scenario_text": f"Error parsing scenario JSON: {str(e)}"
-            }
-        
-    except Exception as e:
-        return {
-            "inbound_route": "error",
-            "ivr_flow": "",
-            "ivr_selections": [],
+                return {
+                    "inbound_route": "error",
+                    "ivr_flow": "",
+                    "ivr_selections": [],
             "user_type": selected_user_type,
-            "phone_email": "",
-            "membership_id": "",
-            "account_details": {
-                "name": "",
-                "surname": "",
-                "location": "",
-                "latest_reviews": "",
-                "latest_jobs": "",
-                "project_cost": "",
-                "payment_status": ""
-            },
-            "scenario_text": f"API Error: {str(e)}"
-        }
+                    "phone_email": "",
+                    "membership_id": "",
+                    "account_details": {
+                        "name": "",
+                        "surname": "",
+                        "location": "",
+                        "latest_reviews": "",
+                        "latest_jobs": "",
+                        "project_cost": "",
+                        "payment_status": ""
+                    },
+                    "scenario_text": f"API Error: {str(e)}"
+    }
 
 ###############################################################################
 # 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
@@ -1548,25 +1548,25 @@ if st.session_state["generated_scenario"]:
                 if faq_category and faq_category.lower() not in ["", "none", "n/a"]:
                     # First check if Category column exists
                     if "Category" in df_faq.columns:
-                        # Filter FAQ dataframe by the suggested category
+                    # Filter FAQ dataframe by the suggested category
                         category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower(), na=False)]
-                        if not category_matches.empty:
-                            # Look for the best match within this category
-                            best_match = None
-                            best_score = 0
-                            
-                            for _, row in category_matches.iterrows():
-                                question = str(row.get("Question", "")).lower()
-                                scenario_lower = scenario_text.lower()
-                                # Count significant word matches
-                                score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
-                                if score > best_score:
-                                    best_score = score
-                                    best_match = row["Question"]
-                            
-                                if best_match and best_score >= 2:  # Require at least 2 significant matches
-                                    relevant_faq = best_match
-                                    faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+                    if not category_matches.empty:
+                        # Look for the best match within this category
+                        best_match = None
+                        best_score = 0
+                        
+                        for _, row in category_matches.iterrows():
+                            question = str(row.get("Question", "")).lower()
+                            scenario_lower = scenario_text.lower()
+                            # Count significant word matches
+                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                            if score > best_score:
+                                best_score = score
+                                best_match = row["Question"]
+                        
+                        if best_match and best_score >= 2:  # Require at least 2 significant matches
+                            relevant_faq = best_match
+                            faq_relevance_score = best_score + 2  # Bonus for model-suggested category
                     else:
                         # If Category column doesn't exist, try searching in Type column instead
                         if "Type" in df_faq.columns:
@@ -2236,16 +2236,3 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
-
-# -----------------------------------------------------------------------------
-# DATA EXPORTS
-# -----------------------------------------------------------------------------
-st.header("Data Exports")
-if len(df) > 0:
-    csv_data = df.to_csv(index=False)
-    st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv")
-
-    json_data = df.to_json(orient="records")
-    st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json")
-else:
-    st.write("No data to export yet.")
