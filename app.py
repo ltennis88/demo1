@@ -773,8 +773,41 @@ def load_membership_terms():
             "sections": []
         }
 
+@st.cache_data
+def load_guarantee_terms():
+    """Load the guarantee terms from file."""
+    try:
+        with open("guarantee_terms.txt", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        st.error("Guarantee terms file not found")
+        return ""
+
+def build_context(df, scenario_text):
+    """Build context from FAQ and terms for classification and response."""
+    faq_context = build_faq_context(df)
+    membership_terms = load_membership_terms()
+    guarantee_terms = load_guarantee_terms()
+    
+    # Combine all context sources
+    full_context = f"""
+    FAQ Information:
+    {faq_context}
+    
+    Membership Terms:
+    {membership_terms}
+    
+    Guarantee Terms:
+    {guarantee_terms}
+    
+    Customer Scenario:
+    {scenario_text}
+    """
+    return full_context
+
 df_faq = load_faq_csv()
 membership_terms = load_membership_terms()
+guarantee_terms = load_guarantee_terms()
 
 ###############################################################################
 # 4) SET UP SESSION STATE
@@ -2750,35 +2783,3 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
-
-@st.cache_data
-def load_guarantee_terms():
-    """Load the guarantee terms from file."""
-    try:
-        with open("guarantee_terms.txt", "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        st.error("Guarantee terms file not found")
-        return ""
-
-def build_context(df, scenario_text):
-    """Build context from FAQ and terms for classification and response."""
-    faq_context = build_faq_context(df)
-    membership_terms = load_membership_terms()
-    guarantee_terms = load_guarantee_terms()
-    
-    # Combine all context sources
-    full_context = f"""
-    FAQ Information:
-    {faq_context}
-    
-    Membership Terms:
-    {membership_terms}
-    
-    Guarantee Terms:
-    {guarantee_terms}
-    
-    Customer Scenario:
-    {scenario_text}
-    """
-    return full_context
