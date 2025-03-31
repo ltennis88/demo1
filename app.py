@@ -783,14 +783,31 @@ def load_guarantee_terms():
         st.error("Guarantee terms file not found")
         return ""
 
-def build_context(df, scenario_text):
-    """Build context from FAQ and terms for classification and response."""
-    faq_context = build_faq_context(df)
+@st.cache_data
+def build_faq_context(df):
+    """
+    Converts each row of the CSV into a bullet point.
+    Expected columns: Type, Category, Question.
+    """
+    if df.empty:
+        return "No FAQ/taxonomy data available."
+    lines = []
+    for _, row in df.iterrows():
+        typ = str(row.get("Type", ""))
+        cat = str(row.get("Category", ""))
+        ques = str(row.get("Question", ""))
+        lines.append(f"- Type: {typ} | Category: {cat} | Q: {ques}")
+    return "\n".join(lines)
+
+@st.cache_data
+def build_base_context():
+    """Cache the base context that doesn't change per request"""
+    faq_df = load_faq_csv()
+    faq_context = build_faq_context(faq_df)
     membership_terms = load_membership_terms()
     guarantee_terms = load_guarantee_terms()
     
-    # Combine all context sources
-    full_context = f"""
+    return f"""
     FAQ Information:
     {faq_context}
     
@@ -799,6 +816,15 @@ def build_context(df, scenario_text):
     
     Guarantee Terms:
     {guarantee_terms}
+    """
+
+def build_context(df, scenario_text):
+    """Build context from FAQ and terms for classification and response."""
+    base_context = build_base_context()
+    
+    # Only add the scenario-specific part
+    full_context = f"""
+    {base_context}
     
     Customer Scenario:
     {scenario_text}
@@ -867,21 +893,6 @@ def save_inquiries_to_file():
 ###############################################################################
 # 5) BUILD FAQ CONTEXT STRING FROM CSV
 ###############################################################################
-def build_faq_context(df):
-    """
-    Converts each row of the CSV into a bullet point.
-    Expected columns: Type, Category, Question.
-    """
-    if df.empty:
-        return "No FAQ/taxonomy data available."
-    lines = []
-    for _, row in df.iterrows():
-        typ = str(row.get("Type", ""))
-        cat = str(row.get("Category", ""))
-        ques = str(row.get("Question", ""))
-        lines.append(f"- Type: {typ} | Category: {cat} | Q: {ques}")
-    return "\n".join(lines)
-
 faq_context = build_faq_context(df_faq)
 
 ###############################################################################
@@ -1404,9 +1415,15 @@ def self_process_ivr_selections(ivr_selections):
 def find_relevant_faq(scenario_text, faq_dataframe):
     """Find the most relevant FAQ for a given scenario using semantic search."""
     
-    # Create the embedding for the scenario
+    # Use cached base context for the scenario prompt
+    base_context = build_base_context()
+    
     scenario_prompt = f"""
-    Given this customer scenario:
+    Given this customer scenario and context:
+    
+    {base_context}
+    
+    Customer Scenario:
     {scenario_text}
     
     What are the key issues or topics being discussed? Focus on:
@@ -1484,15 +1501,20 @@ def find_relevant_faq(scenario_text, faq_dataframe):
 
 def generate_response_suggestion(scenario, classification_result):
     """Generate a response suggestion based on classification and FAQ matching"""
-    # Load FAQ data
-    faq_df = load_faq_csv()
+    # Use cached base context
+    base_context = build_base_context()
     
     # Build comprehensive context including guarantee terms
-    context = build_context(faq_df, scenario)
+    context = f"""
+    {base_context}
+    
+    Customer Scenario:
+    {scenario}
+    """
     
     # Find relevant FAQ with improved matching
     try:
-        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, faq_df)
+        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
     except Exception as e:
         st.error(f"Error finding relevant FAQ: {str(e)}")
         relevant_faq, faq_answer, faq_relevance = None, None, 0
