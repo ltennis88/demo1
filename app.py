@@ -1232,35 +1232,9 @@ def extract_specific_details(scenario_text):
 ###############################################################################
 # 9) STREAMLIT APP UI
 ###############################################################################
-# Dashboard Main Page
-st.title("Contact Center AI Assistant")
-
-# Add horizontal navigation buttons
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown(
-        """<a href="/" style="text-decoration: none;">
-        <div style="background-color: #4285F4; padding: 10px; border-radius: 5px; text-align: center; margin: 5px 0px;">
-        🏠 Main Dashboard
-        </div></a>""",
-        unsafe_allow_html=True
-    )
-with col2:
-    st.markdown(
-        """<a href="/View_Inquiries" style="text-decoration: none;">
-        <div style="background-color: #3c4043; padding: 10px; border-radius: 5px; text-align: center; margin: 5px 0px;">
-        📋 View Inquiries
-        </div></a>""",
-        unsafe_allow_html=True
-    )
-with col3:
-    st.markdown(
-        """<a href="/Analytics_Dashboard" style="text-decoration: none;">
-        <div style="background-color: #3c4043; padding: 10px; border-radius: 5px; text-align: center; margin: 5px 0px;">
-        📊 Analytics Dashboard
-        </div></a>""",
-        unsafe_allow_html=True
-    )
+# Dashboard Main Page - REMOVE SECOND TITLE AND NAVIGATION
+# The main title and navigation are already at the top of the file (lines ~168-188)
+# Remove duplicate title and navigation here
 
 # Generate New Inquiry Section
 st.header("Generate New Inquiry")
