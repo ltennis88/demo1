@@ -1,11 +1,14 @@
 [theme]
 base = "dark"
 primaryColor = "#007bff"
+backgroundColor = "#121212"
+secondaryBackgroundColor = "#1E1E1E"
+textColor = "#FFFFFF"
 
 [server]
-headless = true
-enableXsrfProtection = false
 enableCORS = false
+enableXsrfProtection = false
+headless = true
 
 [browser]
 gatherUsageStats = false
@@ -15,17 +18,6 @@ showErrorDetails = true
 
 [logger]
 level = "error"
-
-[ui]
-hideTopBar = false
-hideSidebarNav = true
-hideSidebar = true
-
-[theme.base]
-base="dark"
-
-[layout]
-contentWidth = 1200
 
 [runner]
 fastReruns = true
