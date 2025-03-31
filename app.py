@@ -1564,69 +1564,40 @@ def generate_response_template(inbound_route):
     return templates.get(inbound_route, "")
 
 def generate_response_suggestion(scenario, classification_result):
-    """Generate a response suggestion based on classification and FAQ matching"""
+    """Generate a response suggestion based on the scenario and classification."""
     try:
-        # Start timing
         start_time = time.time()
         
-        # Use cached base context
+        # Get the base context (cached)
         base_context = build_base_context()
         
-        # Get cached response template
-        template = generate_response_template(scenario.get("inbound_route", ""))
+        # Build the response template based on inbound route
+        response_template = generate_response_template(scenario.get("inbound_route", ""))
         
-        # Build comprehensive context including guarantee terms
-        context = f"""
-        {base_context}
+        # Find relevant FAQs
+        relevant_faqs = find_relevant_faq(scenario.get("scenario_text", ""), faq_df)
         
-        Customer Scenario:
-        {scenario}
+        # Build the comprehensive context
+        context = build_context(relevant_faqs, scenario.get("scenario_text", ""))
         
-        Classification:
-        {json.dumps(classification_result, indent=2)}
+        # Calculate token counts
+        cached_input_tokens = len(base_context.split())  # Cached context
+        non_cached_input_tokens = len(str(scenario).split()) + len(json.dumps(classification_result).split())  # Dynamic content
         
-        Instructions:
-        1. Be professional and empathetic
-        2. Address all aspects of the customer's query
-        3. Include specific details from relevant terms or policies
-        4. If this involves a guarantee claim or complaint about work quality:
-           - Reference the guarantee terms and eligibility criteria
-           - Explain the claims process
-           - Mention the £1000 coverage limit if applicable
-        5. Provide clear next steps
-        6. Keep the response concise but informative
-        """
-        
-        # Find relevant FAQ with improved matching
-        try:
-            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
-            if relevant_faq and faq_answer and faq_relevance >= 7:
-                context += f"""
-                Relevant FAQ:
-                Question: {relevant_faq}
-                Answer: {faq_answer}
-                """
-        except Exception as e:
-            st.error(f"Error finding relevant FAQ: {str(e)}")
-            relevant_faq, faq_answer, faq_relevance = None, None, 0
-        
-        # Generate response using OpenAI
+        # Make the API call
         response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
-                {"role": "user", "content": context}
+                {"role": "system", "content": context},
+                {"role": "user", "content": f"Generate a response for this scenario using the following template:\n\n{response_template}"}
             ],
-            temperature=0.7,
-            max_tokens=500
+            temperature=0.7
         )
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Extract token usage
-        cached_input_tokens = len(base_context.split())  # Cached context
-        non_cached_input_tokens = len(str(scenario).split()) + len(json.dumps(classification_result).split())  # Dynamic content
+        # Get completion tokens
         output_tokens = response.usage.completion_tokens
         
         # Calculate costs
@@ -1634,7 +1605,7 @@ def generate_response_suggestion(scenario, classification_result):
         non_cached_input_cost = calculate_token_cost(non_cached_input_tokens, "input")
         output_cost = calculate_token_cost(output_tokens, "output")
         
-        # Track usage
+        # Track token usage
         track_token_usage(
             operation="response_generation",
             cached_input_tokens=cached_input_tokens,
@@ -1643,21 +1614,11 @@ def generate_response_suggestion(scenario, classification_result):
             response_time=response_time
         )
         
-        # For backward compatibility, return total input tokens and total input cost
-        total_input_tokens = cached_input_tokens + non_cached_input_tokens
-        total_input_cost = cached_input_cost + non_cached_input_cost
-        
-        return (
-            response.choices[0].message.content,
-            total_input_tokens,
-            output_tokens,
-            total_input_cost,
-            output_cost
-        )
+        return response.choices[0].message.content
         
     except Exception as e:
         st.error(f"Error generating response: {str(e)}")
-        return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
+        return None
 
 ###############################################################################
 # 11) STREAMLIT APP UI
@@ -2984,3 +2945,34 @@ if "token_usage" in st.session_state and st.session_state["token_usage"]["genera
     if last_response:
         st.markdown("#### Response Generation Metrics")
         display_operation_metrics(last_response)
+
+# Display metrics for the latest generation
+if latest_generation:
+    st.markdown("### Latest Generation Metrics")
+    metric_col1, metric_col2, metric_col3 = st.columns(3)
+    with metric_col1:
+        st.metric(
+            "Response Time",
+            f"{latest_generation.get('response_time', 0):.2f}s"
+        )
+    with metric_col2:
+        # Calculate total input tokens
+        total_input_tokens = (
+            latest_generation.get('cached_input_tokens', 0) +
+            latest_generation.get('non_cached_input_tokens', 0)
+        )
+        total_input_cost = (
+            latest_generation.get('cached_input_cost', 0) +
+            latest_generation.get('non_cached_input_cost', 0)
+        )
+        st.metric(
+            "Input Tokens",
+            f"{total_input_tokens:,}",
+            f"£{total_input_cost:.4f}"
+        )
+    with metric_col3:
+        st.metric(
+            "Output Tokens",
+            f"{latest_generation.get('output_tokens', 0):,}",
+            f"£{latest_generation.get('output_cost', 0):.4f}"
+        )
