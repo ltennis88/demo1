@@ -476,7 +476,7 @@ def load_faq_csv():
     """
     try:
         # First try with semicolon delimiter
-        try:
+    try:
             df = pd.read_csv("faq_taxonomy.csv", sep=';', encoding='utf-8')
         except:
             # If that fails, try with comma
@@ -494,7 +494,7 @@ def load_faq_csv():
         if "Answer" not in df.columns:
             df["Answer"] = ""
         
-            return df
+        return df
     except Exception as e:
         error_message = f"Error loading faq_taxonomy.csv: {str(e)}. Please ensure the file exists and is in plain text CSV format."
         st.error(error_message)
@@ -535,7 +535,7 @@ def load_dummy_inquiries():
         with open("inquiries.json", "r") as f:
             inquiries_data = json.load(f)
         df = pd.DataFrame(inquiries_data)
-            return df
+        return df
     except Exception as e:
         # If file doesn't exist or has issues, return empty DataFrame
         return pd.DataFrame(columns=[
@@ -896,8 +896,8 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     # Always specify the user type now, since we either have it from input or randomly selected it
         user_content += f"\n\nForce user_type to '{selected_user_type}'."
 
-        try:
-            response = openai.ChatCompletion.create(
+    try:
+        response = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
@@ -914,8 +914,8 @@ def generate_scenario(selected_route=None, selected_user_type=None):
             
         # Calculate costs - since we're using cached prompts, use the cached_input rate
         input_cost = calculate_token_cost(input_tokens, "cached_input")
-            output_cost = calculate_token_cost(output_tokens, "output")
-            total_cost = input_cost + output_cost
+        output_cost = calculate_token_cost(output_tokens, "output")
+        total_cost = input_cost + output_cost
             
             # Calculate response time
             response_time = time.time() - start_time
@@ -941,7 +941,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
             
             raw_reply = response["choices"][0]["message"]["content"].strip()
             
-            try:
+        try:
                 scenario_data = json.loads(raw_reply)
                 
                 # Ensure account details match the user type
@@ -962,9 +962,9 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                 
                 return scenario_data
                 
-            except Exception as e:
-                return {
-                    "inbound_route": "error",
+        except Exception as e:
+        return {
+            "inbound_route": "error",
                     "ivr_flow": "",
                     "ivr_selections": [],
                     "user_type": selected_user_type,
@@ -982,9 +982,9 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                     "scenario_text": f"Error parsing scenario JSON: {str(e)}"
                 }
             
-        except Exception as e:
-                return {
-                    "inbound_route": "error",
+    except Exception as e:
+        return {
+            "inbound_route": "error",
                     "ivr_flow": "",
                     "ivr_selections": [],
             "user_type": selected_user_type,
@@ -1218,7 +1218,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # If we have matching categories, find FAQs in those categories
     if matching_categories:
         for category, category_match_count in matching_categories:
-            try:
+        try:
                 # Look for matches in both the main category and subcategory columns
                 matched_rows = faq_dataframe[
                     faq_dataframe["Type"].str.lower().str.contains(category.lower(), na=False) |  # Main category
@@ -1269,7 +1269,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                         relevance = best_match_score
                         answer = best_row.get("Answer", "") if has_answers and best_row is not None else ""
                         return best_match, answer, relevance
-            except Exception as e:
+        except Exception as e:
                 st.warning(f"Error processing category {category}: {str(e)}")
                 continue
     
@@ -1361,7 +1361,7 @@ def generate_response_suggestion(scenario, classification_result):
         
         # Token count already considered in the session state
         input_tokens = st.session_state.cached_response_prompt_tokens
-            else:
+        else:
         # Create prompt from scratch using a template
         prompt = f"""
         As a Customer Support Agent for Checkatrade, create a response to the following inquiry.
@@ -1505,7 +1505,7 @@ if st.button("Generate New Inquiry", use_container_width=True):
         
         # Get the most recent generation data - check if the list is not empty first
         if st.session_state["token_usage"]["generations"]:
-        latest_generation = st.session_state["token_usage"]["generations"][-1]
+            latest_generation = st.session_state["token_usage"]["generations"][-1]
         
         # Create columns for metrics display
         st.markdown("### Generation Metrics")
@@ -1840,7 +1840,7 @@ if st.session_state["generated_scenario"]:
                         if best_match and best_score >= 2:  # Require at least 2 significant matches
                             relevant_faq = best_match
                             faq_relevance_score = best_score + 2  # Bonus for model-suggested category
-                    else:
+                else:
                         # If Category column doesn't exist, try searching in Type column instead
                         if "Type" in df_faq.columns:
                             category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
@@ -1891,7 +1891,7 @@ if st.session_state["generated_scenario"]:
                 # Generate response suggestion for email or whatsapp
                 inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
                 if inbound_route in ["email", "whatsapp"]:
-                    try:
+                try:
                         response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
                         st.session_state["generated_scenario"], 
                         classification_result
@@ -1903,7 +1903,7 @@ if st.session_state["generated_scenario"]:
                         </div>
                         """
                         st.markdown(response_card, unsafe_allow_html=True)
-                    except Exception as e:
+                except Exception as e:
                         st.error(f"Could not generate response suggestion: {str(e)}")
 
                 # After displaying the classification card, add the agent action area
@@ -2070,7 +2070,7 @@ if len(df) > 0:
         # First search for relevant FAQ
         faq_category = ""
         # Try to parse the classification result to get related_faq_category
-        try:
+    try:
             # Check if we can find something related to faq_category in the summary
             if "faq" in recent_row['summary'].lower():
                 faq_category = recent_row['summary'].lower().split("faq")[1].strip().strip(".:,")
