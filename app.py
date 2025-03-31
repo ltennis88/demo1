@@ -6,6 +6,8 @@ import time
 import random
 import plotly.express as px
 import os
+import asyncio
+import concurrent.futures
 
 ###############################################################################
 # 1) EARLY INITIALIZATION - To prevent SessionInfo errors
@@ -1453,7 +1455,6 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 ###############################################################################
 def find_relevant_faq(scenario_text, faq_dataframe):
     """Find the most relevant FAQ for a given scenario using semantic search."""
-    
     # Use cached base context for the scenario prompt
     base_context = build_base_context()
     
@@ -1463,6 +1464,27 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         # If dictionary not found, reload FAQ data
         _, faq_dict = load_faq_csv()
     
+    # First try quick keyword matching
+    scenario_keywords = set(word.lower() for word in scenario_text.split() if len(word) > 4)
+    best_match = None
+    best_score = 0
+    best_answer = None
+    
+    # Quick keyword matching first
+    for faq_entry in faq_dict['all_faqs']:
+        question = faq_entry['question'].lower()
+        question_keywords = set(word for word in question.split() if len(word) > 4)
+        score = len(scenario_keywords.intersection(question_keywords))
+        if score > best_score:
+            best_score = score
+            best_match = faq_entry['question']
+            best_answer = faq_entry['answer']
+    
+    # If we found a good keyword match, return it immediately
+    if best_score >= 3:
+        return best_match, best_answer, best_score + 5  # Bonus for quick match
+    
+    # If no good keyword match, use semantic search
     scenario_prompt = f"""
     Given this customer scenario and context:
     
@@ -1492,52 +1514,35 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         # Extract key topics from the response
         key_topics = response.choices[0].message.content
         
+        # Cache the key topics for this scenario
+        if 'faq_key_topics' not in st.session_state:
+            st.session_state['faq_key_topics'] = {}
+        st.session_state['faq_key_topics'][scenario_text] = key_topics
+        
         # For each FAQ, calculate relevance score
         best_match = None
         best_score = 0
         best_answer = None
         
-        # Use the all_faqs list from the optimized dictionary
-        for faq_entry in faq_dict['all_faqs']:
-            try:
-                faq_prompt = f"""
-                Compare these two texts and rate their relevance on a scale of 0-10:
-                
-                Customer Issue Summary:
-                {key_topics}
-                
-                FAQ Question:
-                {faq_entry['question']}
-                FAQ Category: {faq_entry['category']}
-                FAQ Type: {faq_entry['type']}
-                
-                Only respond with a number 0-10, where:
-                0 = Completely unrelated
-                5 = Somewhat related but not directly applicable
-                10 = Highly relevant and directly applicable
-                """
-                
-                score_response = openai.ChatCompletion.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
-                        {"role": "user", "content": faq_prompt}
-                    ],
-                    temperature=0,
-                    max_tokens=10
+        # Use ThreadPoolExecutor for parallel scoring
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for faq_entry in faq_dict['all_faqs']:
+                futures.append(
+                    executor.submit(
+                        score_faq_relevance,
+                        key_topics,
+                        faq_entry
+                    )
                 )
-                
-                try:
-                    relevance_score = float(score_response.choices[0].message.content.strip())
-                    if relevance_score > best_score:
-                        best_score = relevance_score
-                        best_match = faq_entry['question']
-                        best_answer = faq_entry['answer']
-                except ValueError:
-                    continue
-            except Exception as e:
-                st.error(f"Error scoring FAQ: {str(e)}")
-                continue
+            
+            # Process results as they complete
+            for future in concurrent.futures.as_completed(futures):
+                score, question, answer = future.result()
+                if score > best_score:
+                    best_score = score
+                    best_match = question
+                    best_answer = answer
         
         # Only return matches that are reasonably relevant
         if best_score >= 7:
@@ -1548,6 +1553,44 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     except Exception as e:
         st.error(f"Error in FAQ matching: {str(e)}")
         return None, None, 0
+
+def score_faq_relevance(key_topics, faq_entry):
+    """Score a single FAQ's relevance - runs in parallel"""
+    try:
+        faq_prompt = f"""
+        Compare these two texts and rate their relevance on a scale of 0-10:
+        
+        Customer Issue Summary:
+        {key_topics}
+        
+        FAQ Question:
+        {faq_entry['question']}
+        FAQ Category: {faq_entry['category']}
+        FAQ Type: {faq_entry['type']}
+        
+        Only respond with a number 0-10, where:
+        0 = Completely unrelated
+        5 = Somewhat related but not directly applicable
+        10 = Highly relevant and directly applicable
+        """
+        
+        score_response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
+                {"role": "user", "content": faq_prompt}
+            ],
+            temperature=0,
+            max_tokens=10
+        )
+        
+        try:
+            relevance_score = float(score_response.choices[0].message.content.strip())
+            return relevance_score, faq_entry['question'], faq_entry['answer']
+        except ValueError:
+            return 0, None, None
+    except Exception:
+        return 0, None, None
 
 ###############################################################################
 # RESPONSE SUGGESTION HELPER FUNCTIONS
@@ -1564,10 +1607,46 @@ def self_process_ivr_selections(ivr_selections):
     else:
         return ""
 
+@st.cache_data
+def generate_response_template(inbound_route):
+    """Cache response templates for different routes"""
+    templates = {
+        "email": """
+        Subject: RE: {classification}
+        
+        Dear {name},
+        
+        Thank you for contacting Checkatrade. I understand your inquiry regarding {summary}.
+        
+        {response_body}
+        
+        {next_steps}
+        
+        Best regards,
+        Checkatrade Support Team
+        """,
+        "whatsapp": """
+        Hi {name},
+        
+        Thanks for messaging Checkatrade. Regarding your {summary}:
+        
+        {response_body}
+        
+        {next_steps}
+        
+        Best,
+        Checkatrade Support
+        """
+    }
+    return templates.get(inbound_route, "")
+
 def generate_response_suggestion(scenario, classification_result):
     """Generate a response suggestion based on classification and FAQ matching"""
     # Use cached base context
     base_context = build_base_context()
+    
+    # Get cached response template
+    template = generate_response_template(scenario.get("inbound_route", ""))
     
     # Build comprehensive context including guarantee terms
     context = f"""
@@ -1585,7 +1664,7 @@ def generate_response_suggestion(scenario, classification_result):
         relevant_faq, faq_answer, faq_relevance = None, None, 0
     
     # Update the prompt to consider guarantee information and FAQ relevance
-    prompt = f"""You are a Checkatrade customer service expert. Using the provided context, generate a helpful response to the customer scenario.
+    prompt = f"""You are a Checkatrade customer service expert. Using the provided context and template, generate a helpful response to the customer scenario.
     Consider all relevant information from FAQs, membership terms, and guarantee terms when crafting your response.
     
     Context:
@@ -1597,6 +1676,9 @@ def generate_response_suggestion(scenario, classification_result):
     {f'''Relevant FAQ:
     Question: {relevant_faq}
     Answer: {faq_answer}''' if relevant_faq and faq_relevance >= 7 else 'No highly relevant FAQ found.'}
+    
+    Response Template:
+    {template}
     
     Instructions:
     1. Be professional and empathetic
