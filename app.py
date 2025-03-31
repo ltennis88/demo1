@@ -290,6 +290,51 @@ div.stApp {
     font-family: monospace;
     white-space: pre-wrap;
 }
+
+/* Override entire layout structure */
+.css-18e3th9 {
+    padding-top: 1rem;
+    padding-bottom: 10rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Force main content to take full width */
+.css-1d391kg {
+    width: 100% !important;
+    padding-left: 0 !important;
+}
+
+/* Reset flex layout from Streamlit */
+.css-1y4p8pa {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+}
+
+/* Fix main content layout */
+.main .block-container {
+    max-width: 95% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    margin-left: 0 !important;
+}
+
+/* Push content leftwards and increase width */
+section[data-testid="stSidebar"] ~ .css-1d391kg {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+/* Container styling for better use of space */
+.stApp > div:not([data-testid="stSidebar"]) {
+    margin-left: 0 !important;
+}
+
+/* Override Streamlit's default column spacing */
+.row-widget.stRadio > div {
+    flex-direction: column;
+}
 </style>
 """, unsafe_allow_html=True)
 
