@@ -18,6 +18,51 @@ st.set_page_config(
 )
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
+# Simple custom styling - minimize to avoid any syntax errors
+st.markdown("""
+<style>
+[data-testid="stSidebar"] {
+    width: 12rem !important;
+    min-width: 12rem !important;
+    max-width: 12rem !important;
+    background-color: #1E1E1E;
+    border-right: 1px solid #424242;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Add some more styling for content
+st.markdown("""
+<style>
+.main .block-container {
+    max-width: 95%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.info-container {
+    background-color: #2C2C2C;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #424242;
+}
+
+.inquiry-label {
+    font-weight: bold;
+    color: #64B5F6;
+    margin-bottom: 5px;
+}
+
+.inquiry-detail {
+    background-color: #1E1E1E;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin-bottom: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Add custom CSS to force layout to be truly left-aligned and wide
 st.markdown("""
 <style>
@@ -42,15 +87,6 @@ section.main {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-}
-
-/* Set sidebar to fixed width */
-[data-testid="stSidebar"] {
-    width: 12rem !important;
-    min-width: 12rem !important;
-    max-width: 12rem !important;
-    background-color: #1E1E1E !important;
-    border-right: 1px solid #424242 !important;
 }
 
 /* Fix column width for content */
@@ -178,14 +214,30 @@ elif st.session_state["page"] == "analytics":
 def load_faq_csv():
     """
     Loads the CSV file with FAQ/taxonomy data.
-    Expected columns: Type, Category, Question.
+    Expected columns: Type, Category, Question, Answer.
     """
     try:
-        df = pd.read_csv("faq_taxonomy.csv", sep=';')  # Changed delimiter to semicolon
+        # Read with explicit encoding to handle special characters
+        df = pd.read_csv("faq_taxonomy.csv", encoding="utf-8")
+        
+        # Check if the required columns exist
+        required_columns = ["Type", "Category", "Question"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            st.error(f"Missing required columns in FAQ taxonomy: {', '.join(missing_columns)}")
+            return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
+            
+        # Ensure the Answer column exists - if not, add it as empty
+        if "Answer" not in df.columns:
+            df["Answer"] = ""
+            st.warning("FAQ data does not contain an Answer column. Adding empty column.")
+
+        return df
     except Exception as e:
-        st.error("Error loading faq_taxonomy.csv. Please ensure the file exists and is in plain text CSV format.")
-        df = pd.DataFrame(columns=["Type", "Category", "Question"])
-    return df
+        st.error(f"Error loading FAQ taxonomy: {str(e)}")
+        # Return empty dataframe with expected columns
+        return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
 
 @st.cache_data
 def load_membership_terms():
@@ -853,6 +905,37 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # For demo purposes, we'll use improved keyword matching
     scenario_lower = scenario_text.lower()
     
+    # Special handling for lighting installation/flickering issues
+    if ("lighting" in scenario_lower or "lights" in scenario_lower or "lamp" in scenario_lower) and \
+       ("flicker" in scenario_lower or "flickering" in scenario_lower or "unstable" in scenario_lower or \
+        "problem" in scenario_lower or "issue" in scenario_lower or "guarantee" in scenario_lower):
+        
+        # Look specifically for guarantee or warranty questions for lighting issues
+        lighting_matches = []
+        for _, row in faq_dataframe.iterrows():
+            question = str(row.get("Question", "")).lower()
+            if ("guarantee" in question or "warranty" in question or "repair" in question or 
+                "after installation" in question or "workmanship" in question):
+                overlap_count = 5  # Higher priority for these matches
+                lighting_matches.append((row, overlap_count))
+        
+        if lighting_matches:
+            # Return the best match for lighting guarantee questions
+            best_row = lighting_matches[0][0]
+            question = best_row.get("Question", "")
+            answer = best_row.get("Answer", "") if has_answers else ""
+            return question, answer, 8  # High relevance score
+    
+    # First try to use special keywords relevant to chargeback/guarantees
+    if "chargeback" in scenario_lower or "guarantee" in scenario_lower or "refund" in scenario_lower:
+        for _, row in faq_dataframe.iterrows():
+            question = str(row.get("Question", "")).lower()
+            if "chargeback" in question and "guarantee" in question:
+                question = row.get("Question", "")
+                answer = row.get("Answer", "") if has_answers else ""
+                return question, answer, 9  # Very high relevance for direct match
+                
+    # Regular processing for other scenarios
     # First, look for direct issue mentions in the scenario text
     issue_keywords = {
         "job not completed": ["not completed", "unfinished", "incomplete", "left halfway", "abandoned", "not finished"],
