@@ -104,32 +104,40 @@ def show_inquiries():
                 st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['scenario_text']}</div>", unsafe_allow_html=True)
             
-            # Classification summary section
-            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+            # Determine priority class
+            priority_class = "priority-medium"
+            if recent_row['priority'] == "High":
+                priority_class = "priority-high"
+            elif recent_row['priority'] == "Low":
+                priority_class = "priority-low"
+                
+            # Create the classification section using Streamlit components instead of raw HTML
+            st.subheader("Classification Summary")
             
-            # Add the classification styles if they don't exist
+            # Create a styled container for the classification results
             st.markdown("""
             <style>
-            .classification-card {
+            .styled-container {
                 background-color: #1E1E1E;
                 border-radius: 10px;
-                padding: 15px;
+                padding: 20px;
                 margin-bottom: 20px;
                 border: 1px solid #424242;
             }
-            .classification-field {
+            .result-row {
+                display: flex;
                 margin-bottom: 12px;
             }
-            .field-label {
+            .result-label {
+                width: 220px;
                 font-weight: bold;
                 color: #64B5F6;
-                margin-bottom: 3px;
             }
-            .field-value {
-                padding: 5px 10px;
+            .result-value {
+                flex-grow: 1;
                 background-color: #2C2C2C;
+                padding: 5px 10px;
                 border-radius: 4px;
-                color: white;
             }
             .priority-high {
                 color: #ff5252;
@@ -146,64 +154,59 @@ def show_inquiries():
             </style>
             """, unsafe_allow_html=True)
             
-            # Determine priority class
-            priority_class = "priority-medium"
-            if recent_row['priority'] == "High":
-                priority_class = "priority-high"
-            elif recent_row['priority'] == "Low":
-                priority_class = "priority-low"
+            # Display formatted classification results
+            st.markdown("<h4>Classification Results</h4>", unsafe_allow_html=True)
+            st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
             
-            # Create the classification card with proper header
-            classification_html = f"""
-            <div class="classification-card">
-                <div style="font-weight: bold; font-size: 16px; margin-bottom: 15px;">Classification Results</div>
-                
-                <div class="classification-field">
-                    <div class="field-label">Classification:</div>
-                    <div class="field-value">{recent_row['classification']}</div>
+            # Create each classification field with proper formatting
+            st.markdown(f"""
+            <div class='result-row'>
+                <div class='result-label'>Classification:</div>
+                <div class='result-value'>{recent_row['classification']}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Department:</div>
+                <div class='result-value'>{recent_row['department']}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Subdepartment:</div>
+                <div class='result-value'>{recent_row['subdepartment']}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Priority:</div>
+                <div class='result-value'>
+                    <span class='{priority_class}'>{recent_row['priority']}</span>
                 </div>
-                
-                <div class="classification-field">
-                    <div class="field-label">Department:</div>
-                    <div class="field-value">{recent_row['department']}</div>
-                </div>
-                
-                <div class="classification-field">
-                    <div class="field-label">Subdepartment:</div>
-                    <div class="field-value">{recent_row['subdepartment']}</div>
-                </div>
-                
-                <div class="classification-field">
-                    <div class="field-label">Priority:</div>
-                    <div class="field-value"><span class="{priority_class}">{recent_row['priority']}</span></div>
-                </div>
-                
-                <div class="classification-field">
-                    <div class="field-label">Estimated Response Time:</div>
-                    <div class="field-value">{recent_row['estimated_response_time']}</div>
-                </div>
-            """
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Estimated Response Time:</div>
+                <div class='result-value'>{recent_row['estimated_response_time']}</div>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Add summary if available
             if recent_row['summary']:
-                classification_html += f"""
-                <div class="classification-field">
-                    <div class="field-label">Summary:</div>
-                    <div class="field-value">{recent_row['summary']}</div>
+                st.markdown(f"""
+                <div class='result-row'>
+                    <div class='result-label'>Summary:</div>
+                    <div class='result-value'>{recent_row['summary']}</div>
                 </div>
-                """
+                """, unsafe_allow_html=True)
             
             # Add related FAQ category if available
             if 'related_faq_category' in recent_row and recent_row['related_faq_category']:
-                classification_html += f"""
-                <div class="classification-field">
-                    <div class="field-label">Related FAQ Category:</div>
-                    <div class="field-value">{recent_row['related_faq_category']}</div>
+                st.markdown(f"""
+                <div class='result-row'>
+                    <div class='result-label'>Related FAQ Category:</div>
+                    <div class='result-value'>{recent_row['related_faq_category']}</div>
                 </div>
-                """
+                """, unsafe_allow_html=True)
             
-            classification_html += "</div>"
-            st.markdown(classification_html, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
             
             # Add case status and agent notes section
             st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
