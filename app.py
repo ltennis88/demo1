@@ -556,6 +556,14 @@ ALLOWED ACTIONS:
 - Ask about insurance requirements
 - Ask about payment processing
 
+FORBIDDEN ACTIONS:
+- Mentioning or discussing any reviews (as they are not yet a member and cannot have submitted any reviews)
+- Asking about review management or review responses
+- Discussing any past work through Checkatrade
+- Mentioning any customer interactions through Checkatrade
+- Asking about existing member features
+- Discussing any active memberships or accounts
+
 COMMON CONTACT REASONS:
 1. Membership Information:
    - Understanding membership tiers
@@ -673,157 +681,6 @@ Scenario text:
 ###############################################################################
 # 7) HELPER: GENERATE SCENARIO VIA OPENAI
 ###############################################################################
-def validate_scenario_rules(scenario_data):
-    """
-    Validates that the generated scenario follows all rules for its user type.
-    Returns (is_valid, error_message) tuple.
-    """
-    user_type = scenario_data.get("user_type", "")
-    scenario_text = scenario_data.get("scenario_text", "").lower()
-    account_details = scenario_data.get("account_details", {})
-    inbound_route = scenario_data.get("inbound_route", "")
-    ivr_flow = scenario_data.get("ivr_flow", "")
-    ivr_selections = scenario_data.get("ivr_selections", [])
-
-    # Check that existing users have account details
-    if "existing" in user_type:
-        # Check required fields for existing users
-        required_fields = ["name", "surname", "location"]
-        for field in required_fields:
-            if not account_details.get(field):
-                return False, f"Existing user missing required account detail: {field}"
-        
-        # At least one of these must be non-empty for existing users
-        if not (account_details.get("latest_reviews") or account_details.get("latest_jobs")):
-            return False, "Existing user must have either reviews or jobs in their history"
-
-    # Define valid IVR flows and their corresponding valid selections
-    valid_ivr_flows = {
-        "homeowner": {
-            "flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
-            "valid_selections": [1, 2, 3],
-            "valid_user_types": ["existing_homeowner", "prospective_homeowner"]
-        },
-        "tradesperson": {
-            "flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
-            "valid_selections": [1, 2, 3],
-            "valid_user_types": ["existing_tradesperson", "prospective_tradesperson"]
-        }
-    }
-
-    # Validate IVR flow and selections for phone route
-    if inbound_route == "phone":
-        # Check if IVR flow is provided
-        if not ivr_flow:
-            return False, "Phone route requires a valid IVR flow"
-
-        # Check if IVR flow matches the predefined format
-        if ivr_flow != valid_ivr_flows["homeowner"]["flow"]:
-            return False, "Invalid IVR flow format"
-
-        # Check if IVR selections are provided and valid
-        if not isinstance(ivr_selections, list):
-            return False, "IVR selections must be a list"
-
-        # Validate each selection is in the valid range
-        for selection in ivr_selections:
-            if selection not in valid_ivr_flows["homeowner"]["valid_selections"]:
-                return False, f"Invalid IVR selection: {selection}. Valid selections are {valid_ivr_flows['homeowner']['valid_selections']}"
-
-        # Validate selections match user type
-        if "homeowner" in user_type and 2 in ivr_selections:
-            return False, "Homeowner cannot select tradesperson options in IVR"
-        if "tradesperson" in user_type and 1 in ivr_selections:
-            return False, "Tradesperson cannot select homeowner options in IVR"
-
-    else:
-        # For non-phone routes, IVR flow and selections should be empty
-        if ivr_flow:
-            return False, "IVR flow should be empty for non-phone routes"
-        if ivr_selections and len(ivr_selections) > 0:
-            return False, "IVR selections should be empty for non-phone routes"
-
-    # Check for empty account details for prospective users
-    if "prospective" in user_type:
-        for key, value in account_details.items():
-            if value and key not in ["name", "surname", "location"]:  # These can be empty strings
-                return False, f"Prospective user has non-empty {key} in account details"
-    
-    # Check membership ID rules
-    membership_id = scenario_data.get("membership_id", "")
-    if "existing_tradesperson" in user_type and not membership_id.startswith("T-"):
-        return False, "Existing tradesperson missing valid membership ID"
-    elif "existing_tradesperson" not in user_type and membership_id:
-        return False, "Non-tradesperson has membership ID"
-    
-    # Define forbidden phrases for each user type
-    forbidden_phrases = {
-        "prospective_homeowner": [
-            "my account", "my review", "poor quality", "not satisfied", 
-            "completed job", "past work", "my business", "insurance details",
-            "trade license", "my customers", "membership", "member benefits"
-        ],
-        "existing_homeowner": [
-            "my business", "insurance details", "trade license", "my customers",
-            "membership", "business profiles", "trade services", "member benefits"
-        ],
-        "prospective_tradesperson": [
-            "my review", "poor quality", "not satisfied", "in my home", 
-            "I hired", "buy a home", "verify tradespeople", "find tradespeople",
-            "reliable tradespeople", "home improvement", "renovation", "repair"
-        ],
-        "existing_tradesperson": [
-            "I hired", "done for me", "my home", "my property", 
-            "not satisfied with", "poor quality", "buy a home",
-            "verify tradespeople", "find tradespeople", "reliable tradespeople"
-        ]
-    }
-    
-    # Check for forbidden phrases
-    if user_type in forbidden_phrases:
-        for phrase in forbidden_phrases[user_type]:
-            if phrase in scenario_text:
-                return False, f"Scenario contains forbidden phrase for {user_type}: '{phrase}'"
-    
-    # Check review format rules
-    latest_reviews = account_details.get("latest_reviews", "")
-    if latest_reviews:
-        if "homeowner" in user_type:
-            if not any(latest_reviews.lower().startswith(word) for word in ["gave", "left", "posted"]):
-                return False, "Homeowner review must start with 'Gave', 'Left', or 'Posted'"
-        elif "tradesperson" in user_type:
-            if not any(latest_reviews.lower().startswith(word) for word in ["received", "customer gave", "client rated"]):
-                return False, "Tradesperson review must start with 'Received', 'Customer gave', or 'Client rated'"
-    
-    # Check job description format with improved validation
-    latest_jobs = account_details.get("latest_jobs", "")
-    if latest_jobs:
-        # Define active and passive verbs
-        active_verbs = ["completed", "installed", "fixed", "repaired", "built", "constructed", "fitted", "mounted", "assembled"]
-        passive_verbs = ["had", "got", "received", "was", "were", "been"]
-        
-        # For homeowners, check for active verbs (should be passive)
-        if "homeowner" in user_type:
-            active_verb_count = sum(1 for verb in active_verbs if verb in latest_jobs.lower())
-            if active_verb_count > 0:
-                return False, "Homeowner job description should be passive (e.g., 'Had kitchen renovated' not 'Completed kitchen renovation')"
-            
-            # Check if it starts with a passive verb
-            if not any(latest_jobs.lower().startswith(verb) for verb in passive_verbs):
-                return False, "Homeowner job description should start with a passive verb (e.g., 'Had', 'Got', 'Received')"
-        
-        # For tradespeople, check for passive verbs (should be active)
-        elif "tradesperson" in user_type:
-            passive_verb_count = sum(1 for verb in passive_verbs if verb in latest_jobs.lower())
-            if passive_verb_count > 0:
-                return False, "Tradesperson job description should be active (e.g., 'Completed kitchen renovation' not 'Had kitchen renovated')"
-            
-            # Check if it starts with an active verb
-            if not any(latest_jobs.lower().startswith(verb) for verb in active_verbs):
-                return False, "Tradesperson job description should start with an active verb (e.g., 'Completed', 'Installed', 'Fixed')"
-    
-    return True, ""
-
 def calculate_token_cost(tokens, token_type):
     """Calculate cost for a given number of tokens and type."""
     cost_per_million = TOKEN_COSTS.get(token_type, 0)
@@ -838,254 +695,133 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     # Start timing
     start_time = time.time()
     
-    # Add IVR validation rules to the base prompt
-    ivr_rules = """
-    STRICT IVR RULES:
-    
-    For phone route ONLY:
-    - IVR flow must be EXACTLY: "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support."
-    - IVR selections must be a list of numbers from [1, 2, 3]
-    - Homeowners can only select options 1 and 3
-    - Tradespeople can only select options 2 and 3
-    - Account support (option 3) is available to all users
-    
-    For non-phone routes:
-    - IVR flow must be an empty string
-    - IVR selections must be an empty array
-    
-    EXAMPLE IVR SELECTIONS:
-    - Homeowner calling about finding a tradesperson: [1]
-    - Homeowner with account issue: [1, 3]
-    - Tradesperson calling about membership: [2]
-    - Tradesperson with account issue: [2, 3]
-    """
-    
     # For random user type, we'll randomize it ourselves to ensure true randomness
     should_randomize_user_type = selected_user_type is None
     
-    # Get the appropriate user type prompt
-    user_type_prompt = get_user_type_prompt(selected_user_type) if selected_user_type else ""
+    # If we're randomizing, do it now so we can get the correct prompt
+    if should_randomize_user_type:
+        user_types = ["existing_homeowner", "existing_tradesperson", 
+                    "prospective_homeowner", "prospective_tradesperson"]
+        selected_user_type = random.choice(user_types)
+    
+    # Get the appropriate user type prompt - this is now guaranteed to have a user type
+    user_type_prompt = get_user_type_prompt(selected_user_type)
     
     # Start with base prompt
-    user_content = base_prompt + "\n\n" + ivr_rules + "\n\n" + user_type_prompt
+    user_content = base_prompt + "\n\n" + user_type_prompt
     
     # Add route and user type instructions
-    if selected_route and selected_user_type:
-        user_content += f"\n\nForce inbound_route to '{selected_route}' and user_type to '{selected_user_type}'."
-    elif selected_route:
+    if selected_route:
         user_content += f"\n\nForce inbound_route to '{selected_route}'."
-    elif selected_user_type:
-        user_content += f"\n\nForce user_type to '{selected_user_type}'."
-    else:
-        user_content += "\n\nYou may pick any inbound_route and user_type."
-
-    # Update example scenarios in user type prompts to include correct IVR flows
-    if selected_route == "phone":
-        user_content += """
-        
-        PHONE ROUTE IVR EXAMPLES:
-        - Homeowner inquiry about finding tradesperson:
-          "ivr_flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
-          "ivr_selections": [1]
-        
-        - Tradesperson inquiry about membership:
-          "ivr_flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
-          "ivr_selections": [2]
-        
-        - Account support inquiry:
-          "ivr_flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
-          "ivr_selections": [3]
-        """
-
-    max_retries = 3
-    retry_count = 0
     
-    while retry_count < max_retries:
+    # Always specify the user type now, since we either have it from input or randomly selected it
+    user_content += f"\n\nForce user_type to '{selected_user_type}'."
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=1.0,
+            max_tokens=500
+        )
+        
+        # Calculate token usage and costs
+        input_tokens = response["usage"]["prompt_tokens"]
+        output_tokens = response["usage"]["completion_tokens"]
+        total_tokens = response["usage"]["total_tokens"]
+        
+        # Calculate costs
+        input_cost = calculate_token_cost(input_tokens, "input")
+        output_cost = calculate_token_cost(output_tokens, "output")
+        total_cost = input_cost + output_cost
+        
+        # Calculate response time
+        response_time = time.time() - start_time
+        
+        # Store usage data
+        usage_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "input_cost": input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "response_time": response_time,
+            "operation": "generation"
+        }
+        
+        st.session_state["token_usage"]["generations"].append(usage_data)
+        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+        st.session_state["token_usage"]["total_cost"] += total_cost
+        st.session_state["token_usage"]["response_times"].append(response_time)
+        
+        raw_reply = response["choices"][0]["message"]["content"].strip()
+        
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
-                    {"role": "user", "content": user_content}
-                ],
-                temperature=1.0,
-                max_tokens=500
-            )
+            scenario_data = json.loads(raw_reply)
             
-            # Calculate token usage and costs
-            input_tokens = response["usage"]["prompt_tokens"]
-            output_tokens = response["usage"]["completion_tokens"]
-            total_tokens = response["usage"]["total_tokens"]
+            # Ensure account details match the user type
+            if "prospective" in selected_user_type:
+                scenario_data["account_details"] = {
+                    "name": "",
+                    "surname": "",
+                    "location": "",
+                    "latest_reviews": "",
+                    "latest_jobs": "",
+                    "project_cost": "",
+                    "payment_status": ""
+                }
+                scenario_data["membership_id"] = ""
             
-            # Calculate costs
-            input_cost = calculate_token_cost(input_tokens, "input")
-            output_cost = calculate_token_cost(output_tokens, "output")
-            total_cost = input_cost + output_cost
+            # Force the user type to match what was selected/randomized
+            scenario_data["user_type"] = selected_user_type
             
-            # Calculate response time
-            response_time = time.time() - start_time
-            
-            # Store usage data
-            usage_data = {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": total_tokens,
-                "input_cost": input_cost,
-                "output_cost": output_cost,
-                "total_cost": total_cost,
-                "response_time": response_time,
-                "operation": "generation"  # Add operation type to distinguish from classification
-            }
-            
-            st.session_state["token_usage"]["generations"].append(usage_data)
-            st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-            st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-            st.session_state["token_usage"]["total_cost"] += total_cost
-            st.session_state["token_usage"]["response_times"].append(response_time)
-            
-            raw_reply = response["choices"][0]["message"]["content"].strip()
-            
-            try:
-                scenario_data = json.loads(raw_reply)
-                
-                # Validate required fields
-                required_fields = ["inbound_route", "ivr_flow", "ivr_selections", "user_type", 
-                                 "phone_email", "membership_id", "account_details", "scenario_text"]
-                required_account_fields = ["name", "surname", "location", "latest_reviews", 
-                                         "latest_jobs", "project_cost", "payment_status"]
-                
-                # Check all required fields exist
-                for field in required_fields:
-                    if field not in scenario_data:
-                        raise ValueError(f"Missing required field: {field}")
-                
-                # Check account_details structure
-                if not isinstance(scenario_data["account_details"], dict):
-                    raise ValueError("account_details must be an object")
-                
-                for field in required_account_fields:
-                    if field not in scenario_data["account_details"]:
-                        raise ValueError(f"Missing required account field: {field}")
-                
-                # If we're supposed to randomize the user type, do it manually
-                if should_randomize_user_type:
-                    user_types = ["existing_homeowner", "existing_tradesperson", 
-                                "prospective_homeowner", "prospective_tradesperson"]
-                    random_user_type = random.choice(user_types)
-                    scenario_data["user_type"] = random_user_type
-                    
-                    # Update account details based on user type
-                    if "prospective" in random_user_type:
-                        scenario_data["account_details"] = {
-                            "name": "",
-                            "surname": "",
-                            "location": "",
-                            "latest_reviews": "",
-                            "latest_jobs": "",
-                            "project_cost": "",
-                            "payment_status": ""
-                        }
-                        scenario_data["membership_id"] = ""
-                
-                # Validate the scenario against all rules
-                is_valid, error_message = validate_scenario_rules(scenario_data)
-                if not is_valid:
-                    if retry_count < max_retries - 1:
-                        retry_count += 1
-                        continue
-                    else:
-                        # If we've hit max retries, return an error scenario with more specific error message
-                        return {
-                            "inbound_route": "error",
-                            "ivr_flow": "",
-                            "ivr_selections": [],
-                            "user_type": selected_user_type if selected_user_type else "error",
-                            "phone_email": "",
-                            "membership_id": "",
-                            "account_details": {
-                                "name": "",
-                                "surname": "",
-                                "location": "",
-                                "latest_reviews": "",
-                                "latest_jobs": "",
-                                "project_cost": "",
-                                "payment_status": ""
-                            },
-                            "scenario_text": f"Failed to generate valid scenario after {max_retries} attempts. Last error: {error_message}"
-                        }
-                
-                return scenario_data
-                
-            except Exception as e:
-                if retry_count < max_retries - 1:
-                    retry_count += 1
-                    continue
-                else:
-                    # Return a properly structured error scenario
-                    return {
-                        "inbound_route": "error",
-                        "ivr_flow": "",
-                        "ivr_selections": [],
-                        "user_type": selected_user_type if selected_user_type else "error",
-                        "phone_email": "",
-                        "membership_id": "",
-                        "account_details": {
-                            "name": "",
-                            "surname": "",
-                            "location": "",
-                            "latest_reviews": "",
-                            "latest_jobs": "",
-                            "project_cost": "",
-                            "payment_status": ""
-                        },
-                        "scenario_text": f"Error parsing scenario JSON: {str(e)}"
-                    }
+            return scenario_data
             
         except Exception as e:
-            if retry_count < max_retries - 1:
-                retry_count += 1
-                continue
-            else:
-                # Return a properly structured error scenario for API errors
-                return {
-                    "inbound_route": "error",
-                    "ivr_flow": "",
-                    "ivr_selections": [],
-                    "user_type": selected_user_type if selected_user_type else "error",
-                    "phone_email": "",
-                    "membership_id": "",
-                    "account_details": {
-                        "name": "",
-                        "surname": "",
-                        "location": "",
-                        "latest_reviews": "",
-                        "latest_jobs": "",
-                        "project_cost": "",
-                        "payment_status": ""
-                    },
-                    "scenario_text": f"API Error: {str(e)}"
-                }
-    
-    # If we've exhausted all retries, return an error scenario
-    return {
-        "inbound_route": "error",
-        "ivr_flow": "",
-        "ivr_selections": [],
-        "user_type": selected_user_type if selected_user_type else "error",
-        "phone_email": "",
-        "membership_id": "",
-        "account_details": {
-            "name": "",
-            "surname": "",
-            "location": "",
-            "latest_reviews": "",
-            "latest_jobs": "",
-            "project_cost": "",
-            "payment_status": ""
-        },
-        "scenario_text": f"Failed to generate valid scenario after {max_retries} attempts."
-    }
+            return {
+                "inbound_route": "error",
+                "ivr_flow": "",
+                "ivr_selections": [],
+                "user_type": selected_user_type,
+                "phone_email": "",
+                "membership_id": "",
+                "account_details": {
+                    "name": "",
+                    "surname": "",
+                    "location": "",
+                    "latest_reviews": "",
+                    "latest_jobs": "",
+                    "project_cost": "",
+                    "payment_status": ""
+                },
+                "scenario_text": f"Error parsing scenario JSON: {str(e)}"
+            }
+        
+    except Exception as e:
+        return {
+            "inbound_route": "error",
+            "ivr_flow": "",
+            "ivr_selections": [],
+            "user_type": selected_user_type,
+            "phone_email": "",
+            "membership_id": "",
+            "account_details": {
+                "name": "",
+                "surname": "",
+                "location": "",
+                "latest_reviews": "",
+                "latest_jobs": "",
+                "project_cost": "",
+                "payment_status": ""
+            },
+            "scenario_text": f"API Error: {str(e)}"
+        }
 
 ###############################################################################
 # 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
