@@ -8,10 +8,64 @@ import plotly.express as px
 import os
 
 ###############################################################################
-# 1) PAGE CONFIGURATION & OPENAI SETUP
+# 1) EARLY INITIALIZATION - To prevent SessionInfo errors
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="collapsed", 
-                 menu_items=None)
+# Initialize all session state variables at the very beginning
+if "page" not in st.session_state:
+    st.session_state["page"] = "main"
+
+if "generated_scenario" not in st.session_state:
+    st.session_state["generated_scenario"] = None
+
+if "current_case_id" not in st.session_state:
+    st.session_state["current_case_id"] = None
+
+# Define token cost constants
+TOKEN_COSTS = {
+    "input": 0.15,      # $0.15 per 1M tokens
+    "cached_input": 0.075,  # $0.075 per 1M tokens
+    "output": 0.60      # $0.60 per 1M tokens
+}
+
+# Initialize token usage tracking
+if "token_usage" not in st.session_state:
+    st.session_state["token_usage"] = {
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_cost": 0,
+        "response_times": [],
+        "generations": []
+    }
+
+# Initialize cached values
+if "cached_response_prompt" not in st.session_state:
+    st.session_state["cached_response_prompt"] = ""
+    
+if "cached_response_prompt_tokens" not in st.session_state:
+    st.session_state["cached_response_prompt_tokens"] = 0
+
+# Initialize inquiries early to avoid issues
+if "inquiries" not in st.session_state:
+    # Create a placeholder until we can properly load in the full initialization section
+    st.session_state["inquiries"] = pd.DataFrame(columns=[
+        "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
+        "phone_email", "membership_id", "scenario_text", "classification",
+        "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
+        "account_location", "account_reviews", "account_jobs", "project_cost", 
+        "payment_status", "estimated_response_time", "agent_notes", "case_status"
+    ])
+
+###############################################################################
+# 2) PAGE CONFIGURATION & OPENAI SETUP
+###############################################################################
+# Use simplified page config without custom theme
+st.set_page_config(
+    layout="wide", 
+    page_title="Contact Center AI Assistant",
+    initial_sidebar_state="collapsed"
+)
+
+# Setup API key
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Add global CSS for better UI
@@ -368,7 +422,7 @@ elif st.session_state["page"] == "analytics":
     st.stop()  # Stop execution of the rest of the script
 
 ###############################################################################
-# 2) LOAD FAQ / TAXONOMY DATA
+# 3) LOAD FAQ / TAXONOMY DATA
 ###############################################################################
 @st.cache_data
 def load_faq_csv():
@@ -426,7 +480,7 @@ df_faq = load_faq_csv()
 membership_terms = load_membership_terms()
 
 ###############################################################################
-# 3) SET UP SESSION STATE
+# 4) SET UP SESSION STATE
 ###############################################################################
 @st.cache_data
 def load_dummy_inquiries():
@@ -480,58 +534,8 @@ def save_inquiries_to_file():
         st.error(f"Failed to save inquiries to file: {str(e)}")
         return False
 
-# Initialize all session state variables to avoid SessionInfo errors
-if "page" not in st.session_state:
-    st.session_state["page"] = "main"
-
-if "generated_scenario" not in st.session_state:
-    st.session_state["generated_scenario"] = None
-
-if "current_case_id" not in st.session_state:
-    st.session_state["current_case_id"] = None
-
-# Add these constants at the top of the file after the imports
-TOKEN_COSTS = {
-    "input": 0.15,      # $0.15 per 1M tokens
-    "cached_input": 0.075,  # $0.075 per 1M tokens
-    "output": 0.60      # $0.60 per 1M tokens
-}
-
-# Add this to the session state initialization section
-if "token_usage" not in st.session_state:
-    st.session_state["token_usage"] = {
-        "total_input_tokens": 0,
-        "total_output_tokens": 0,
-        "total_cost": 0,
-        "response_times": [],
-        "generations": []
-    }
-
-# Initialize response suggestion related values
-if "cached_response_prompt" not in st.session_state:
-    st.session_state["cached_response_prompt"] = ""
-    
-if "cached_response_prompt_tokens" not in st.session_state:
-    st.session_state["cached_response_prompt_tokens"] = 0
-
-# Initialize inquiries if not already present
-if "inquiries" not in st.session_state:
-    # Try to load dummy data first
-    dummy_data = load_dummy_inquiries()
-    if not dummy_data.empty:
-        st.session_state["inquiries"] = dummy_data
-    else:
-        # If no dummy data, initialize with empty DataFrame
-        st.session_state["inquiries"] = pd.DataFrame(columns=[
-            "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
-            "phone_email", "membership_id", "scenario_text", "classification",
-            "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
-            "account_location", "account_reviews", "account_jobs", "project_cost", 
-            "payment_status", "estimated_response_time", "agent_notes", "case_status"
-        ])
-
 ###############################################################################
-# 4) BUILD FAQ CONTEXT STRING FROM CSV
+# 5) BUILD FAQ CONTEXT STRING FROM CSV
 ###############################################################################
 def build_faq_context(df):
     """
@@ -551,7 +555,7 @@ def build_faq_context(df):
 faq_context = build_faq_context(df_faq)
 
 ###############################################################################
-# 5) SCENARIO GENERATION PROMPTS
+# 6) SCENARIO GENERATION PROMPTS
 ###############################################################################
 # Base prompt with common structure
 base_prompt = """
@@ -584,7 +588,7 @@ REFER TO THE FOLLOWING DEFINITIONS:
 """
 
 ###############################################################################
-# 5) USER TYPE PROMPTS
+# 7) USER TYPE PROMPTS
 ###############################################################################
 
 # Convert to cached variables similar to how FAQ_context is cached
@@ -777,7 +781,7 @@ def get_user_type_prompt(user_type):
     return prompts.get(user_type, "")
 
 ###############################################################################
-# 6) CLASSIFICATION PROMPT
+# 8) CLASSIFICATION PROMPT
 ###############################################################################
 classification_prompt_template = """
 You are an AI classification assistant for Checkatrade.
@@ -810,7 +814,7 @@ Scenario text:
 """
 
 ###############################################################################
-# 7) HELPER: GENERATE SCENARIO VIA OPENAI
+# 9) HELPER: GENERATE SCENARIO VIA OPENAI
 ###############################################################################
 def calculate_token_cost(tokens, token_type):
     """Calculate cost for a given number of tokens and type."""
@@ -955,7 +959,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         }
 
 ###############################################################################
-# 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
+# 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
 ###############################################################################
 def classify_scenario(text):
     # Start timing
@@ -1372,7 +1376,7 @@ def generate_response_suggestion(scenario, classification_result):
         return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
 
 ###############################################################################
-# 9) STREAMLIT APP UI
+# 11) STREAMLIT APP UI
 ###############################################################################
 # Dashboard Main Page - REMOVE SECOND TITLE AND NAVIGATION
 # The main title and navigation are already at the top of the file (lines ~168-188)
