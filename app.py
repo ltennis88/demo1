@@ -2361,12 +2361,23 @@ if len(df) > 0:
     with st.expander("View Analytics Dashboard", expanded=False):
         if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
             st.subheader("Analytics Overview")
-            # Display basic metrics without the full update_analytics function
+            # Get token data
             token_data = st.session_state["token_usage"]
-            total_cost = sum(gen.get("total_cost", 0) for gen in token_data["generations"])
-            total_input_tokens = sum(gen.get("input_tokens", 0) for gen in token_data["generations"])
-            total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
+            generations = token_data["generations"]
+            num_generations = len(generations)
             
+            # Calculate totals
+            total_cost = sum(gen.get("total_cost", 0) for gen in generations)
+            total_input_tokens = sum(gen.get("input_tokens", 0) for gen in generations)
+            total_output_tokens = sum(gen.get("output_tokens", 0) for gen in generations)
+            
+            # Calculate averages
+            avg_cost = total_cost / num_generations if num_generations > 0 else 0
+            avg_input_tokens = total_input_tokens / num_generations if num_generations > 0 else 0
+            avg_output_tokens = total_output_tokens / num_generations if num_generations > 0 else 0
+            
+            # Display totals
+            st.write("##### Total Metrics")
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Total Cost", f"${total_cost:.4f}")
@@ -2374,6 +2385,86 @@ if len(df) > 0:
                 st.metric("Total Input Tokens", f"{total_input_tokens:,}")
             with col3:
                 st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+            
+            # Display averages
+            st.write("##### Average Metrics (per response)")
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                st.metric("Avg Cost", f"${avg_cost:.4f}")
+            with col5:
+                st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
+            with col6:
+                st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
+            
+            # Display response time metrics if available
+            response_times = [gen.get("response_time", 0) for gen in generations]
+            if response_times:
+                avg_response_time = sum(response_times) / len(response_times)
+                max_response_time = max(response_times)
+                min_response_time = min(response_times)
+                st.write("##### Response Time Metrics")
+                col7, col8, col9 = st.columns(3)
+                with col7:
+                    st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
+                with col8:
+                    st.metric("Max Response Time", f"{max_response_time:.2f}s")
+                with col9:
+                    st.metric("Min Response Time", f"{min_response_time:.2f}s")
+            
+            # Display classification and priority distributions
+            if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+                df = st.session_state["inquiries"]
+                
+                # Classification distribution with graph
+                st.write("##### Classification Distribution")
+                if "classification" in df.columns and not df["classification"].isna().all():
+                    classification_counts = df["classification"].value_counts()
+                    fig_class = px.bar(
+                        x=classification_counts.index,
+                        y=classification_counts.values,
+                        labels={"x": "Classification", "y": "Count"},
+                        title="Classification Distribution"
+                    )
+                    fig_class.update_layout(showlegend=False)
+                    st.plotly_chart(fig_class, use_container_width=True)
+                
+                # Priority distribution with graph
+                st.write("##### Priority Distribution")
+                if "priority" in df.columns and not df["priority"].isna().all():
+                    priority_counts = df["priority"].value_counts()
+                    fig_priority = px.bar(
+                        x=priority_counts.index,
+                        y=priority_counts.values,
+                        labels={"x": "Priority", "y": "Count"},
+                        title="Priority Distribution"
+                    )
+                    fig_priority.update_layout(showlegend=False)
+                    st.plotly_chart(fig_priority, use_container_width=True)
+                
+                # Common topics analysis
+                st.write("##### Common Topics & Themes")
+                if "summary" in df.columns and not df["summary"].isna().all():
+                    summaries = " ".join(df["summary"].fillna("")).lower()
+                    words = re.findall(r'\b\w+\b', summaries)
+                    word_counts = Counter(words)
+                    
+                    # Filter out common stop words and short words
+                    stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+                    themes = [(word, count) for word, count in word_counts.most_common(10) 
+                             if word not in stop_words and len(word) > 3]
+                    
+                    if themes:
+                        words, counts = zip(*themes)
+                        fig_themes = px.bar(
+                            x=words,
+                            y=counts,
+                            labels={"x": "Topic", "y": "Frequency"},
+                            title="Most Common Topics"
+                        )
+                        fig_themes.update_layout(showlegend=False)
+                        st.plotly_chart(fig_themes, use_container_width=True)
+                    else:
+                        st.text("No common themes found yet")
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
