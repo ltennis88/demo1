@@ -1172,6 +1172,12 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     if faq_dataframe.empty:
         return None, 0
     
+    # Check if required columns exist
+    required_columns = ["Type", "Category", "Question"]
+    if not all(col in faq_dataframe.columns for col in required_columns):
+        st.warning("FAQ data is missing required columns. Expected: Type, Category, Question")
+        return None, 0
+    
     # In a real implementation, this would use embedding similarity
     # For demo purposes, we'll use improved keyword matching
     scenario_lower = scenario_text.lower()
@@ -1204,7 +1210,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 scenario_words = set(scenario_lower.split())
                 question_words = set(question.split())
                 overlap_count = len(scenario_words.intersection(question_words))
-                warranty_matches.append((row["Question"], overlap_count + 5))  # Bonus for warranty match
+                warranty_matches.append((row.get("Question", ""), overlap_count + 5))  # Bonus for warranty match
         
         if warranty_matches:
             # Return the one with highest score
@@ -1223,7 +1229,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 # If the issue matches keywords in the question, return it with high relevance
                 keyword_matches = sum(1 for keyword in keywords if keyword in question)
                 if keyword_matches >= 2:
-                    return row["Question"], 8  # High relevance for direct issue match
+                    return row.get("Question", ""), 8  # High relevance for direct issue match
     
     # If no direct issue match, try matching by category with improved categories
     category_keywords = {
@@ -1259,53 +1265,57 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # If we have matching categories, find FAQs in those categories
     if matching_categories:
         for category, category_match_count in matching_categories:
-            # Look for matches in both the main category and subcategory columns
-            matched_rows = faq_dataframe[
-                faq_dataframe.iloc[:, 0].str.lower().str.contains(category.lower()) |  # Main category
-                faq_dataframe.iloc[:, 1].str.lower().str.contains(category.lower())    # Subcategory
-            ]
-            
-            if not matched_rows.empty:
-                # Find the FAQ that best matches specific words in the scenario
-                best_match = None
-                best_match_score = 0
+            try:
+                # Look for matches in both the main category and subcategory columns
+                matched_rows = faq_dataframe[
+                    faq_dataframe["Type"].str.lower().str.contains(category.lower(), na=False) |  # Main category
+                    faq_dataframe["Category"].str.lower().str.contains(category.lower(), na=False)    # Subcategory
+                ]
                 
-                for _, row in matched_rows.iterrows():
-                    question = str(row.get("Question", "")).lower()
+                if not matched_rows.empty:
+                    # Find the FAQ that best matches specific words in the scenario
+                    best_match = None
+                    best_match_score = 0
                     
-                    # Enhanced scoring system:
-                    # 1. More weight for matching significant words
-                    # 2. Bonus for multiple word matches
-                    # 3. Penalty for questions with irrelevant topics
+                    for _, row in matched_rows.iterrows():
+                        question = str(row.get("Question", "")).lower()
+                        
+                        # Enhanced scoring system:
+                        # 1. More weight for matching significant words
+                        # 2. Bonus for multiple word matches
+                        # 3. Penalty for questions with irrelevant topics
+                        
+                        # Get significant words (longer words carry more meaning)
+                        scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
+                        
+                        # Count matches
+                        word_matches = sum(1 for word in scenario_words if word in question)
+                        
+                        # Bonus for consecutive words matching (phrases)
+                        phrase_bonus = 0
+                        for i in range(len(scenario_words) - 1):
+                            phrase = f"{scenario_words[i]} {scenario_words[i+1]}"
+                            if phrase in question:
+                                phrase_bonus += 2
+                        
+                        # Check for irrelevant topics that would make the FAQ inappropriate
+                        irrelevant_terms = ["drone", "survey", "partnership", "newsletter", "marketing"]
+                        irrelevance_penalty = sum(3 for term in irrelevant_terms if term in question)
+                        
+                        # Final score
+                        score = word_matches + phrase_bonus + (category_match_count/2) - irrelevance_penalty
+                        
+                        if score > best_match_score:
+                            best_match_score = score
+                            best_match = row.get("Question", "")
                     
-                    # Get significant words (longer words carry more meaning)
-                    scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
-                    
-                    # Count matches
-                    word_matches = sum(1 for word in scenario_words if word in question)
-                    
-                    # Bonus for consecutive words matching (phrases)
-                    phrase_bonus = 0
-                    for i in range(len(scenario_words) - 1):
-                        phrase = f"{scenario_words[i]} {scenario_words[i+1]}"
-                        if phrase in question:
-                            phrase_bonus += 2
-                    
-                    # Check for irrelevant topics that would make the FAQ inappropriate
-                    irrelevant_terms = ["drone", "survey", "partnership", "newsletter", "marketing"]
-                    irrelevance_penalty = sum(3 for term in irrelevant_terms if term in question)
-                    
-                    # Final score
-                    score = word_matches + phrase_bonus + (category_match_count/2) - irrelevance_penalty
-                    
-                    if score > best_match_score:
-                        best_match_score = score
-                        best_match = row["Question"]
-                
-                if best_match and best_match_score >= 3:  # Higher threshold for relevance
-                    # Relevance is based on both category match and word match
-                    relevance = best_match_score
-                    return best_match, relevance
+                    if best_match and best_match_score >= 3:  # Higher threshold for relevance
+                        # Relevance is based on both category match and word match
+                        relevance = best_match_score
+                        return best_match, relevance
+            except Exception as e:
+                st.warning(f"Error processing category {category}: {str(e)}")
+                continue
     
     # Last resort: look for any significant word matches with improved scoring
     best_match = None
@@ -1335,7 +1345,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         
         if total_score > best_score:
             best_score = total_score
-            best_match = row["Question"]
+            best_match = row.get("Question", "")
     
     if best_match and best_score >= 3:  # Higher threshold for relevance
         return best_match, best_score
