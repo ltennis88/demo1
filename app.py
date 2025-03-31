@@ -493,8 +493,8 @@ def load_faq_csv():
         # If no Answer column exists, add an empty one
         if "Answer" not in df.columns:
             df["Answer"] = ""
-            
-    return df
+        
+            return df
     except Exception as e:
         error_message = f"Error loading faq_taxonomy.csv: {str(e)}. Please ensure the file exists and is in plain text CSV format."
         st.error(error_message)
@@ -535,7 +535,7 @@ def load_dummy_inquiries():
         with open("inquiries.json", "r") as f:
             inquiries_data = json.load(f)
         df = pd.DataFrame(inquiries_data)
-        return df
+            return df
     except Exception as e:
         # If file doesn't exist or has issues, return empty DataFrame
         return pd.DataFrame(columns=[
