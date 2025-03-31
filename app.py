@@ -2458,13 +2458,6 @@ with st.expander("View Analytics Dashboard"):
         )
         
         st.plotly_chart(fig2, use_container_width=True)
-        
-        # Show priority breakdown as text too
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        for priority, count in priority_counts.items():
-            percentage = (count / len(df)) * 100
-            st.markdown(f"<div class='inquiry-label'>{priority}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
     
     # Row 2: User type and Route distribution 
     colC, colD = st.columns(2)
@@ -2501,80 +2494,80 @@ with st.expander("View Analytics Dashboard"):
         )
         
         st.plotly_chart(fig3, use_container_width=True)
+    
+    with colD:
+        route_counts = df["inbound_route"].value_counts()
         
-        with colD:
-            route_counts = df["inbound_route"].value_counts()
-            
-            # Create color mapping for routes
-            route_colors = {
-                "phone": "#4285F4",     # Blue for phone
-                "email": "#DB4437",     # Red for email
-                "whatsapp": "#0F9D58",  # Green for whatsapp
-                "web_form": "#F4B400"   # Yellow for web form
-            }
-            
-            # Create a pie chart using plotly express
-            fig4 = px.pie(
-                values=route_counts.values,
-                names=route_counts.index,
-                title="Inbound Route Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=route_colors
-            )
-            
-            # Customize
-            fig4.update_traces(textinfo='percent+label')
-            fig4.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig4, use_container_width=True)
+        # Create color mapping for routes
+        route_colors = {
+            "phone": "#4285F4",     # Blue for phone
+            "email": "#DB4437",     # Red for email
+            "whatsapp": "#0F9D58",  # Green for whatsapp
+            "web_form": "#F4B400"   # Yellow for web form
+        }
+        
+        # Create a pie chart using plotly express
+        fig4 = px.pie(
+            values=route_counts.values,
+            names=route_counts.index,
+            title="Inbound Route Distribution",
+            hole=0.4,  # Makes it a donut chart
+            color_discrete_map=route_colors
+        )
+        
+        # Customize
+        fig4.update_traces(textinfo='percent+label')
+        fig4.update_layout(
+            legend=dict(orientation="h", y=-0.1),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white")
+        )
+        
+        st.plotly_chart(fig4, use_container_width=True)
 
-        # Common topics/themes from summaries
-        st.subheader("Common Topics & Themes")
-        topics_container = st.container()
-        with topics_container:
-            # Extract keywords from summaries to create topic tags
-            all_summaries = " ".join(df["summary"].dropna())
-            
-            # Display a word cloud-like representation with the most common words
-            common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
-                           "technical", "login", "access", "website", "app", "mobile", "payment",
-                           "renewal", "subscription", "complaint", "feedback", "review", "rating",
-                           "tradesperson", "homeowner", "service", "quality", "delay"]
-            
-            # Create a container with improved styling for a horizontal tag layout
-            st.markdown("""
-            <div class='info-container'>
-                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
-            """, unsafe_allow_html=True)
-            
-            # Filter to only show words that appear in the summaries
-            matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
-            
-            # Generate random counts for demo purposes
-            for word in matching_words:
-                count = random.randint(1, len(df))
-                if count > 0:
-                    # Calculate opacity based on count (more frequent = more opaque)
-                    opacity = min(0.5 + (count / len(df)), 1.0)
-                    # Create the tag with improved styling
-                    st.markdown(f"""
-                        <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
-                             color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
-                             opacity: {opacity}; margin-bottom: 10px;">
-                            {word.title()} ({count})
-                        </div>
-                    """, unsafe_allow_html=True)
-            
-            st.markdown("""
-                </div>
+    # Common topics/themes from summaries
+    st.subheader("Common Topics & Themes")
+    topics_container = st.container()
+    with topics_container:
+        # Extract keywords from summaries to create topic tags
+        all_summaries = " ".join(df["summary"].dropna())
+        
+        # Display a word cloud-like representation with the most common words
+        common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
+                       "technical", "login", "access", "website", "app", "mobile", "payment",
+                       "renewal", "subscription", "complaint", "feedback", "review", "rating",
+                       "tradesperson", "homeowner", "service", "quality", "delay"]
+        
+        # Create a container with improved styling for a horizontal tag layout
+        st.markdown("""
+        <div class='info-container'>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
+        """, unsafe_allow_html=True)
+        
+        # Filter to only show words that appear in the summaries
+        matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
+        
+        # Generate random counts for demo purposes
+        for word in matching_words:
+            count = random.randint(1, len(df))
+            if count > 0:
+                # Calculate opacity based on count (more frequent = more opaque)
+                opacity = min(0.5 + (count / len(df)), 1.0)
+                # Create the tag with improved styling
+                st.markdown(f"""
+                    <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
+                         color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
+                         opacity: {opacity}; margin-bottom: 10px;">
+                        {word.title()} ({count})
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown("""
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
     # Add new Token Usage Analytics section
     st.subheader("Token Usage Analytics")
@@ -2631,6 +2624,9 @@ with st.expander("View Analytics Dashboard"):
             avg_non_cached_tokens = classification_data['non_cached_input_tokens'].mean()
             avg_output_tokens_class = classification_data['output_tokens'].mean()
             
+            # Calculate total input cost for display
+            total_input_cost = classification_data['cached_input_cost'].sum() + classification_data['non_cached_input_cost'].sum()
+            
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -2660,6 +2656,14 @@ with st.expander("View Analytics Dashboard"):
                     f"{avg_output_tokens_class:,.0f}",
                     f"${classification_data['output_cost'].sum():.4f}"
                 )
+
+            # Add total cost summary
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            st.markdown("<div class='inquiry-section'>Total Costs</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${classification_data['output_cost'].sum():.4f}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Total Cost: ${classification_data['total_cost'].sum():.4f}</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
         # Create line charts for token usage over time
         st.markdown("### Token Usage Over Time")
