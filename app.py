@@ -8,6 +8,7 @@ import plotly.express as px
 import os
 import asyncio
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
 ###############################################################################
 # 1) EARLY INITIALIZATION - To prevent SessionInfo errors
@@ -847,19 +848,19 @@ def build_base_context():
     """Cache the base context that doesn't change per request"""
     faq_df, faq_dict = load_faq_csv()
     faq_context = build_faq_context(faq_dict)
-membership_terms = load_membership_terms()
+    membership_terms = load_membership_terms()
     guarantee_terms = load_guarantee_terms()
     
     return f"""
-    FAQ Information:
-    {faq_context}
-    
-    Membership Terms:
-    {membership_terms}
-    
-    Guarantee Terms:
-    {guarantee_terms}
-    """
+FAQ Information:
+{faq_context}
+
+Membership Terms:
+{membership_terms}
+
+Guarantee Terms:
+{guarantee_terms}
+"""
 
 def build_context(df, scenario_text):
     """Build context from FAQ and terms for classification and response."""
@@ -867,11 +868,11 @@ def build_context(df, scenario_text):
     
     # Only add the scenario-specific part
     full_context = f"""
-    {base_context}
-    
-    Customer Scenario:
-    {scenario_text}
-    """
+{base_context}
+
+Current Customer Scenario:
+{scenario_text}
+"""
     return full_context
 
 df_faq, faq_dict = load_faq_csv()
@@ -1530,51 +1531,20 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         # Get the optimized FAQ dictionary from session state
         faq_dict = st.session_state.get('faq_dict', {})
         if not faq_dict:
-            # If dictionary not found, reload FAQ data
             _, faq_dict = load_faq_csv()
-        
+            
         # First try quick keyword matching
-        scenario_keywords = set(word.lower() for word in str(scenario_text).split() if len(word) > 4)
+        scenario_keywords = set(word.lower() for word in str(scenario_text).split())
         best_match = None
         best_score = 0
-        best_answer = None
-        
-        # Quick keyword matching first
-        for faq_entry in faq_dict.get('all_faqs', []):
-            question = str(faq_entry.get('question', '')).lower()
-            question_keywords = set(word for word in question.split() if len(word) > 4)
-            score = len(scenario_keywords.intersection(question_keywords))
-            if score > best_score:
-                best_score = score
-                best_match = faq_entry.get('question')
-                best_answer = faq_entry.get('answer')
-        
-        # If we found a good keyword match, return it immediately
-        if best_score >= 3:
-            return best_match, best_answer, best_score + 5  # Bonus for quick match
-        
-        # If no good keyword match, use semantic search
-        scenario_prompt = f"""
-        Given this customer scenario and context:
-        
-        {base_context}
-        
-        Customer Scenario:
-        {str(scenario_text)}
-        
-        What are the key issues or topics being discussed? Focus on:
-        1. The specific problem or request
-        2. The type of service involved
-        3. Any urgency or timeline factors
-        4. Customer concerns or complaints
-        """
         
         try:
-    response = openai.ChatCompletion.create(
+            # Try semantic search with OpenAI
+            response = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
-        messages=[
-                    {"role": "system", "content": "You are a customer service expert helping to match customer inquiries with relevant FAQs."},
-                    {"role": "user", "content": scenario_prompt}
+                messages=[
+                    {"role": "system", "content": "Extract key topics from this customer scenario."},
+                    {"role": "user", "content": scenario_text}
                 ],
                 temperature=0,
                 max_tokens=150
@@ -1588,41 +1558,36 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 st.session_state['faq_key_topics'] = {}
             st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
             
-            # For each FAQ, calculate relevance score
-            best_match = None
-            best_score = 0
-            best_answer = None
+            # Score FAQs in parallel
+            with ThreadPoolExecutor() as executor:
+                scores = list(executor.map(
+                    lambda faq: score_faq_relevance(key_topics, faq),
+                    faq_dict.values()
+                ))
             
-            # Use ThreadPoolExecutor for parallel scoring
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = []
-                for faq_entry in faq_dict.get('all_faqs', []):
-                    futures.append(
-                        executor.submit(
-                            score_faq_relevance,
-                            key_topics,
-                            faq_entry
-                        )
-                    )
-                
-                # Process results as they complete
-                for future in concurrent.futures.as_completed(futures):
-                    score, question, answer = future.result()
-                    if score > best_score:
-                        best_score = score
-                        best_match = question
-                        best_answer = answer
-            
-            # Only return matches that are reasonably relevant
+            # Find best match
+            best_score = max(scores) if scores else 0
             if best_score >= 7:
-                return best_match, best_answer, best_score
-            else:
-                return None, None, 0
+                best_idx = scores.index(best_score)
+                best_match = list(faq_dict.keys())[best_idx]
+                return best_match, faq_dict[best_match], best_score
                 
-    except Exception as e:
+        except Exception as e:
             st.error(f"Error in semantic search: {str(e)}")
-            return None, None, 0
             
+        # If semantic search fails or no good match, try keyword matching
+        for question, answer in faq_dict.items():
+            faq_keywords = set(word.lower() for word in str(question).split())
+            common_words = scenario_keywords & faq_keywords
+            if len(common_words) > best_score:
+                best_score = len(common_words)
+                best_match = question
+        
+        if best_match and best_score > 0:
+            return best_match, faq_dict[best_match], best_score
+            
+        return None, None, 0
+        
     except Exception as e:
         st.error(f"Error in FAQ matching: {str(e)}")
         return None, None, 0
@@ -1713,8 +1678,8 @@ def generate_response_template(inbound_route):
     }
     return templates.get(inbound_route, "")
 
-def generate_response_suggestion(scenario, classification_result):
-    """Generate a response suggestion based on classification and FAQ matching"""
+def generate_response_suggestion(scenario_dict, classification_dict):
+    """Generate a response suggestion using the scenario and classification."""
     try:
         # Start timing
         start_time = time.time()
@@ -1723,17 +1688,17 @@ def generate_response_suggestion(scenario, classification_result):
         base_context = build_base_context()
         
         # Get cached response template
-        template = generate_response_template(scenario.get("inbound_route", ""))
+        template = generate_response_template(scenario_dict.get("inbound_route", ""))
         
         # Build comprehensive context including guarantee terms
         context = f"""
         {base_context}
         
         Customer Scenario:
-        {scenario}
+        {scenario_dict}
         
         Classification:
-        {json.dumps(classification_result, indent=2)}
+        {json.dumps(classification_dict, indent=2)}
         
         Instructions:
         1. Be professional and empathetic
@@ -1747,66 +1712,71 @@ def generate_response_suggestion(scenario, classification_result):
         6. Keep the response concise but informative
         """
         
-        # Find relevant FAQ with improved matching
+        # Process relevant FAQ
         try:
-            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
+            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_dict, load_faq_csv())
             if relevant_faq and faq_answer and faq_relevance >= 7:
                 context += f"""
                 Relevant FAQ:
                 Question: {relevant_faq}
                 Answer: {faq_answer}
                 """
-    except Exception as e:
-        st.error(f"Error finding relevant FAQ: {str(e)}")
-        relevant_faq, faq_answer, faq_relevance = None, None, 0
-    
+        except Exception as e:
+            st.error(f"Error finding relevant FAQ: {str(e)}")
+            relevant_faq, faq_answer, faq_relevance = None, None, 0
+        
         # Generate response using OpenAI
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
-                {"role": "user", "content": context}
-            ],
-            temperature=0.7,
-            max_tokens=500
-        )
-        
-        # Calculate response time
-        response_time = time.time() - start_time
-        
-        # Extract token usage
-        cached_input_tokens = len(base_context.split())  # Cached context
-        non_cached_input_tokens = len(str(scenario).split()) + len(json.dumps(classification_result).split())  # Dynamic content
-        output_tokens = response.usage.completion_tokens
-        
-        # Calculate costs
-        cached_input_cost = calculate_token_cost(cached_input_tokens, "cached_input")
-        non_cached_input_cost = calculate_token_cost(non_cached_input_tokens, "input")
-        output_cost = calculate_token_cost(output_tokens, "output")
-        
-        # Track usage
-        track_token_usage(
-            operation="response_generation",
-            cached_input_tokens=cached_input_tokens,
-            non_cached_input_tokens=non_cached_input_tokens,
-            output_tokens=output_tokens,
-            response_time=response_time
-        )
-        
-        # For backward compatibility, return total input tokens and total input cost
-        total_input_tokens = cached_input_tokens + non_cached_input_tokens
-        total_input_cost = cached_input_cost + non_cached_input_cost
-        
-        return (
-            response.choices[0].message.content,
-            total_input_tokens,
-            output_tokens,
-            total_input_cost,
-            output_cost
-        )
-    
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
+                    {"role": "user", "content": context}
+                ],
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            # Calculate response time
+            response_time = time.time() - start_time
+            
+            # Extract token usage
+            cached_input_tokens = len(base_context.split())  # Cached context
+            non_cached_input_tokens = len(str(scenario_dict).split()) + len(json.dumps(classification_dict).split())  # Dynamic content
+            output_tokens = response.usage.completion_tokens
+            
+            # Calculate costs
+            cached_input_cost = calculate_token_cost(cached_input_tokens, "cached_input")
+            non_cached_input_cost = calculate_token_cost(non_cached_input_tokens, "input")
+            output_cost = calculate_token_cost(output_tokens, "output")
+            
+            # Track usage
+            track_token_usage(
+                operation="response_generation",
+                cached_input_tokens=cached_input_tokens,
+                non_cached_input_tokens=non_cached_input_tokens,
+                output_tokens=output_tokens,
+                response_time=response_time
+            )
+            
+            # For backward compatibility, return total input tokens and total input cost
+            total_input_tokens = cached_input_tokens + non_cached_input_tokens
+            total_input_cost = cached_input_cost + non_cached_input_cost
+            
+            return (
+                response.choices[0].message.content,
+                total_input_tokens,
+                output_tokens,
+                total_input_cost,
+                output_cost
+            )
+            
+        except Exception as e:
+            st.error(f"Error in OpenAI call: {str(e)}")
+            return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
+            
     except Exception as e:
-        st.error(f"Error generating response: {str(e)}")
+        st.error(f"Error in response generation: {str(e)}")
         return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
 
 ###############################################################################
@@ -3062,3 +3032,44 @@ if st.button("Generate Response"):
         # Display analytics with unique section identifier
         if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
             update_analytics("response")
+
+def extract_key_topics(scenario_text):
+    """Extract key topics from the scenario using OpenAI."""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a customer service assistant. Extract the key topics from this scenario."},
+                {"role": "user", "content": scenario_text}
+            ],
+            temperature=0,
+            max_tokens=150
+        )
+        
+        # Extract key topics from the response
+        key_topics = response.choices[0].message.content
+        
+        # Cache the key topics for this scenario
+        if 'faq_key_topics' not in st.session_state:
+            st.session_state['faq_key_topics'] = {}
+        st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+        
+        return key_topics
+    except Exception as e:
+        st.error(f"Error extracting key topics: {str(e)}")
+        return None
+
+def process_relevant_faq(scenario_text, faq_dataframe, context):
+    """Process and find relevant FAQ entries."""
+    try:
+        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_text, faq_dataframe)
+        if relevant_faq and faq_answer and faq_relevance >= 7:
+            return context + f"""
+Relevant FAQ:
+Question: {relevant_faq}
+Answer: {faq_answer}
+"""
+        return context
+    except Exception as e:
+        st.error(f"Error finding relevant FAQ: {str(e)}")
+        return context
