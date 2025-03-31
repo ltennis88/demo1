@@ -389,165 +389,82 @@ REFER TO THE FOLLOWING DEFINITIONS:
 }}
 """
 
-# Separate prompts for each user type
-existing_homeowner_prompt = """
-You are generating a scenario for an EXISTING HOMEOWNER. This means they have already had work done through Checkatrade.
+###############################################################################
+# 5) USER TYPE PROMPTS
+###############################################################################
 
-ALLOWED ACTIONS:
-- Leave a review about work completed for them
-- Complain about work quality or issues with completed jobs
-- Ask about warranty coverage for work they've had done
-- Report issues with completed work
-- Request refunds or compensation for poor work
-- Ask about insurance coverage for work done
+# Convert to cached variables similar to how FAQ_context is cached
+@st.cache_data
+def load_existing_homeowner_prompt():
+    return """
+Generate a realistic customer service scenario for Checkatrade's contact center involving an existing homeowner.
 
-COMMON CONTACT REASONS:
-1. Work Quality Issues:
-   - Uneven or poor finishing
-   - Delays in completion
-   - Materials different from agreed
-   - Work not matching original quote
-   - Incomplete or rushed work
+For existing homeowners, consider scenarios like:
+- Complaints about tradesperson quality, behavior, or work
+- Questions about a project they've arranged through Checkatrade
+- Billing or payment disputes
+- Problems with a tradesperson not showing up
+- Questions about the guarantee
+- How to leave a review
+- How to find another tradesperson
+- Account management issues
 
-2. Communication Problems:
-   - Tradesperson not responding to concerns
-   - Difficulty scheduling remaining work
-   - Questions about additional costs
-   - Clarification on warranty coverage
-   - Follow-up on promised fixes
+Include:
+1. A randomized inbound_route (phone, email, whatsapp, or web_form)
+2. Random phone number or email based on the route
+3. Appropriate membership_id for an existing homeowner
+4. Realistic account details including name, location, and a recent review or job
+5. A detailed scenario_text from the customer's perspective
 
-3. Review System:
-   - How to update an existing review
-   - Questions about review verification
-   - Help with adding photos to reviews
-   - Issues with review submission
-   - Responding to tradesperson comments
+The response should be in valid JSON format like this:
+{
+    "inbound_route": "phone",
+    "ivr_flow": "homeowner_support",
+    "ivr_selections": ["existing_customer", "complaint"],
+    "user_type": "existing_homeowner",
+    "phone_email": "+44 7911 123456",
+    "membership_id": "H-12345678",
+    "account_details": {
+        "name": "Sarah",
+        "surname": "Johnson",
+        "location": "Manchester",
+        "latest_reviews": "Left a 4-star review for PlumbPerfect Ltd 3 weeks ago",
+        "latest_jobs": "Bathroom renovation completed on 15 May 2023",
+        "project_cost": "£4,500",
+        "payment_status": "Paid in full"
+    },
+    "scenario_text": "I'm calling about the bathroom renovation that was completed last month. The sink has started leaking and the tradesperson isn't responding to my calls. I need someone to come fix it urgently as water is damaging my cabinet."
+}
+"""
 
-4. Payment & Billing:
-   - Questions about partial payments
-   - Disputing additional charges
-   - Understanding payment protection
-   - Requesting refund information
-   - Questions about payment schedules
+@st.cache_data
+def load_prospective_homeowner_prompt():
+    return """
+Generate a realistic customer service scenario for Checkatrade's contact center involving a prospective homeowner (not yet a customer).
 
-5. Warranty & Guarantees:
-   - Understanding warranty coverage
-   - Reporting issues within warranty period
-   - Questions about extended guarantees
-   - Help with warranty claims
-   - Documentation requirements
+For prospective homeowners, consider scenarios like:
+- Questions about how Checkatrade works
+- How to find a tradesperson for a specific job
+- Questions about vetting or qualification checking
+- Inquiries about the Checkatrade guarantee
+- Questions about becoming a member
+- How reviews work and if they can be trusted
+- Comparing quotes from multiple tradespeople
 
-EXAMPLE CREATIVE SCENARIOS:
-1. "Had a bathroom renovation completed last week, but noticed the tiles are starting to show hairline cracks. Need to understand my warranty options."
+Include:
+1. A randomized inbound_route (phone, email, whatsapp, or web_form)
+2. Random phone number or email based on the route
+3. Empty account details (as they are not yet a customer)
+4. No membership_id
+5. A detailed scenario_text from the prospective customer's perspective
 
-2. "Got my kitchen remodeled two months ago. The new cabinet doors aren't aligning properly, and I'm having trouble getting the tradesperson to respond."
-
-3. "Received a follow-up quote for additional work that seems much higher than initially discussed. Need to understand my options."
-
-4. "Had windows installed last month and noticed condensation forming between the panes. Need help with warranty claim process."
-
-5. "Want to update my review for the recent landscaping work as they came back to fix some issues - how can I modify my existing review?"
-
-ACCOUNT DETAILS REQUIREMENTS:
-- Must include a realistic name and surname
-- Must include a realistic UK location
-- Latest reviews must start with "Gave", "Left", or "Posted"
-- Latest jobs must be in passive voice (e.g., "Had kitchen renovated by a plumber")
-- Project cost and payment status must be provided if mentioning a job
-
-EXAMPLE SCENARIO:
+The response should be in valid JSON format like this:
 {
     "inbound_route": "email",
     "ivr_flow": "",
     "ivr_selections": [],
-    "user_type": "existing_homeowner",
-    "phone_email": "john.smith@email.com",
-    "membership_id": "",
-    "account_details": {
-        "name": "John",
-        "surname": "Smith",
-        "location": "Manchester",
-        "latest_reviews": "Gave a 4-star review for bathroom renovation",
-        "latest_jobs": "Had bathroom renovated by a local plumber",
-        "project_cost": "£3,500",
-        "payment_status": "Paid"
-    },
-    "scenario_text": "I need to report an issue with my recently completed bathroom renovation. The tiles are coming loose after just 2 weeks."
-}
-"""
-
-prospective_homeowner_prompt = """
-You are generating a scenario for a PROSPECTIVE HOMEOWNER. This means they have NOT had any work done through Checkatrade yet.
-
-ALLOWED ACTIONS:
-- Ask general questions about finding reliable tradespeople
-- Inquire about the vetting process
-- Ask about how to create an account
-- Ask about how to verify tradespeople
-- Ask about the review system
-- Ask about insurance coverage options
-
-COMMON CONTACT REASONS:
-1. Finding Tradespeople:
-   - Seeking recommendations for specific trades
-   - Asking about typical wait times for different trades
-   - Inquiring about how to compare multiple tradespeople
-   - Questions about service coverage in specific areas
-   - Help with urgent/emergency trade requirements
-
-2. Vetting Process:
-   - Understanding background checks
-   - Questions about trade qualifications verification
-   - Inquiring about insurance requirements for tradespeople
-   - Understanding the review verification process
-   - Questions about quality monitoring
-
-3. Platform Usage:
-   - How to create and set up an account
-   - Understanding how to search effectively
-   - Questions about the quote request process
-   - Help with using filters and search options
-   - Understanding how to message tradespeople
-
-4. Safety & Security:
-   - Questions about payment protection
-   - Understanding dispute resolution process
-   - Inquiring about insurance coverage
-   - Questions about data privacy
-   - Understanding safety measures and guarantees
-
-EXAMPLE CREATIVE SCENARIOS:
-1. "I'm planning a complete kitchen renovation and need to find multiple trades. Can you explain how I can coordinate different tradespeople through Checkatrade?"
-
-2. "My elderly mother needs some urgent plumbing work. How can I be sure the tradesperson I find through Checkatrade is trustworthy and verified?"
-
-3. "I'm comparing different platforms for finding tradespeople. What makes Checkatrade's vetting process more reliable than others?"
-
-4. "I've heard horror stories about cowboy builders. Can you explain what safeguards Checkatrade has in place to protect homeowners?"
-
-5. "I'm looking to have solar panels installed. How can I verify if the tradespeople on Checkatrade have the proper certifications for this type of work?"
-
-FORBIDDEN ACTIONS:
-- Mentioning any completed work
-- Referencing any reviews they've left
-- Mentioning any specific jobs
-- Talking about poor quality or dissatisfaction
-- Mentioning any past work
-- Asking about warranty claims
-- Asking about refunds
-- Any questions about becoming a tradesperson
-- Any questions about memberships or membership benefits
-
-ACCOUNT DETAILS REQUIREMENTS:
-- All account details must be empty (name, surname, location, latest_reviews, latest_jobs, project_cost, payment_status)
-
-EXAMPLE SCENARIO:
-{
-    "inbound_route": "phone",
-    "ivr_flow": "Homeowner Inquiry",
-    "ivr_selections": [1, 2],
     "user_type": "prospective_homeowner",
-    "phone_email": "07700900000",
+    "phone_email": "jane.smith@example.com",
     "membership_id": "",
     "account_details": {
         "name": "",
@@ -558,175 +475,82 @@ EXAMPLE SCENARIO:
         "project_cost": "",
         "payment_status": ""
     },
-    "scenario_text": "I'm looking to find a reliable plumber for a bathroom renovation. How does Checkatrade verify their tradespeople?"
+    "scenario_text": "I'm planning a kitchen renovation and I'm not sure how to get started with Checkatrade. Do you just show me a list of companies, or do you help match me with the right tradesperson? And how do I know if they're reliable?"
 }
 """
 
-existing_tradesperson_prompt = """
-You are generating a scenario for an EXISTING TRADESPERSON. This means they are already a member of Checkatrade.
+@st.cache_data
+def load_existing_tradesperson_prompt():
+    return """
+Generate a realistic customer service scenario for Checkatrade's contact center involving an existing tradesperson member.
 
-ALLOWED ACTIONS:
-- Update business details
-- Ask about membership renewal
-- Respond to customer reviews
-- Update insurance details
-- Ask about business profile improvements
-- Report technical issues with their account
-- Ask about payment processing
+For existing tradespeople, consider scenarios like:
+- Questions about membership fees or renewal
+- How to respond to customer reviews (especially negative ones)
+- Technical issues with their profile or the app
+- Billing or payment queries
+- Questions about upgrading membership
+- Lead generation concerns
+- Insurance or qualification verification updates
+- Competition concerns with other tradespeople
 
-COMMON CONTACT REASONS:
-1. Account Management:
-   - Updating business hours
-   - Adding new service areas
-   - Updating insurance documents
-   - Adding new trade categories
-   - Modifying contact information
+Include:
+1. A randomized inbound_route (phone, email, whatsapp, or web_form)
+2. Random phone number or email based on the route
+3. Appropriate membership_id for a tradesperson (T- prefix)
+4. Realistic account details including business name, location, and recent activity
+5. A detailed scenario_text from the tradesperson's perspective
 
-2. Profile Enhancement:
-   - Adding new project photos
-   - Updating qualifications
-   - Questions about profile visibility
-   - Help with description optimization
-   - Adding new accreditations
-
-3. Review Management:
-   - Help with review responses
-   - Questions about review verification
-   - Disputing unfair reviews
-   - Understanding review metrics
-   - Improving review scores
-
-4. Technical Support:
-   - App login issues
-   - Quote system problems
-   - Calendar sync issues
-   - Notification settings
-   - Payment gateway problems
-
-5. Membership & Billing:
-   - Subscription renewal questions
-   - Payment method updates
-   - Invoice queries
-   - Membership tier questions
-   - Additional features costs
-
-EXAMPLE CREATIVE SCENARIOS:
-1. "Need to update my profile to show I'm now certified for electric vehicle charging installations. Where do I add this qualification?"
-
-2. "Having issues with the mobile app notifications - not receiving alerts for new quote requests in real-time."
-
-3. "Want to expand my service area to include neighboring counties. Need help updating my coverage map."
-
-4. "Received an unusual review that I believe was meant for a different tradesperson. How can I dispute this?"
-
-5. "Looking to upgrade my membership to include priority listing. What are the costs and benefits?"
-
-ACCOUNT DETAILS REQUIREMENTS:
-- Must include a realistic name and surname
-- Must include a realistic UK location
-- Latest reviews must start with "Received", "Customer gave", or "Client rated"
-- Latest jobs must be in active voice (e.g., "Completed kitchen renovation with custom tiling")
-- Project cost and payment status must be provided if mentioning a job
-- Must include a valid membership_id in format "T-xxxxx"
-
-EXAMPLE SCENARIO:
-{
-    "inbound_route": "email",
-    "ivr_flow": "",
-    "ivr_selections": [],
-    "user_type": "existing_tradesperson",
-    "phone_email": "contact@smithplumbing.co.uk",
-    "membership_id": "T-12345",
-    "account_details": {
-        "name": "John",
-        "surname": "Smith",
-        "location": "Manchester",
-        "latest_reviews": "Received a 5-star review for bathroom renovation",
-        "latest_jobs": "Completed bathroom renovation with custom tiling",
-        "project_cost": "£3,500",
-        "payment_status": "Paid"
-    },
-    "scenario_text": "I need to update my Public Liability Insurance details as my policy has been renewed."
-}
-"""
-
-prospective_tradesperson_prompt = """
-You are generating a scenario for a PROSPECTIVE TRADESPERSON. This means they are NOT yet a member of Checkatrade.
-
-ALLOWED ACTIONS:
-- Ask questions about joining Checkatrade
-- Inquire about membership fees
-- Ask about application requirements
-- Ask about the vetting process
-- Ask about business profile setup
-- Ask about insurance requirements
-- Ask about payment processing
-
-FORBIDDEN ACTIONS:
-- Mentioning or discussing any reviews (as they are not yet a member and cannot have submitted any reviews)
-- Asking about review management or review responses
-- Discussing any past work through Checkatrade
-- Mentioning any customer interactions through Checkatrade
-- Asking about existing member features
-- Discussing any active memberships or accounts
-
-COMMON CONTACT REASONS:
-1. Membership Information:
-   - Understanding membership tiers
-   - Questions about costs and fees
-   - Payment plan options
-   - Membership benefits comparison
-   - Special offers or promotions
-
-2. Application Process:
-   - Required documentation
-   - Background check process
-   - Insurance requirements
-   - Qualification verification
-   - Application timeframes
-
-3. Platform Features:
-   - Lead generation system
-   - Quote management tools
-   - Payment processing options
-   - Mobile app capabilities
-   - Customer communication tools
-
-4. Business Growth:
-   - Expected lead volumes
-   - Marketing support
-   - Profile optimization tips
-   - Competition levels
-   - Success rates
-
-5. Verification Process:
-   - Required certifications
-   - Reference checks
-   - Insurance validation
-   - Trade association requirements
-   - Quality assessment process
-
-EXAMPLE CREATIVE SCENARIOS:
-1. "I'm starting my own electrical business and interested in the vetting process. What certifications do you require for electrical contractors?"
-
-2. "Currently working as a self-employed plumber. What's the typical return on investment for your membership fees in terms of new business?"
-
-3. "Expanding my roofing company and considering Checkatrade. How does your lead generation compare to other platforms?"
-
-4. "I'm a qualified bathroom fitter. What documents do I need to prepare for the application process?"
-
-5. "Running a family painting business. How long does the verification process typically take, and what's involved?"
-
-ACCOUNT DETAILS REQUIREMENTS:
-- All account details must be empty (name, surname, location, latest_reviews, latest_jobs, project_cost, payment_status)
-
-EXAMPLE SCENARIO:
+The response should be in valid JSON format like this:
 {
     "inbound_route": "phone",
-    "ivr_flow": "Tradesperson Inquiry",
-    "ivr_selections": [1, 3],
+    "ivr_flow": "tradesperson_support",
+    "ivr_selections": ["existing_member", "billing"],
+    "user_type": "existing_tradesperson",
+    "phone_email": "+44 7700 900123",
+    "membership_id": "T-87654321",
+    "account_details": {
+        "name": "Johnson Plumbing",
+        "surname": "Ltd",
+        "location": "Liverpool",
+        "latest_reviews": "Received a 3-star review 2 days ago that seems unfair",
+        "latest_jobs": "3 new leads in the past week, 1 converted to quote",
+        "project_cost": "Monthly Premium membership: £74.99",
+        "payment_status": "Next payment due: 05/08/2023"
+    },
+    "scenario_text": "I'm calling about a negative review I received last week. The customer complained about delays, but they kept changing the requirements which caused the delays. I think the review is unfair and damaging to my business. Can you help me get it removed or respond to it appropriately?"
+}
+"""
+
+@st.cache_data
+def load_prospective_tradesperson_prompt():
+    return """
+Generate a realistic customer service scenario for Checkatrade's contact center involving a prospective tradesperson (interested in joining).
+
+For prospective tradespeople, consider scenarios like:
+- Questions about how to join Checkatrade
+- Inquiries about membership costs and benefits
+- Questions about the vetting process
+- How lead generation works
+- What documentation they need to provide
+- How the review system works
+- Comparing different membership levels
+- Questions about competitors like MyBuilder or RatedPeople
+
+Include:
+1. A randomized inbound_route (phone, email, whatsapp, or web_form)
+2. Random phone number or email based on the route
+3. No membership_id (as they are not yet a member)
+4. Empty account details (as they don't have an account yet)
+5. A detailed scenario_text from the prospective tradesperson's perspective
+
+The response should be in valid JSON format like this:
+{
+    "inbound_route": "web_form",
+    "ivr_flow": "",
+    "ivr_selections": [],
     "user_type": "prospective_tradesperson",
-    "phone_email": "07700900000",
+    "phone_email": "mike.builders@example.com",
     "membership_id": "",
     "account_details": {
         "name": "",
@@ -741,6 +565,13 @@ EXAMPLE SCENARIO:
 }
 """
 
+# Load the cached prompts once
+existing_homeowner_prompt = load_existing_homeowner_prompt()
+prospective_homeowner_prompt = load_prospective_homeowner_prompt()
+existing_tradesperson_prompt = load_existing_tradesperson_prompt()
+prospective_tradesperson_prompt = load_prospective_tradesperson_prompt()
+
+@st.cache_data
 def get_user_type_prompt(user_type):
     """Returns the appropriate prompt based on user type."""
     prompts = {
