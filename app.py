@@ -476,7 +476,7 @@ def load_faq_csv():
     """
     try:
         # First try with semicolon delimiter
-    try:
+        try:
             df = pd.read_csv("faq_taxonomy.csv", sep=';', encoding='utf-8')
         except:
             # If that fails, try with comma
@@ -501,7 +501,6 @@ def load_faq_csv():
         print(error_message)  # Also log to console for debugging
         # Return empty DataFrame with the expected columns
         return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
-
 @st.cache_data
 def load_membership_terms():
     """
@@ -894,7 +893,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         user_content += f"\n\nForce inbound_route to '{selected_route}'."
     
     # Always specify the user type now, since we either have it from input or randomly selected it
-        user_content += f"\n\nForce user_type to '{selected_user_type}'."
+    user_content += f"\n\nForce user_type to '{selected_user_type}'."
 
     try:
         response = openai.ChatCompletion.create(
@@ -908,79 +907,79 @@ def generate_scenario(selected_route=None, selected_user_type=None):
             )
             
             # Calculate token usage and costs
-            input_tokens = response["usage"]["prompt_tokens"]
-            output_tokens = response["usage"]["completion_tokens"]
-            total_tokens = response["usage"]["total_tokens"]
-            
+        input_tokens = response["usage"]["prompt_tokens"]
+        output_tokens = response["usage"]["completion_tokens"]
+        total_tokens = response["usage"]["total_tokens"]
+        
         # Calculate costs - since we're using cached prompts, use the cached_input rate
         input_cost = calculate_token_cost(input_tokens, "cached_input")
         output_cost = calculate_token_cost(output_tokens, "output")
         total_cost = input_cost + output_cost
-            
-            # Calculate response time
-            response_time = time.time() - start_time
-            
-            # Store usage data
-            usage_data = {
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": total_tokens,
-                "input_cost": input_cost,
-                "output_cost": output_cost,
-                "total_cost": total_cost,
-                "response_time": response_time,
-            "operation": "generation"
-            }
-            
-            st.session_state["token_usage"]["generations"].append(usage_data)
-            st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-            st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-            st.session_state["token_usage"]["total_cost"] += total_cost
-            st.session_state["token_usage"]["response_times"].append(response_time)
-            
-            raw_reply = response["choices"][0]["message"]["content"].strip()
-            
+        
+        # Calculate response time
+        response_time = time.time() - start_time
+        
+        # Store usage data
+        usage_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "input_cost": input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "response_time": response_time,
+        "operation": "generation"
+        }
+        
+        st.session_state["token_usage"]["generations"].append(usage_data)
+        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+        st.session_state["token_usage"]["total_cost"] += total_cost
+        st.session_state["token_usage"]["response_times"].append(response_time)
+        
+        raw_reply = response["choices"][0]["message"]["content"].strip()
+        
         try:
-                scenario_data = json.loads(raw_reply)
-                
-                # Ensure account details match the user type
-                if "prospective" in selected_user_type:
-                    scenario_data["account_details"] = {
-                        "name": "",
-                        "surname": "",
-                        "location": "",
-                        "latest_reviews": "",
-                        "latest_jobs": "",
-                        "project_cost": "",
-                        "payment_status": ""
-                    }
-                    scenario_data["membership_id"] = ""
-                
-                # Force the user type to match what was selected/randomized
-                scenario_data["user_type"] = selected_user_type
-                
-                return scenario_data
+            scenario_data = json.loads(raw_reply)
+            
+            # Ensure account details match the user type
+            if "prospective" in selected_user_type:
+                scenario_data["account_details"] = {
+                    "name": "",
+                    "surname": "",
+                    "location": "",
+                    "latest_reviews": "",
+                    "latest_jobs": "",
+                    "project_cost": "",
+                    "payment_status": ""
+                }
+                scenario_data["membership_id"] = ""
+            
+            # Force the user type to match what was selected/randomized
+            scenario_data["user_type"] = selected_user_type
+            
+            return scenario_data
                 
         except Exception as e:
-        return {
-            "inbound_route": "error",
-                    "ivr_flow": "",
-                    "ivr_selections": [],
-                    "user_type": selected_user_type,
-                    "phone_email": "",
-                    "membership_id": "",
-                    "account_details": {
-                        "name": "",
-                        "surname": "",
-                        "location": "",
-                        "latest_reviews": "",
-                        "latest_jobs": "",
-                        "project_cost": "",
-                        "payment_status": ""
-                    },
-                    "scenario_text": f"Error parsing scenario JSON: {str(e)}"
-                }
+            return {
+                "inbound_route": "error",
+                        "ivr_flow": "",
+                        "ivr_selections": [],
+                        "user_type": selected_user_type,
+                        "phone_email": "",
+                        "membership_id": "",
+                        "account_details": {
+                            "name": "",
+                            "surname": "",
+                            "location": "",
+                            "latest_reviews": "",
+                            "latest_jobs": "",
+                            "project_cost": "",
+                            "payment_status": ""
+                        },
+                        "scenario_text": f"Error parsing scenario JSON: {str(e)}"
+                    }
             
     except Exception as e:
         return {
@@ -1218,11 +1217,11 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # If we have matching categories, find FAQs in those categories
     if matching_categories:
         for category, category_match_count in matching_categories:
-        try:
+            try:
                 # Look for matches in both the main category and subcategory columns
                 matched_rows = faq_dataframe[
                     faq_dataframe["Type"].str.lower().str.contains(category.lower(), na=False) |  # Main category
-                    faq_dataframe["Category"].str.lower().str.contains(category.lower(), na=False)    # Subcategory
+                    faq_dataframe["Category"].str.lower().str.contains(category.lower(), na=False)  # Subcategory
                 ]
                 
                 if not matched_rows.empty:
@@ -1248,28 +1247,25 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                         # Bonus for consecutive words matching (phrases)
                         phrase_bonus = 0
                         for i in range(len(scenario_words) - 1):
-                            phrase = f"{scenario_words[i]} {scenario_words[i+1]}"
-                            if phrase in question:
-                                phrase_bonus += 2
+                            if scenario_words[i] in question and scenario_words[i+1] in question:
+                                phrase_bonus += 1
+                                
+                        # Calculate final score with category match bonus
+                        match_score = word_matches + phrase_bonus + category_match_count
                         
-                        # Check for irrelevant topics that would make the FAQ inappropriate
-                        irrelevant_terms = ["drone", "survey", "partnership", "newsletter", "marketing"]
-                        irrelevance_penalty = sum(3 for term in irrelevant_terms if term in question)
-                        
-                        # Final score
-                        score = word_matches + phrase_bonus + (category_match_count/2) - irrelevance_penalty
-                        
-                        if score > best_match_score:
-                            best_match_score = score
+                        if match_score > best_match_score:
+                            best_match_score = match_score
                             best_match = row.get("Question", "")
                             best_row = row
                     
-                    if best_match and best_match_score >= 3:  # Higher threshold for relevance
-                        # Relevance is based on both category match and word match
-                        relevance = best_match_score
+                    # If we found a good match, use it
+                    if best_match and best_match_score >= 2:  # Threshold for relevance
+                        # Get the answer if available
+                        has_answers = "Answer" in faq_dataframe.columns
                         answer = best_row.get("Answer", "") if has_answers and best_row is not None else ""
+                        relevance = best_match_score
                         return best_match, answer, relevance
-        except Exception as e:
+            except Exception as e:
                 st.warning(f"Error processing category {category}: {str(e)}")
                 continue
     
@@ -1361,7 +1357,7 @@ def generate_response_suggestion(scenario, classification_result):
         
         # Token count already considered in the session state
         input_tokens = st.session_state.cached_response_prompt_tokens
-        else:
+    else:
         # Create prompt from scratch using a template
         prompt = f"""
         As a Customer Support Agent for Checkatrade, create a response to the following inquiry.
@@ -1505,7 +1501,7 @@ if st.button("Generate New Inquiry", use_container_width=True):
         
         # Get the most recent generation data - check if the list is not empty first
         if st.session_state["token_usage"]["generations"]:
-            latest_generation = st.session_state["token_usage"]["generations"][-1]
+                latest_generation = st.session_state["token_usage"]["generations"][-1]
         
         # Create columns for metrics display
         st.markdown("### Generation Metrics")
@@ -1840,7 +1836,7 @@ if st.session_state["generated_scenario"]:
                         if best_match and best_score >= 2:  # Require at least 2 significant matches
                             relevant_faq = best_match
                             faq_relevance_score = best_score + 2  # Bonus for model-suggested category
-                else:
+                    else:
                         # If Category column doesn't exist, try searching in Type column instead
                         if "Type" in df_faq.columns:
                             category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
@@ -1891,7 +1887,7 @@ if st.session_state["generated_scenario"]:
                 # Generate response suggestion for email or whatsapp
                 inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
                 if inbound_route in ["email", "whatsapp"]:
-                try:
+                    try:
                         response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
                         st.session_state["generated_scenario"], 
                         classification_result
@@ -1903,7 +1899,7 @@ if st.session_state["generated_scenario"]:
                         </div>
                         """
                         st.markdown(response_card, unsafe_allow_html=True)
-                except Exception as e:
+                    except Exception as e:
                         st.error(f"Could not generate response suggestion: {str(e)}")
 
                 # After displaying the classification card, add the agent action area
@@ -2070,7 +2066,7 @@ if len(df) > 0:
         # First search for relevant FAQ
         faq_category = ""
         # Try to parse the classification result to get related_faq_category
-    try:
+        try:
             # Check if we can find something related to faq_category in the summary
             if "faq" in recent_row['summary'].lower():
                 faq_category = recent_row['summary'].lower().split("faq")[1].strip().strip(".:,")
