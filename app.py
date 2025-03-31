@@ -137,23 +137,25 @@ div.stApp {
 }
 
 .nav-button {
-    background-color: #333;
+    background-color: #121212;
     color: white;
     padding: 10px 15px;
     border-radius: 5px;
     margin-right: 10px;
     text-decoration: none;
     display: inline-block;
-    border: 1px solid #555;
+    border: 2px solid #555;
     font-weight: 500;
 }
 .nav-button.active {
-    background-color: #1E88E5;
-    border-color: #1E88E5;
+    background-color: transparent;
+    border: 2px solid #E30613;
+    color: #E30613;
 }
 .nav-button:hover:not(.active) {
-    background-color: #444;
-    border-color: #777;
+    background-color: #1E1E1E;
+    border-color: #0087CC;
+    color: #0087CC;
 }
 .nav-container {
     margin-bottom: 20px;
@@ -169,9 +171,9 @@ st.title("Checkatrade Contact Center AI Assistant")
 # Create horizontal navigation with buttons
 st.markdown("""
 <div class="nav-container">
-    <a href="/" class="nav-button active">Main Dashboard</a>
-    <a href="/1_📋_View_Inquiries" class="nav-button">View Inquiries</a>
-    <a href="/2_📊_Dashboard" class="nav-button">Analytics Dashboard</a>
+    <a href="/" class="nav-button active">🏠 Main Dashboard</a>
+    <a href="/1_📋_View_Inquiries" class="nav-button">📋 View Inquiries</a>
+    <a href="/2_📊_Dashboard" class="nav-button">📊 Analytics Dashboard</a>
 </div>
 """, unsafe_allow_html=True)
 
