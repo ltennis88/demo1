@@ -782,29 +782,22 @@ st.header("Generate New Inquiry")
 # Create columns for the route selection mode
 col1, col2, col3, col4, col5 = st.columns([1, 0.75, 0.75, 0.75, 0.75])
 
-# Route Selection
 with col1:
     st.markdown("<div class='inquiry-label'>Route Selection:</div>", unsafe_allow_html=True)
-    route_random = st.checkbox("Random Route", value=True, key="route_random")
+    route_selection = st.radio(
+        label="Route",
+        options=["Random", "Phone", "Email", "WhatsApp", "Web Form"],
+        label_visibility="collapsed",
+        horizontal=True,
+        key="route_selection"
+    )
 
-# Enable route options only if Random is not selected
-route_disabled = route_random
-
-with col2:
-    st.markdown("<div class='inquiry-label'>Phone</div>", unsafe_allow_html=True)
-    route_phone = st.checkbox("", key="route_phone", disabled=route_disabled)
-
-with col3:
-    st.markdown("<div class='inquiry-label'>Email</div>", unsafe_allow_html=True)
-    route_email = st.checkbox("", key="route_email", disabled=route_disabled)
-
-with col4:
-    st.markdown("<div class='inquiry-label'>WhatsApp</div>", unsafe_allow_html=True)
-    route_whatsapp = st.checkbox("", key="route_whatsapp", disabled=route_disabled)
-
-with col5:
-    st.markdown("<div class='inquiry-label'>Web Form</div>", unsafe_allow_html=True)
-    route_webform = st.checkbox("", key="route_webform", disabled=route_disabled)
+# Map route selection to variables
+route_random = route_selection == "Random"
+route_phone = route_selection == "Phone"
+route_email = route_selection == "Email"
+route_whatsapp = route_selection == "WhatsApp"
+route_webform = route_selection == "Web Form"
 
 # User Type Selection
 st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
@@ -812,73 +805,42 @@ col1, col2, col3, col4 = st.columns([1, 0.75, 0.75, 0.75])
 
 with col1:
     st.markdown("<div class='inquiry-label'>Customer Type:</div>", unsafe_allow_html=True)
-    user_random = st.checkbox("Random Type", value=True, key="user_random")
+    user_selection = st.radio(
+        label="User Type",
+        options=["Random", "Existing Homeowner", "Existing Tradesperson", "Unknown/New Contact"],
+        label_visibility="collapsed",
+        horizontal=True,
+        key="user_selection"
+    )
 
-# Enable user type options only if Random is not selected
-user_disabled = user_random
-
-with col2:
-    st.markdown("<div class='inquiry-label'>Existing Homeowner</div>", unsafe_allow_html=True)
-    user_homeowner = st.checkbox("", key="user_homeowner", disabled=user_disabled)
-
-with col3:
-    st.markdown("<div class='inquiry-label'>Existing Tradesperson</div>", unsafe_allow_html=True)
-    user_tradesperson = st.checkbox("", key="user_tradesperson", disabled=user_disabled)
-
-with col4:
-    st.markdown("<div class='inquiry-label'>Unknown/New Contact</div>", unsafe_allow_html=True)
-    user_unknown = st.checkbox("", key="user_unknown", disabled=user_disabled)
+# Map user type selection to variables
+user_random = user_selection == "Random"
+user_homeowner = user_selection == "Existing Homeowner"
+user_tradesperson = user_selection == "Existing Tradesperson"
+user_unknown = user_selection == "Unknown/New Contact"
 
 # Map the selection to the correct user_type value
 selected_user_type = None
 if not user_random:
     if user_homeowner:
         selected_user_type = "existing_homeowner"
-        # Disable other options if this one is selected
-        if user_tradesperson:
-            st.warning("Multiple types selected. Using Existing Homeowner as priority.")
-        if user_unknown:
-            st.warning("Multiple types selected. Using Existing Homeowner as priority.")
     elif user_tradesperson:
         selected_user_type = "existing_tradesperson"
-        # Disable other options if this one is selected
-        if user_unknown:
-            st.warning("Multiple types selected. Using Existing Tradesperson as priority.")
     elif user_unknown:
         # For unknown/new, randomly choose between prospective homeowner or tradesperson
         selected_user_type = random.choice(["prospective_homeowner", "prospective_tradesperson"])
-    else:
-        selected_user_type = "existing_homeowner"  # Default if none selected
 
 # Determine selected route
 selected_route = None
 if not route_random:
-    # Check which route is selected (in priority order)
     if route_phone:
         selected_route = "phone"
-        # Disable other options if this one is selected
-        if route_email:
-            st.warning("Multiple routes selected. Using Phone as priority.")
-        if route_whatsapp:
-            st.warning("Multiple routes selected. Using Phone as priority.")
-        if route_webform:
-            st.warning("Multiple routes selected. Using Phone as priority.")
     elif route_email:
         selected_route = "email"
-        # Disable other options if this one is selected
-        if route_whatsapp:
-            st.warning("Multiple routes selected. Using Email as priority.")
-        if route_webform:
-            st.warning("Multiple routes selected. Using Email as priority.")
     elif route_whatsapp:
         selected_route = "whatsapp"
-        # Disable other options if this one is selected
-        if route_webform:
-            st.warning("Multiple routes selected. Using WhatsApp as priority.")
     elif route_webform:
         selected_route = "web_form"
-    else:
-        selected_route = "web_form"  # Default if none selected
 
 # Generate button in a new row
 if st.button("Generate New Inquiry", use_container_width=True):
