@@ -153,7 +153,26 @@ def load_faq_csv():
         df = pd.DataFrame(columns=["Type", "Category", "Question"])
     return df
 
+@st.cache_data
+def load_membership_terms():
+    """
+    Loads the membership terms and conditions from JSON file.
+    Returns a dictionary containing structured T&Cs data.
+    """
+    try:
+        with open("membership_terms.json", "r") as f:
+            terms_data = json.load(f)
+        return terms_data
+    except Exception as e:
+        st.error("Error loading membership_terms.json. Please ensure the file exists and is properly formatted.")
+        return {
+            "last_updated": "",
+            "version": "",
+            "sections": []
+        }
+
 df_faq = load_faq_csv()
+membership_terms = load_membership_terms()
 
 ###############################################################################
 # 3) SET UP SESSION STATE
@@ -193,6 +212,23 @@ if "inquiries" not in st.session_state:
 
 if "generated_scenario" not in st.session_state:
     st.session_state["generated_scenario"] = None
+
+# Add these constants at the top of the file after the imports
+TOKEN_COSTS = {
+    "input": 0.15,      # $0.15 per 1M tokens
+    "cached_input": 0.075,  # $0.075 per 1M tokens
+    "output": 0.60      # $0.60 per 1M tokens
+}
+
+# Add this to the session state initialization section
+if "token_usage" not in st.session_state:
+    st.session_state["token_usage"] = {
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_cost": 0,
+        "response_times": [],
+        "generations": []
+    }
 
 ###############################################################################
 # 4) BUILD FAQ CONTEXT STRING FROM CSV
@@ -259,12 +295,52 @@ ALLOWED ACTIONS:
 - Request refunds or compensation for poor work
 - Ask about insurance coverage for work done
 
-FORBIDDEN ACTIONS:
-- Asking about membership fees
-- Inquiring about business profiles
-- Asking about trade services
-- Any questions about becoming a tradesperson
-- Any questions about joining Checkatrade
+COMMON CONTACT REASONS:
+1. Work Quality Issues:
+   - Uneven or poor finishing
+   - Delays in completion
+   - Materials different from agreed
+   - Work not matching original quote
+   - Incomplete or rushed work
+
+2. Communication Problems:
+   - Tradesperson not responding to concerns
+   - Difficulty scheduling remaining work
+   - Questions about additional costs
+   - Clarification on warranty coverage
+   - Follow-up on promised fixes
+
+3. Review System:
+   - How to update an existing review
+   - Questions about review verification
+   - Help with adding photos to reviews
+   - Issues with review submission
+   - Responding to tradesperson comments
+
+4. Payment & Billing:
+   - Questions about partial payments
+   - Disputing additional charges
+   - Understanding payment protection
+   - Requesting refund information
+   - Questions about payment schedules
+
+5. Warranty & Guarantees:
+   - Understanding warranty coverage
+   - Reporting issues within warranty period
+   - Questions about extended guarantees
+   - Help with warranty claims
+   - Documentation requirements
+
+EXAMPLE CREATIVE SCENARIOS:
+1. "Had a bathroom renovation completed last week, but noticed the tiles are starting to show hairline cracks. Need to understand my warranty options."
+
+2. "Got my kitchen remodeled two months ago. The new cabinet doors aren't aligning properly, and I'm having trouble getting the tradesperson to respond."
+
+3. "Received a follow-up quote for additional work that seems much higher than initially discussed. Need to understand my options."
+
+4. "Had windows installed last month and noticed condensation forming between the panes. Need help with warranty claim process."
+
+5. "Want to update my review for the recent landscaping work as they came back to fix some issues - how can I modify my existing review?"
 
 ACCOUNT DETAILS REQUIREMENTS:
 - Must include a realistic name and surname
@@ -302,9 +378,48 @@ ALLOWED ACTIONS:
 - Inquire about the vetting process
 - Ask about how to create an account
 - Ask about how to verify tradespeople
-- Ask about membership benefits for homeowners
 - Ask about the review system
 - Ask about insurance coverage options
+
+COMMON CONTACT REASONS:
+1. Finding Tradespeople:
+   - Seeking recommendations for specific trades
+   - Asking about typical wait times for different trades
+   - Inquiring about how to compare multiple tradespeople
+   - Questions about service coverage in specific areas
+   - Help with urgent/emergency trade requirements
+
+2. Vetting Process:
+   - Understanding background checks
+   - Questions about trade qualifications verification
+   - Inquiring about insurance requirements for tradespeople
+   - Understanding the review verification process
+   - Questions about quality monitoring
+
+3. Platform Usage:
+   - How to create and set up an account
+   - Understanding how to search effectively
+   - Questions about the quote request process
+   - Help with using filters and search options
+   - Understanding how to message tradespeople
+
+4. Safety & Security:
+   - Questions about payment protection
+   - Understanding dispute resolution process
+   - Inquiring about insurance coverage
+   - Questions about data privacy
+   - Understanding safety measures and guarantees
+
+EXAMPLE CREATIVE SCENARIOS:
+1. "I'm planning a complete kitchen renovation and need to find multiple trades. Can you explain how I can coordinate different tradespeople through Checkatrade?"
+
+2. "My elderly mother needs some urgent plumbing work. How can I be sure the tradesperson I find through Checkatrade is trustworthy and verified?"
+
+3. "I'm comparing different platforms for finding tradespeople. What makes Checkatrade's vetting process more reliable than others?"
+
+4. "I've heard horror stories about cowboy builders. Can you explain what safeguards Checkatrade has in place to protect homeowners?"
+
+5. "I'm looking to have solar panels installed. How can I verify if the tradespeople on Checkatrade have the proper certifications for this type of work?"
 
 FORBIDDEN ACTIONS:
 - Mentioning any completed work
@@ -315,6 +430,7 @@ FORBIDDEN ACTIONS:
 - Asking about warranty claims
 - Asking about refunds
 - Any questions about becoming a tradesperson
+- Any questions about memberships or membership benefits
 
 ACCOUNT DETAILS REQUIREMENTS:
 - All account details must be empty (name, surname, location, latest_reviews, latest_jobs, project_cost, payment_status)
@@ -352,12 +468,52 @@ ALLOWED ACTIONS:
 - Report technical issues with their account
 - Ask about payment processing
 
-FORBIDDEN ACTIONS:
-- Asking about finding tradespeople
-- Mentioning work they've hired others to do
-- Talking about their own home improvements
-- Asking about homeowner membership
-- Any questions about becoming a homeowner
+COMMON CONTACT REASONS:
+1. Account Management:
+   - Updating business hours
+   - Adding new service areas
+   - Updating insurance documents
+   - Adding new trade categories
+   - Modifying contact information
+
+2. Profile Enhancement:
+   - Adding new project photos
+   - Updating qualifications
+   - Questions about profile visibility
+   - Help with description optimization
+   - Adding new accreditations
+
+3. Review Management:
+   - Help with review responses
+   - Questions about review verification
+   - Disputing unfair reviews
+   - Understanding review metrics
+   - Improving review scores
+
+4. Technical Support:
+   - App login issues
+   - Quote system problems
+   - Calendar sync issues
+   - Notification settings
+   - Payment gateway problems
+
+5. Membership & Billing:
+   - Subscription renewal questions
+   - Payment method updates
+   - Invoice queries
+   - Membership tier questions
+   - Additional features costs
+
+EXAMPLE CREATIVE SCENARIOS:
+1. "Need to update my profile to show I'm now certified for electric vehicle charging installations. Where do I add this qualification?"
+
+2. "Having issues with the mobile app notifications - not receiving alerts for new quote requests in real-time."
+
+3. "Want to expand my service area to include neighboring counties. Need help updating my coverage map."
+
+4. "Received an unusual review that I believe was meant for a different tradesperson. How can I dispute this?"
+
+5. "Looking to upgrade my membership to include priority listing. What are the costs and benefits?"
 
 ACCOUNT DETAILS REQUIREMENTS:
 - Must include a realistic name and surname
@@ -400,14 +556,52 @@ ALLOWED ACTIONS:
 - Ask about insurance requirements
 - Ask about payment processing
 
-FORBIDDEN ACTIONS:
-- Mentioning any completed work
-- Referencing any reviews
-- Talking about home services
-- Mentioning any specific jobs
-- Asking about homeowner membership
-- Any questions about finding tradespeople
-- Any questions about home improvements
+COMMON CONTACT REASONS:
+1. Membership Information:
+   - Understanding membership tiers
+   - Questions about costs and fees
+   - Payment plan options
+   - Membership benefits comparison
+   - Special offers or promotions
+
+2. Application Process:
+   - Required documentation
+   - Background check process
+   - Insurance requirements
+   - Qualification verification
+   - Application timeframes
+
+3. Platform Features:
+   - Lead generation system
+   - Quote management tools
+   - Payment processing options
+   - Mobile app capabilities
+   - Customer communication tools
+
+4. Business Growth:
+   - Expected lead volumes
+   - Marketing support
+   - Profile optimization tips
+   - Competition levels
+   - Success rates
+
+5. Verification Process:
+   - Required certifications
+   - Reference checks
+   - Insurance validation
+   - Trade association requirements
+   - Quality assessment process
+
+EXAMPLE CREATIVE SCENARIOS:
+1. "I'm starting my own electrical business and interested in the vetting process. What certifications do you require for electrical contractors?"
+
+2. "Currently working as a self-employed plumber. What's the typical return on investment for your membership fees in terms of new business?"
+
+3. "Expanding my roofing company and considering Checkatrade. How does your lead generation compare to other platforms?"
+
+4. "I'm a qualified bathroom fitter. What documents do I need to prepare for the application process?"
+
+5. "Running a family painting business. How long does the verification process typically take, and what's involved?"
 
 ACCOUNT DETAILS REQUIREMENTS:
 - All account details must be empty (name, surname, location, latest_reviews, latest_jobs, project_cost, payment_status)
@@ -487,7 +681,56 @@ def validate_scenario_rules(scenario_data):
     user_type = scenario_data.get("user_type", "")
     scenario_text = scenario_data.get("scenario_text", "").lower()
     account_details = scenario_data.get("account_details", {})
-    
+    inbound_route = scenario_data.get("inbound_route", "")
+    ivr_flow = scenario_data.get("ivr_flow", "")
+    ivr_selections = scenario_data.get("ivr_selections", [])
+
+    # Define valid IVR flows and their corresponding valid selections
+    valid_ivr_flows = {
+        "homeowner": {
+            "flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
+            "valid_selections": [1, 2, 3],
+            "valid_user_types": ["existing_homeowner", "prospective_homeowner"]
+        },
+        "tradesperson": {
+            "flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
+            "valid_selections": [1, 2, 3],
+            "valid_user_types": ["existing_tradesperson", "prospective_tradesperson"]
+        }
+    }
+
+    # Validate IVR flow and selections for phone route
+    if inbound_route == "phone":
+        # Check if IVR flow is provided
+        if not ivr_flow:
+            return False, "Phone route requires a valid IVR flow"
+
+        # Check if IVR flow matches the predefined format
+        if ivr_flow != valid_ivr_flows["homeowner"]["flow"]:
+            return False, "Invalid IVR flow format"
+
+        # Check if IVR selections are provided and valid
+        if not isinstance(ivr_selections, list):
+            return False, "IVR selections must be a list"
+
+        # Validate each selection is in the valid range
+        for selection in ivr_selections:
+            if selection not in valid_ivr_flows["homeowner"]["valid_selections"]:
+                return False, f"Invalid IVR selection: {selection}. Valid selections are {valid_ivr_flows['homeowner']['valid_selections']}"
+
+        # Validate selections match user type
+        if "homeowner" in user_type and 2 in ivr_selections:
+            return False, "Homeowner cannot select tradesperson options in IVR"
+        if "tradesperson" in user_type and 1 in ivr_selections:
+            return False, "Tradesperson cannot select homeowner options in IVR"
+
+    else:
+        # For non-phone routes, IVR flow and selections should be empty
+        if ivr_flow:
+            return False, "IVR flow should be empty for non-phone routes"
+        if ivr_selections and len(ivr_selections) > 0:
+            return False, "IVR selections should be empty for non-phone routes"
+
     # Check for empty account details for prospective users
     if "prospective" in user_type:
         for key, value in account_details.items():
@@ -506,11 +749,11 @@ def validate_scenario_rules(scenario_data):
         "prospective_homeowner": [
             "my account", "my review", "poor quality", "not satisfied", 
             "completed job", "past work", "my business", "insurance details",
-            "trade license", "my customers"
+            "trade license", "my customers", "membership", "member benefits"
         ],
         "existing_homeowner": [
             "my business", "insurance details", "trade license", "my customers",
-            "membership fees", "business profiles", "trade services"
+            "membership", "business profiles", "trade services", "member benefits"
         ],
         "prospective_tradesperson": [
             "my review", "poor quality", "not satisfied", "in my home", 
@@ -569,12 +812,42 @@ def validate_scenario_rules(scenario_data):
     
     return True, ""
 
+def calculate_token_cost(tokens, token_type):
+    """Calculate cost for a given number of tokens and type."""
+    cost_per_million = TOKEN_COSTS.get(token_type, 0)
+    return (tokens / 1_000_000) * cost_per_million
+
 def generate_scenario(selected_route=None, selected_user_type=None):
     """
     Generates a scenario using OpenAI's ChatCompletion.
     If selected_route is provided (phone, whatsapp, email, web_form), force that route.
     If selected_user_type is provided, force that user type.
     """
+    # Start timing
+    start_time = time.time()
+    
+    # Add IVR validation rules to the base prompt
+    ivr_rules = """
+    STRICT IVR RULES:
+    
+    For phone route ONLY:
+    - IVR flow must be EXACTLY: "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support."
+    - IVR selections must be a list of numbers from [1, 2, 3]
+    - Homeowners can only select options 1 and 3
+    - Tradespeople can only select options 2 and 3
+    - Account support (option 3) is available to all users
+    
+    For non-phone routes:
+    - IVR flow must be an empty string
+    - IVR selections must be an empty array
+    
+    EXAMPLE IVR SELECTIONS:
+    - Homeowner calling about finding a tradesperson: [1]
+    - Homeowner with account issue: [1, 3]
+    - Tradesperson calling about membership: [2]
+    - Tradesperson with account issue: [2, 3]
+    """
+    
     # For random user type, we'll randomize it ourselves to ensure true randomness
     should_randomize_user_type = selected_user_type is None
     
@@ -582,7 +855,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     user_type_prompt = get_user_type_prompt(selected_user_type) if selected_user_type else ""
     
     # Start with base prompt
-    user_content = base_prompt + "\n\n" + user_type_prompt
+    user_content = base_prompt + "\n\n" + ivr_rules + "\n\n" + user_type_prompt
     
     # Add route and user type instructions
     if selected_route and selected_user_type:
@@ -593,6 +866,24 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         user_content += f"\n\nForce user_type to '{selected_user_type}'."
     else:
         user_content += "\n\nYou may pick any inbound_route and user_type."
+
+    # Update example scenarios in user type prompts to include correct IVR flows
+    if selected_route == "phone":
+        user_content += """
+        
+        PHONE ROUTE IVR EXAMPLES:
+        - Homeowner inquiry about finding tradesperson:
+          "ivr_flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
+          "ivr_selections": [1]
+        
+        - Tradesperson inquiry about membership:
+          "ivr_flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
+          "ivr_selections": [2]
+        
+        - Account support inquiry:
+          "ivr_flow": "Welcome to Checkatrade. Press 1 for homeowner inquiries, press 2 for tradesperson inquiries, press 3 for account support.",
+          "ivr_selections": [3]
+        """
 
     max_retries = 3
     retry_count = 0
@@ -608,6 +899,38 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                 temperature=1.0,
                 max_tokens=500
             )
+            
+            # Calculate token usage and costs
+            input_tokens = response["usage"]["prompt_tokens"]
+            output_tokens = response["usage"]["completion_tokens"]
+            total_tokens = response["usage"]["total_tokens"]
+            
+            # Calculate costs
+            input_cost = calculate_token_cost(input_tokens, "input")
+            output_cost = calculate_token_cost(output_tokens, "output")
+            total_cost = input_cost + output_cost
+            
+            # Calculate response time
+            response_time = time.time() - start_time
+            
+            # Store usage data
+            usage_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+                "input_cost": input_cost,
+                "output_cost": output_cost,
+                "total_cost": total_cost,
+                "response_time": response_time
+            }
+            
+            st.session_state["token_usage"]["generations"].append(usage_data)
+            st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+            st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+            st.session_state["token_usage"]["total_cost"] += total_cost
+            st.session_state["token_usage"]["response_times"].append(response_time)
+            
             raw_reply = response["choices"][0]["message"]["content"].strip()
             
             try:
@@ -970,7 +1293,7 @@ def generate_response_suggestion(scenario, classification_result):
     Generate a suggested response based on scenario type (email/whatsapp)
     """
     inbound_route = scenario.get("inbound_route", "")
-    scenario_text = scenario.get("scenario_text", "")
+    scenario_text = scenario.get("scenario_text", "").lower()
     user_type = scenario.get("user_type", "")
     classification = classification_result.get("classification", "")
     
@@ -982,6 +1305,24 @@ def generate_response_suggestion(scenario, classification_result):
     latest_reviews = account_details.get("latest_reviews", "")
     project_cost = account_details.get("project_cost", "")
     
+    # Check if this is a membership-related query
+    is_membership_query = any(word in scenario_text for word in ["membership", "join", "sign up", "register", "become a member"])
+    
+    # If it's a membership query, get relevant terms
+    membership_info = ""
+    if is_membership_query and "tradesperson" in user_type:
+        # Find relevant membership terms based on the query
+        relevant_terms = []
+        for section in membership_terms.get("sections", []):
+            if any(word in scenario_text for word in section["title"].lower().split()):
+                relevant_terms.append(section["content"])
+                for subsection in section.get("subsections", []):
+                    if any(word in scenario_text for word in subsection["title"].lower().split()):
+                        relevant_terms.append(subsection["content"])
+        
+        if relevant_terms:
+            membership_info = " ".join(relevant_terms)
+
     # Generate appropriate greeting based on route type and available information
     greeting = ""
     if inbound_route in ["email", "whatsapp"]:
@@ -995,7 +1336,7 @@ def generate_response_suggestion(scenario, classification_result):
     
     # Reference job details if relevant to the issue
     job_reference = ""
-    if "complaint" in classification.lower() or "job" in scenario_text.lower() or "issue" in scenario_text.lower():
+    if "complaint" in classification.lower() or "job" in scenario_text or "issue" in scenario_text:
         # Extract job type from latest_jobs if available
         job_type = ""
         if latest_jobs:
@@ -1194,7 +1535,17 @@ if st.button("Generate New Inquiry", use_container_width=True):
     with st.spinner("Generating scenario..."):
         scenario_data = generate_scenario(selected_route, selected_user_type)
         st.session_state["generated_scenario"] = scenario_data
-        st.success("Scenario generated!")
+        
+        # Get the most recent generation data
+        latest_generation = st.session_state["token_usage"]["generations"][-1]
+        
+        # Display success message with token usage and costs
+        st.success(f"""Scenario generated!
+        
+Response Time: {latest_generation['response_time']:.2f} seconds
+Input Tokens: {latest_generation['input_tokens']:,} (${latest_generation['input_cost']:.4f})
+Output Tokens: {latest_generation['output_tokens']:,} (${latest_generation['output_cost']:.4f})
+Total Cost: ${latest_generation['total_cost']:.4f}""")
 
 # Create a visual separation before the scenario display
 st.markdown("<hr style='margin: 30px 0px; border-color: #424242;'/>", unsafe_allow_html=True)
@@ -1841,3 +2192,72 @@ with st.expander("View Analytics Dashboard"):
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+    # Add new Token Usage Analytics section
+    st.subheader("Token Usage Analytics")
+    
+    if st.session_state["token_usage"]["generations"]:
+        # Calculate averages
+        avg_response_time = sum(st.session_state["token_usage"]["response_times"]) / len(st.session_state["token_usage"]["response_times"])
+        avg_input_tokens = st.session_state["token_usage"]["total_input_tokens"] / len(st.session_state["token_usage"]["generations"])
+        avg_output_tokens = st.session_state["token_usage"]["total_output_tokens"] / len(st.session_state["token_usage"]["generations"])
+        
+        # Create columns for the metrics
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "Average Response Time",
+                f"{avg_response_time:.2f}s",
+                f"Total: {sum(st.session_state['token_usage']['response_times']):.2f}s"
+            )
+        
+        with col2:
+            st.metric(
+                "Average Input Tokens",
+                f"{avg_input_tokens:,.0f}",
+                f"Total: {st.session_state['token_usage']['total_input_tokens']:,}"
+            )
+        
+        with col3:
+            st.metric(
+                "Average Output Tokens",
+                f"{avg_output_tokens:,.0f}",
+                f"Total: {st.session_state['token_usage']['total_output_tokens']:,}"
+            )
+        
+        # Create a line chart for token usage over time
+        df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
+        df_tokens['timestamp'] = pd.to_datetime(df_tokens['timestamp'])
+        
+        fig_tokens = px.line(
+            df_tokens,
+            x='timestamp',
+            y=['input_tokens', 'output_tokens'],
+            title='Token Usage Over Time',
+            labels={'value': 'Tokens', 'timestamp': 'Time'}
+        )
+        
+        fig_tokens.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white"),
+            xaxis=dict(gridcolor="#444"),
+            yaxis=dict(gridcolor="#444")
+        )
+        
+        st.plotly_chart(fig_tokens, use_container_width=True)
+        
+        # Display cost breakdown
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        st.markdown("<div class='inquiry-section'>Cost Breakdown</div>", unsafe_allow_html=True)
+        
+        total_input_cost = sum(g['input_cost'] for g in st.session_state["token_usage"]["generations"])
+        total_output_cost = sum(g['output_cost'] for g in st.session_state["token_usage"]["generations"])
+        
+        st.markdown(f"<div class='inquiry-label'>Total Input Cost: ${total_input_cost:.4f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${total_output_cost:.4f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-label'>Total Cost: ${st.session_state['token_usage']['total_cost']:.4f}</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.info("No token usage data available yet. Generate some scenarios to see analytics.")
