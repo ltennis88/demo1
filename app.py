@@ -934,7 +934,8 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                 "input_cost": input_cost,
                 "output_cost": output_cost,
                 "total_cost": total_cost,
-                "response_time": response_time
+                "response_time": response_time,
+                "operation": "generation"  # Add operation type to distinguish from classification
             }
             
             st.session_state["token_usage"]["generations"].append(usage_data)
@@ -1090,6 +1091,9 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 # 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
 ###############################################################################
 def classify_scenario(text):
+    # Start timing
+    start_time = time.time()
+    
     prompt = classification_prompt_template.replace("{SCENARIO}", text)
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",  # Updated to use gpt-4o-mini
@@ -1100,6 +1104,39 @@ def classify_scenario(text):
         temperature=0.5,
         max_tokens=300
     )
+    
+    # Calculate token usage and costs
+    input_tokens = response["usage"]["prompt_tokens"]
+    output_tokens = response["usage"]["completion_tokens"]
+    total_tokens = response["usage"]["total_tokens"]
+    
+    # Calculate costs
+    input_cost = calculate_token_cost(input_tokens, "input")
+    output_cost = calculate_token_cost(output_tokens, "output")
+    total_cost = input_cost + output_cost
+    
+    # Calculate response time
+    response_time = time.time() - start_time
+    
+    # Store usage data
+    usage_data = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "input_cost": input_cost,
+        "output_cost": output_cost,
+        "total_cost": total_cost,
+        "response_time": response_time,
+        "operation": "classification"  # Add operation type to distinguish from scenario generation
+    }
+    
+    st.session_state["token_usage"]["generations"].append(usage_data)
+    st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+    st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+    st.session_state["token_usage"]["total_cost"] += total_cost
+    st.session_state["token_usage"]["response_times"].append(response_time)
+    
     raw_reply = response["choices"][0]["message"]["content"].strip()
     try:
         classification_data = json.loads(raw_reply)
@@ -2235,66 +2272,147 @@ with st.expander("View Analytics Dashboard"):
     st.subheader("Token Usage Analytics")
     
     if st.session_state["token_usage"]["generations"]:
-        # Calculate averages
-        avg_response_time = sum(st.session_state["token_usage"]["response_times"]) / len(st.session_state["token_usage"]["response_times"])
-        avg_input_tokens = st.session_state["token_usage"]["total_input_tokens"] / len(st.session_state["token_usage"]["generations"])
-        avg_output_tokens = st.session_state["token_usage"]["total_output_tokens"] / len(st.session_state["token_usage"]["generations"])
-        
-        # Create columns for the metrics
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric(
-                "Average Response Time",
-                f"{avg_response_time:.2f}s",
-                f"Total: {sum(st.session_state['token_usage']['response_times']):.2f}s"
-            )
-        
-        with col2:
-            st.metric(
-                "Average Input Tokens",
-                f"{avg_input_tokens:,.0f}",
-                f"Total: {st.session_state['token_usage']['total_input_tokens']:,}"
-            )
-        
-        with col3:
-            st.metric(
-                "Average Output Tokens",
-                f"{avg_output_tokens:,.0f}",
-                f"Total: {st.session_state['token_usage']['total_output_tokens']:,}"
-            )
-        
-        # Create a line chart for token usage over time
+        # Create DataFrames for each operation type
         df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
         df_tokens['timestamp'] = pd.to_datetime(df_tokens['timestamp'])
         
-        fig_tokens = px.line(
-            df_tokens,
-            x='timestamp',
-            y=['input_tokens', 'output_tokens'],
-            title='Token Usage Over Time',
-            labels={'value': 'Tokens', 'timestamp': 'Time'}
-        )
+        # Split data by operation
+        scenario_data = df_tokens[df_tokens['operation'].isna()]  # Scenario generation doesn't have operation field
+        classification_data = df_tokens[df_tokens['operation'] == 'classification']
         
-        fig_tokens.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white"),
-            xaxis=dict(gridcolor="#444"),
-            yaxis=dict(gridcolor="#444")
-        )
+        # Calculate averages for scenario generation
+        if not scenario_data.empty:
+            st.markdown("### Scenario Generation Metrics")
+            avg_response_time_scenario = scenario_data['response_time'].mean()
+            avg_input_tokens_scenario = scenario_data['input_tokens'].mean()
+            avg_output_tokens_scenario = scenario_data['output_tokens'].mean()
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Average Response Time",
+                    f"{avg_response_time_scenario:.2f}s",
+                    f"Total: {scenario_data['response_time'].sum():.2f}s"
+                )
+            
+            with col2:
+                st.metric(
+                    "Average Input Tokens",
+                    f"{avg_input_tokens_scenario:,.0f}",
+                    f"Total: {scenario_data['input_tokens'].sum():,}"
+                )
+            
+            with col3:
+                st.metric(
+                    "Average Output Tokens",
+                    f"{avg_output_tokens_scenario:,.0f}",
+                    f"Total: {scenario_data['output_tokens'].sum():,}"
+                )
         
-        st.plotly_chart(fig_tokens, use_container_width=True)
+        # Calculate averages for classification
+        if not classification_data.empty:
+            st.markdown("### Classification Metrics")
+            avg_response_time_class = classification_data['response_time'].mean()
+            avg_input_tokens_class = classification_data['input_tokens'].mean()
+            avg_output_tokens_class = classification_data['output_tokens'].mean()
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Average Response Time",
+                    f"{avg_response_time_class:.2f}s",
+                    f"Total: {classification_data['response_time'].sum():.2f}s"
+                )
+            
+            with col2:
+                st.metric(
+                    "Average Input Tokens",
+                    f"{avg_input_tokens_class:,.0f}",
+                    f"Total: {classification_data['input_tokens'].sum():,}"
+                )
+            
+            with col3:
+                st.metric(
+                    "Average Output Tokens",
+                    f"{avg_output_tokens_class:,.0f}",
+                    f"Total: {classification_data['output_tokens'].sum():,}"
+                )
+        
+        # Create line charts for token usage over time
+        st.markdown("### Token Usage Over Time")
+        
+        # Scenario Generation Chart
+        if not scenario_data.empty:
+            fig_scenario = px.line(
+                scenario_data,
+                x='timestamp',
+                y=['input_tokens', 'output_tokens'],
+                title='Scenario Generation Token Usage',
+                labels={'value': 'Tokens', 'timestamp': 'Time'}
+            )
+            
+            fig_scenario.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="#444"),
+                yaxis=dict(gridcolor="#444")
+            )
+            
+            st.plotly_chart(fig_scenario, use_container_width=True)
+        
+        # Classification Chart
+        if not classification_data.empty:
+            fig_class = px.line(
+                classification_data,
+                x='timestamp',
+                y=['input_tokens', 'output_tokens'],
+                title='Classification Token Usage',
+                labels={'value': 'Tokens', 'timestamp': 'Time'}
+            )
+            
+            fig_class.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="#444"),
+                yaxis=dict(gridcolor="#444")
+            )
+            
+            st.plotly_chart(fig_class, use_container_width=True)
         
         # Display cost breakdown
+        st.markdown("### Cost Breakdown")
         st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        st.markdown("<div class='inquiry-section'>Cost Breakdown</div>", unsafe_allow_html=True)
         
-        total_input_cost = sum(g['input_cost'] for g in st.session_state["token_usage"]["generations"])
-        total_output_cost = sum(g['output_cost'] for g in st.session_state["token_usage"]["generations"])
+        # Scenario Generation Costs
+        if not scenario_data.empty:
+            st.markdown("<div class='inquiry-section'>Scenario Generation</div>", unsafe_allow_html=True)
+            scenario_input_cost = scenario_data['input_cost'].sum()
+            scenario_output_cost = scenario_data['output_cost'].sum()
+            scenario_total_cost = scenario_data['total_cost'].sum()
+            
+            st.markdown(f"<div class='inquiry-label'>Input Cost: ${scenario_input_cost:.4f}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Output Cost: ${scenario_output_cost:.4f}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Total Cost: ${scenario_total_cost:.4f}</div>", unsafe_allow_html=True)
         
-        st.markdown(f"<div class='inquiry-label'>Total Input Cost: ${total_input_cost:.4f}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${total_output_cost:.4f}</div>", unsafe_allow_html=True)
+        # Classification Costs
+        if not classification_data.empty:
+            st.markdown("<div class='inquiry-section'>Classification</div>", unsafe_allow_html=True)
+            class_input_cost = classification_data['input_cost'].sum()
+            class_output_cost = classification_data['output_cost'].sum()
+            class_total_cost = classification_data['total_cost'].sum()
+            
+            st.markdown(f"<div class='inquiry-label'>Input Cost: ${class_input_cost:.4f}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Output Cost: ${class_output_cost:.4f}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-label'>Total Cost: ${class_total_cost:.4f}</div>", unsafe_allow_html=True)
+        
+        # Overall Totals
+        st.markdown("<div class='inquiry-section'>Overall Totals</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-label'>Total Input Cost: ${df_tokens['input_cost'].sum():.4f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${df_tokens['output_cost'].sum():.4f}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='inquiry-label'>Total Cost: ${st.session_state['token_usage']['total_cost']:.4f}</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     else:
