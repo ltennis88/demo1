@@ -1487,68 +1487,81 @@ def score_faq_relevance(key_topics, faq_entry):
         return 0
 
 def find_relevant_faq(scenario_text, faq_dataframe):
-    """Find the most relevant FAQ for a given scenario using semantic search."""
+    """Find the most relevant FAQ for a given scenario using keyword matching first."""
     try:
-        # Use cached base context for the scenario prompt
-        base_context = build_base_context()
-        
         # Get the optimized FAQ dictionary from session state
         faq_dict = st.session_state.get('faq_dict', {})
         if not faq_dict:
             _, faq_dict = load_faq_csv()
             
-        # First try quick keyword matching
-        scenario_keywords = set(word.lower() for word in str(scenario_text).split())
+        # Quick keyword matching first
+        scenario_keywords = set(word.lower() for word in str(scenario_text).split() if len(word) > 3)
         best_match = None
         best_score = 0
         best_answer = None
         
-        try:
-            # Try semantic search with OpenAI
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Extract key topics from this customer scenario."},
-                    {"role": "user", "content": str(scenario_text)}
-                ],
-                temperature=0,
-                max_tokens=150
-            )
-            
-            # Extract key topics from the response
-            key_topics = response['choices'][0]['message']['content']
-            
-            # Cache the key topics for this scenario
-            if 'faq_key_topics' not in st.session_state:
-                st.session_state['faq_key_topics'] = {}
-            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
-            
-            # Score each FAQ
-            for faq_entry in faq_dict['all_faqs']:
-                score = score_faq_relevance(key_topics, faq_entry)
-                if score > best_score:
-                    best_score = score
-                    best_match = faq_entry['question']
-                    best_answer = faq_entry['answer']
-            
-            if best_match and best_score >= 7:
-                return best_match, best_answer, best_score
-                
-        except Exception as e:
-            st.error(f"Error in semantic search: {str(e)}")
-            
-        # If semantic search fails or no good match, try keyword matching
+        # Try keyword matching first
         for faq_entry in faq_dict['all_faqs']:
             question = str(faq_entry['question']).lower()
-            faq_keywords = set(word.lower() for word in question.split())
+            answer = str(faq_entry['answer'])
+            category = str(faq_entry['category']).lower()
+            faq_type = str(faq_entry['type']).lower()
+            
+            # Combine all text for matching
+            faq_text = f"{question} {category} {faq_type}"
+            faq_keywords = set(word.lower() for word in faq_text.split() if len(word) > 3)
+            
+            # Calculate score based on keyword matches
             common_words = scenario_keywords & faq_keywords
-            score = len(common_words)
+            score = len(common_words) * 2  # Give more weight to keyword matches
+            
+            # Boost score for exact phrase matches
+            for phrase in scenario_text.lower().split('.'):
+                if phrase.strip() and phrase.strip() in question:
+                    score += 3
+            
             if score > best_score:
                 best_score = score
                 best_match = faq_entry['question']
-                best_answer = faq_entry['answer']
+                best_answer = answer
         
-        if best_match and best_score > 0:
+        # Only use semantic search if keyword matching didn't find a good match
+        if best_score < 4:
+            try:
+                # Get cached key topics if available
+                key_topics = st.session_state.get('faq_key_topics', {}).get(str(scenario_text))
+                
+                # If not cached, extract key topics
+                if not key_topics:
+                    response = openai.ChatCompletion.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "Extract key topics from this customer scenario."},
+                            {"role": "user", "content": str(scenario_text)}
+                        ],
+                        temperature=0,
+                        max_tokens=150
+                    )
+                    key_topics = response['choices'][0]['message']['content']
+                    
+                    # Cache the key topics
+                    if 'faq_key_topics' not in st.session_state:
+                        st.session_state['faq_key_topics'] = {}
+                    st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+                
+                # Score each FAQ
+                for faq_entry in faq_dict['all_faqs']:
+                    score = score_faq_relevance(key_topics, faq_entry)
+                    if score > best_score:
+                        best_score = score
+                        best_match = faq_entry['question']
+                        best_answer = faq_entry['answer']
+                
+            except Exception as e:
+                st.error(f"Error in semantic search: {str(e)}")
+        
+        # Return results if we found a good match
+        if best_match and best_score >= 3:
             return best_match, best_answer, best_score
             
         return None, None, 0
@@ -1611,38 +1624,38 @@ def generate_response_suggestion(scenario_dict, classification_dict):
         # Start timing
         start_time = time.time()
         
-        # Use cached base context
-        base_context = build_base_context()
-        
         # Get cached response template
         template = generate_response_template(scenario_dict.get("inbound_route", ""))
         
-        # Build comprehensive context including guarantee terms
+        # Build minimal context
         context = f"""
-        {base_context}
-        
         Customer Scenario:
-        {scenario_dict}
+        {scenario_dict.get('scenario_text', '')}
         
-        Classification:
-        {json.dumps(classification_dict, indent=2)}
+        User Type: {scenario_dict.get('user_type', '')}
+        Classification: {classification_dict.get('classification', '')}
+        Priority: {classification_dict.get('priority', '')}
+        Summary: {classification_dict.get('summary', '')}
         
         Instructions:
         1. Be professional and empathetic
         2. Address all aspects of the customer's query
-        3. Include specific details from relevant terms or policies
-        4. If this involves a guarantee claim or complaint about work quality:
-           - Reference the guarantee terms and eligibility criteria
-           - Explain the claims process
-           - Mention the £1000 coverage limit if applicable
-        5. Provide clear next steps
-        6. Keep the response concise but informative
+        3. Keep the response concise but informative
+        4. Provide clear next steps
         """
+        
+        # Only include account details if they exist and are relevant
+        account_details = scenario_dict.get('account_details', {})
+        if any(account_details.values()):
+            context += "\nCustomer Details:\n"
+            for key, value in account_details.items():
+                if value:
+                    context += f"{key}: {value}\n"
         
         # Process relevant FAQ
         try:
-            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_dict, load_faq_csv())
-            if relevant_faq and faq_answer and faq_relevance >= 7:
+            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_dict.get('scenario_text', ''), load_faq_csv())
+            if relevant_faq and faq_answer and faq_relevance >= 3:
                 context += f"""
                 Relevant FAQ:
                 Question: {relevant_faq}
@@ -1650,14 +1663,13 @@ def generate_response_suggestion(scenario_dict, classification_dict):
                 """
         except Exception as e:
             st.error(f"Error finding relevant FAQ: {str(e)}")
-            relevant_faq, faq_answer, faq_relevance = None, None, 0
         
         # Generate response using OpenAI
         try:
             response = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
+                    {"role": "system", "content": "You are a Customer Support Agent for Checkatrade. Provide a concise, professional response."},
                     {"role": "user", "content": context}
                 ],
                 temperature=0.7,
@@ -1668,33 +1680,26 @@ def generate_response_suggestion(scenario_dict, classification_dict):
             response_time = time.time() - start_time
             
             # Extract token usage
-            cached_input_tokens = len(base_context.split())  # Cached context
-            non_cached_input_tokens = len(str(scenario_dict).split()) + len(json.dumps(classification_dict).split())  # Dynamic content
+            input_tokens = len(context.split())
             output_tokens = response.usage.completion_tokens
             
             # Calculate costs
-            cached_input_cost = calculate_token_cost(cached_input_tokens, "cached_input")
-            non_cached_input_cost = calculate_token_cost(non_cached_input_tokens, "input")
+            input_cost = calculate_token_cost(input_tokens, "input")
             output_cost = calculate_token_cost(output_tokens, "output")
             
             # Track usage
             track_token_usage(
                 operation="response_generation",
-                cached_input_tokens=cached_input_tokens,
-                non_cached_input_tokens=non_cached_input_tokens,
+                non_cached_input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 response_time=response_time
             )
             
-            # For backward compatibility, return total input tokens and total input cost
-            total_input_tokens = cached_input_tokens + non_cached_input_tokens
-            total_input_cost = cached_input_cost + non_cached_input_cost
-            
             return (
                 response.choices[0].message.content,
-                total_input_tokens,
+                input_tokens,
                 output_tokens,
-                total_input_cost,
+                input_cost,
                 output_cost
             )
             
@@ -2501,135 +2506,103 @@ else:
 # -----------------------------------------------------------------------------
 # ANALYTICS
 # -----------------------------------------------------------------------------
-st.subheader("Analytics")
+def update_analytics(section="main"):
+    """Update analytics display."""
+    if "token_usage" not in st.session_state or not st.session_state["token_usage"]["generations"]:
+        st.info("No analytics data available yet. Generate some responses to see analytics.")
+        return
 
-# Then show summary charts with expanded information
-with st.expander("View Analytics Dashboard"):
-    st.subheader("Summary Analytics")
+    st.header("Analytics Dashboard")
     
-    # Row 1: Classification and Priority distribution
-    colA, colB = st.columns(2)
-    with colA:
-        classification_counts = df["classification"].value_counts()
-        
-        # Create pie chart with plotly express
-        fig1 = px.pie(
-            values=classification_counts.values,
-            names=classification_counts.index,
-            title="Classification Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
-        )
-        
-        # Customize
-        fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
-        fig1.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig1, use_container_width=True)
-        
-        # Show classification breakdown as text too
-        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-        for classification, count in classification_counts.items():
-            percentage = (count / len(df)) * 100
-            st.markdown(f"<div class='inquiry-label'>{classification}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-    with colB:
-        priority_counts = df["priority"].value_counts()
-        
-        # Create color mapping for priorities
-        priority_colors = {
-            "High": "#DB4437",    # Red for high
-            "Medium": "#F4B400",  # Yellow for medium
-            "Low": "#0F9D58"      # Green for low
-        }
-        
-        # Create a pie chart using plotly express
-        fig2 = px.pie(
-            values=priority_counts.values,
-            names=priority_counts.index,
-            title="Priority Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_map=priority_colors
-        )
-        
-        # Customize
-        fig2.update_traces(textinfo='percent+label')
-        fig2.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig2, use_container_width=True)
+    # Get the token usage data
+    token_data = st.session_state["token_usage"]
     
-    # Row 2: User type and Route distribution 
-    colC, colD = st.columns(2)
-    with colC:
-        user_type_counts = df["user_type"].value_counts()
+    # Calculate total costs and tokens
+    total_input_tokens = sum(gen["input_tokens"] for gen in token_data["generations"])
+    total_output_tokens = sum(gen["output_tokens"] for gen in token_data["generations"])
+    total_input_cost = sum(gen["input_cost"] for gen in token_data["generations"])
+    total_output_cost = sum(gen["output_cost"] for gen in token_data["generations"])
+    total_cost = total_input_cost + total_output_cost
+    
+    # Display summary metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Cost", f"${total_cost:.4f}")
+    with col2:
+        st.metric("Total Input Tokens", total_input_tokens)
+    with col3:
+        st.metric("Total Output Tokens", total_output_tokens)
+    
+    # Display cost breakdown
+    st.subheader("Cost Breakdown")
+    col4, col5 = st.columns(2)
+    with col4:
+        st.metric("Input Cost", f"${total_input_cost:.4f}")
+    with col5:
+        st.metric("Output Cost", f"${total_output_cost:.4f}")
+    
+    # Display average response time
+    response_times = [gen["response_time"] for gen in token_data["generations"] if "response_time" in gen]
+    if response_times:
+        avg_response_time = sum(response_times) / len(response_times)
+        st.metric("Average Response Time", f"{avg_response_time:.2f}s")
+    
+    # Display inquiries data if available
+    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+        df = st.session_state["inquiries"]
         
-        # Convert value_counts to DataFrame for plotly
-        user_type_df = pd.DataFrame({
-            'User Type': user_type_counts.index,
-            'Count': user_type_counts.values
-        })
+        # Classification distribution
+        st.subheader("Classification Distribution")
+        if "classification" in df.columns:
+            classification_counts = df["classification"].value_counts()
+            for classification, count in classification_counts.items():
+                percentage = (count / len(df)) * 100
+                st.text(f"{classification}: {count} ({percentage:.1f}%)")
         
-        # Create horizontal bar chart using plotly express
-        fig3 = px.bar(
-            user_type_df,
-            x='Count',
-            y='User Type',
-            orientation='h',
-            title="User Type Distribution",
-            text='Count',
-            color_discrete_sequence=["#4285F4"]
-        )
+        # Priority distribution
+        st.subheader("Priority Distribution")
+        if "priority" in df.columns:
+            priority_counts = df["priority"].value_counts()
+            for priority, count in priority_counts.items():
+                percentage = (count / len(df)) * 100
+                st.text(f"{priority}: {count} ({percentage:.1f}%)")
         
-        # Customize
-        fig3.update_layout(
-            xaxis_title="Count",
-            yaxis_title="",
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white"),
-            xaxis=dict(gridcolor="#444"),
-            yaxis=dict(gridcolor="#444")
-        )
-        
-        st.plotly_chart(fig3, use_container_width=True)
-        
-        with colD:
-            route_counts = df["inbound_route"].value_counts()
+        # Common topics analysis
+        st.subheader("Common Topics & Themes")
+        if "summary" in df.columns:
+            summaries = " ".join(df["summary"].fillna("")).lower()
+            words = re.findall(r'\b\w+\b', summaries)
+            word_counts = Counter(words)
             
-            # Create color mapping for routes
-            route_colors = {
-                "phone": "#4285F4",     # Blue for phone
-                "email": "#DB4437",     # Red for email
-                "whatsapp": "#0F9D58",  # Green for whatsapp
-                "web_form": "#F4B400"   # Yellow for web form
-            }
+            # Filter out common stop words
+            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+            themes = [(word, count) for word, count in word_counts.most_common(10) 
+                     if word not in stop_words and len(word) > 3]
             
-            # Create a pie chart using plotly express
-            fig4 = px.pie(
-                values=route_counts.values,
-                names=route_counts.index,
-                title="Inbound Route Distribution",
+            for word, count in themes:
+                st.text(f"{word.title()}: {count}")
+
+    # Then show summary charts with expanded information
+    with st.expander("View Analytics Dashboard"):
+        st.subheader("Summary Analytics")
+        
+        # Row 1: Classification and Priority distribution
+        colA, colB = st.columns(2)
+        with colA:
+            classification_counts = df["classification"].value_counts()
+            
+            # Create pie chart with plotly express
+            fig1 = px.pie(
+                values=classification_counts.values,
+                names=classification_counts.index,
+                title="Classification Distribution",
                 hole=0.4,  # Makes it a donut chart
-                color_discrete_map=route_colors
+                color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
             )
             
             # Customize
-            fig4.update_traces(textinfo='percent+label')
-            fig4.update_layout(
+            fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
+            fig1.update_layout(
                 legend=dict(orientation="h", y=-0.1),
                 height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -2637,7 +2610,113 @@ with st.expander("View Analytics Dashboard"):
                 font=dict(color="white")
             )
             
-            st.plotly_chart(fig4, use_container_width=True)
+            st.plotly_chart(fig1, use_container_width=True)
+            
+            # Show classification breakdown as text too
+            st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+            for classification, count in classification_counts.items():
+                percentage = (count / len(df)) * 100
+                st.markdown(f"<div class='inquiry-label'>{classification}: {count} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        with colB:
+            priority_counts = df["priority"].value_counts()
+            
+            # Create color mapping for priorities
+            priority_colors = {
+                "High": "#DB4437",    # Red for high
+                "Medium": "#F4B400",  # Yellow for medium
+                "Low": "#0F9D58"      # Green for low
+            }
+            
+            # Create a pie chart using plotly express
+            fig2 = px.pie(
+                values=priority_counts.values,
+                names=priority_counts.index,
+                title="Priority Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=priority_colors
+            )
+            
+            # Customize
+            fig2.update_traces(textinfo='percent+label')
+            fig2.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
+        
+        # Row 2: User type and Route distribution 
+        colC, colD = st.columns(2)
+        with colC:
+            user_type_counts = df["user_type"].value_counts()
+            
+            # Convert value_counts to DataFrame for plotly
+            user_type_df = pd.DataFrame({
+                'User Type': user_type_counts.index,
+                'Count': user_type_counts.values
+            })
+            
+            # Create horizontal bar chart using plotly express
+            fig3 = px.bar(
+                user_type_df,
+                x='Count',
+                y='User Type',
+                orientation='h',
+                title="User Type Distribution",
+                text='Count',
+                color_discrete_sequence=["#4285F4"]
+            )
+            
+            # Customize
+            fig3.update_layout(
+                xaxis_title="Count",
+                yaxis_title="",
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white"),
+                xaxis=dict(gridcolor="#444"),
+                yaxis=dict(gridcolor="#444")
+            )
+            
+            st.plotly_chart(fig3, use_container_width=True)
+            
+            with colD:
+                route_counts = df["inbound_route"].value_counts()
+                
+                # Create color mapping for routes
+                route_colors = {
+                    "phone": "#4285F4",     # Blue for phone
+                    "email": "#DB4437",     # Red for email
+                    "whatsapp": "#0F9D58",  # Green for whatsapp
+                    "web_form": "#F4B400"   # Yellow for web form
+                }
+                
+                # Create a pie chart using plotly express
+                fig4 = px.pie(
+                    values=route_counts.values,
+                    names=route_counts.index,
+                    title="Inbound Route Distribution",
+                    hole=0.4,  # Makes it a donut chart
+                    color_discrete_map=route_colors
+                )
+                
+                # Customize
+                fig4.update_traces(textinfo='percent+label')
+                fig4.update_layout(
+                    legend=dict(orientation="h", y=-0.1),
+                    height=300,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="white")
+                )
+                
+                st.plotly_chart(fig4, use_container_width=True)
 
         # Common topics/themes from summaries
         st.subheader("Common Topics & Themes")
@@ -2854,63 +2933,6 @@ with st.expander("View Analytics Dashboard"):
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
-
-def update_analytics(section="main"):
-    """Update the analytics display with token usage and costs.
-    Args:
-        section (str): Section identifier to ensure unique chart IDs
-    """
-    if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-        last_usage = st.session_state["token_usage"]["generations"][-1]
-        
-        # Calculate total input cost from cached and non-cached
-        total_input_cost = last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0)
-        total_cost = total_input_cost + last_usage.get("output_cost", 0)
-        
-        # Display current metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
-        with col2:
-            total_tokens = (
-                last_usage.get("cached_input_tokens", 0) + 
-                last_usage.get("non_cached_input_tokens", 0) + 
-                last_usage.get("output_tokens", 0)
-            )
-            st.metric("Total Tokens", f"{total_tokens:,}")
-        with col3:
-            st.metric("Total Cost", f"${total_cost:.4f}")
-        
-        # Detailed token breakdown
-        st.markdown("#### Current Usage Breakdown")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Input Tokens:**")
-            st.markdown(f"- Cached: {last_usage.get('cached_input_tokens', 0):,} (${last_usage.get('cached_input_cost', 0):.4f})")
-            st.markdown(f"- Non-cached: {last_usage.get('non_cached_input_tokens', 0):,} (${last_usage.get('non_cached_input_cost', 0):.4f})")
-            st.markdown(f"- Total Input: {last_usage.get('cached_input_tokens', 0) + last_usage.get('non_cached_input_tokens', 0):,} (${total_input_cost:.4f})")
-        with col2:
-            st.markdown("**Output Tokens:**")
-            st.markdown(f"- Total: {last_usage.get('output_tokens', 0):,} (${last_usage.get('output_cost', 0):.4f})")
-        
-        # Show historical data if available
-        if len(st.session_state["token_usage"]["generations"]) > 1:
-            st.markdown("#### Historical Usage")
-            
-            # Calculate summary statistics
-            st.markdown("#### Summary Statistics")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                avg_response_time = df_history['response_time'].mean()
-                st.metric("Average Response Time", f"{avg_response_time:.2f}s")
-            with col2:
-                total_cost_sum = df_history['total_cost'].sum()
-                st.metric("Total Cost (All Sessions)", f"${total_cost_sum:.4f}")
-            with col3:
-                avg_cost = df_history['total_cost'].mean()
-                st.metric("Average Cost per Request", f"${avg_cost:.4f}")
-    else:
-        st.info("No analytics data available yet. Generate some responses to see usage statistics.")
 
 # Update all calls to update_analytics to include a section identifier
 if st.session_state.get("token_usage", {}).get("generations"):
