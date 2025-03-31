@@ -358,6 +358,79 @@ Scenario text:
 ###############################################################################
 # 7) HELPER: GENERATE SCENARIO VIA OPENAI
 ###############################################################################
+def validate_scenario_rules(scenario_data):
+    """
+    Validates that the generated scenario follows all rules for its user type.
+    Returns (is_valid, error_message) tuple.
+    """
+    user_type = scenario_data.get("user_type", "")
+    scenario_text = scenario_data.get("scenario_text", "").lower()
+    account_details = scenario_data.get("account_details", {})
+    
+    # Check for empty account details for prospective users
+    if "prospective" in user_type:
+        for key, value in account_details.items():
+            if value and key not in ["name", "surname", "location"]:  # These can be empty strings
+                return False, f"Prospective user has non-empty {key} in account details"
+    
+    # Check membership ID rules
+    membership_id = scenario_data.get("membership_id", "")
+    if "existing_tradesperson" in user_type and not membership_id.startswith("T-"):
+        return False, "Existing tradesperson missing valid membership ID"
+    elif "existing_tradesperson" not in user_type and membership_id:
+        return False, "Non-tradesperson has membership ID"
+    
+    # Define forbidden phrases for each user type
+    forbidden_phrases = {
+        "prospective_homeowner": [
+            "my account", "my review", "poor quality", "not satisfied", 
+            "completed job", "past work", "my business", "insurance details",
+            "trade license", "my customers"
+        ],
+        "existing_homeowner": [
+            "my business", "insurance details", "trade license", "my customers",
+            "membership fees", "business profiles", "trade services"
+        ],
+        "prospective_tradesperson": [
+            "my review", "poor quality", "not satisfied", "in my home", 
+            "I hired", "buy a home", "verify tradespeople", "find tradespeople",
+            "reliable tradespeople", "home improvement", "renovation", "repair"
+        ],
+        "existing_tradesperson": [
+            "I hired", "done for me", "my home", "my property", 
+            "not satisfied with", "poor quality", "buy a home",
+            "verify tradespeople", "find tradespeople", "reliable tradespeople"
+        ]
+    }
+    
+    # Check for forbidden phrases
+    if user_type in forbidden_phrases:
+        for phrase in forbidden_phrases[user_type]:
+            if phrase in scenario_text:
+                return False, f"Scenario contains forbidden phrase for {user_type}: '{phrase}'"
+    
+    # Check review format rules
+    latest_reviews = account_details.get("latest_reviews", "")
+    if latest_reviews:
+        if "homeowner" in user_type:
+            if not any(latest_reviews.lower().startswith(word) for word in ["gave", "left", "posted"]):
+                return False, "Homeowner review must start with 'Gave', 'Left', or 'Posted'"
+        elif "tradesperson" in user_type:
+            if not any(latest_reviews.lower().startswith(word) for word in ["received", "customer gave", "client rated"]):
+                return False, "Tradesperson review must start with 'Received', 'Customer gave', or 'Client rated'"
+    
+    # Check job description format
+    latest_jobs = account_details.get("latest_jobs", "")
+    if latest_jobs:
+        if "homeowner" in user_type:
+            if any(word in latest_jobs.lower() for word in ["completed", "installed", "fixed", "repaired"]):
+                return False, "Homeowner job description should be passive"
+        elif "tradesperson" in user_type:
+            if not any(word in latest_jobs.lower() for word in ["completed", "installed", "fixed", "repaired"]):
+                return False, "Tradesperson job description should be active"
+    
+    return True, ""
+
 def generate_scenario(selected_route=None, selected_user_type=None):
     """
     Generates a scenario using OpenAI's ChatCompletion.
@@ -408,50 +481,132 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     else:
         user_content += "\n\nYou may pick any inbound_route and user_type."
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
-                {"role": "user", "content": user_content}
-            ],
-            temperature=1.0,
-            max_tokens=500
-        )
-        raw_reply = response["choices"][0]["message"]["content"].strip()
-        
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
-            scenario_data = json.loads(raw_reply)
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
+                    {"role": "user", "content": user_content}
+                ],
+                temperature=1.0,
+                max_tokens=500
+            )
+            raw_reply = response["choices"][0]["message"]["content"].strip()
             
-            # Validate required fields
-            required_fields = ["inbound_route", "ivr_flow", "ivr_selections", "user_type", 
-                             "phone_email", "membership_id", "account_details", "scenario_text"]
-            required_account_fields = ["name", "surname", "location", "latest_reviews", 
-                                     "latest_jobs", "project_cost", "payment_status"]
-            
-            # Check all required fields exist
-            for field in required_fields:
-                if field not in scenario_data:
-                    raise ValueError(f"Missing required field: {field}")
-            
-            # Check account_details structure
-            if not isinstance(scenario_data["account_details"], dict):
-                raise ValueError("account_details must be an object")
-            
-            for field in required_account_fields:
-                if field not in scenario_data["account_details"]:
-                    raise ValueError(f"Missing required account field: {field}")
-            
-            # If we're supposed to randomize the user type, do it manually
-            if should_randomize_user_type:
-                user_types = ["existing_homeowner", "existing_tradesperson", 
-                            "prospective_homeowner", "prospective_tradesperson"]
-                random_user_type = random.choice(user_types)
-                scenario_data["user_type"] = random_user_type
+            try:
+                scenario_data = json.loads(raw_reply)
                 
-                # Update account details based on user type
-                if "prospective" in random_user_type:
-                    scenario_data["account_details"] = {
+                # Validate required fields
+                required_fields = ["inbound_route", "ivr_flow", "ivr_selections", "user_type", 
+                                 "phone_email", "membership_id", "account_details", "scenario_text"]
+                required_account_fields = ["name", "surname", "location", "latest_reviews", 
+                                         "latest_jobs", "project_cost", "payment_status"]
+                
+                # Check all required fields exist
+                for field in required_fields:
+                    if field not in scenario_data:
+                        raise ValueError(f"Missing required field: {field}")
+                
+                # Check account_details structure
+                if not isinstance(scenario_data["account_details"], dict):
+                    raise ValueError("account_details must be an object")
+                
+                for field in required_account_fields:
+                    if field not in scenario_data["account_details"]:
+                        raise ValueError(f"Missing required account field: {field}")
+                
+                # If we're supposed to randomize the user type, do it manually
+                if should_randomize_user_type:
+                    user_types = ["existing_homeowner", "existing_tradesperson", 
+                                "prospective_homeowner", "prospective_tradesperson"]
+                    random_user_type = random.choice(user_types)
+                    scenario_data["user_type"] = random_user_type
+                    
+                    # Update account details based on user type
+                    if "prospective" in random_user_type:
+                        scenario_data["account_details"] = {
+                            "name": "",
+                            "surname": "",
+                            "location": "",
+                            "latest_reviews": "",
+                            "latest_jobs": "",
+                            "project_cost": "",
+                            "payment_status": ""
+                        }
+                        scenario_data["membership_id"] = ""
+                
+                # Validate the scenario against all rules
+                is_valid, error_message = validate_scenario_rules(scenario_data)
+                if not is_valid:
+                    if retry_count < max_retries - 1:
+                        retry_count += 1
+                        continue
+                    else:
+                        # If we've hit max retries, return an error scenario
+                        return {
+                            "inbound_route": "error",
+                            "ivr_flow": "",
+                            "ivr_selections": [],
+                            "user_type": selected_user_type if selected_user_type else "error",
+                            "phone_email": "",
+                            "membership_id": "",
+                            "account_details": {
+                                "name": "",
+                                "surname": "",
+                                "location": "",
+                                "latest_reviews": "",
+                                "latest_jobs": "",
+                                "project_cost": "",
+                                "payment_status": ""
+                            },
+                            "scenario_text": f"Failed to generate valid scenario after {max_retries} attempts. Last error: {error_message}"
+                        }
+                
+                return scenario_data
+                
+            except Exception as e:
+                if retry_count < max_retries - 1:
+                    retry_count += 1
+                    continue
+                else:
+                    # Return a properly structured error scenario
+                    return {
+                        "inbound_route": "error",
+                        "ivr_flow": "",
+                        "ivr_selections": [],
+                        "user_type": selected_user_type if selected_user_type else "error",
+                        "phone_email": "",
+                        "membership_id": "",
+                        "account_details": {
+                            "name": "",
+                            "surname": "",
+                            "location": "",
+                            "latest_reviews": "",
+                            "latest_jobs": "",
+                            "project_cost": "",
+                            "payment_status": ""
+                        },
+                        "scenario_text": f"Error parsing scenario JSON: {str(e)}"
+                    }
+            
+        except Exception as e:
+            if retry_count < max_retries - 1:
+                retry_count += 1
+                continue
+            else:
+                # Return a properly structured error scenario for API errors
+                return {
+                    "inbound_route": "error",
+                    "ivr_flow": "",
+                    "ivr_selections": [],
+                    "user_type": selected_user_type if selected_user_type else "error",
+                    "phone_email": "",
+                    "membership_id": "",
+                    "account_details": {
                         "name": "",
                         "surname": "",
                         "location": "",
@@ -459,52 +614,29 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                         "latest_jobs": "",
                         "project_cost": "",
                         "payment_status": ""
-                    }
-                    scenario_data["membership_id"] = ""
-                
-            return scenario_data
-            
-        except Exception as e:
-            # Return a properly structured error scenario
-            return {
-                "inbound_route": "error",
-                "ivr_flow": "",
-                "ivr_selections": [],
-                "user_type": selected_user_type if selected_user_type else "error",
-                "phone_email": "",
-                "membership_id": "",
-                "account_details": {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
-                },
-                "scenario_text": f"Error parsing scenario JSON: {str(e)}"
-            }
-            
-    except Exception as e:
-        # Return a properly structured error scenario for API errors
-        return {
-            "inbound_route": "error",
-            "ivr_flow": "",
-            "ivr_selections": [],
-            "user_type": selected_user_type if selected_user_type else "error",
-            "phone_email": "",
-            "membership_id": "",
-            "account_details": {
-                "name": "",
-                "surname": "",
-                "location": "",
-                "latest_reviews": "",
-                "latest_jobs": "",
-                "project_cost": "",
-                "payment_status": ""
-            },
-            "scenario_text": f"API Error: {str(e)}"
-        }
+                    },
+                    "scenario_text": f"API Error: {str(e)}"
+                }
+    
+    # If we've exhausted all retries, return an error scenario
+    return {
+        "inbound_route": "error",
+        "ivr_flow": "",
+        "ivr_selections": [],
+        "user_type": selected_user_type if selected_user_type else "error",
+        "phone_email": "",
+        "membership_id": "",
+        "account_details": {
+            "name": "",
+            "surname": "",
+            "location": "",
+            "latest_reviews": "",
+            "latest_jobs": "",
+            "project_cost": "",
+            "payment_status": ""
+        },
+        "scenario_text": f"Failed to generate valid scenario after {max_retries} attempts."
+    }
 
 ###############################################################################
 # 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
