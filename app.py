@@ -1698,102 +1698,69 @@ def generate_response_template(inbound_route):
 
 def generate_response_suggestion(scenario, classification_result):
     """Generate a response suggestion based on classification and FAQ matching"""
-    # Use cached base context
-    base_context = build_base_context()
-    
-    # Get cached response template
-    template = generate_response_template(scenario.get("inbound_route", ""))
-    
-    # Build comprehensive context including guarantee terms
-    context = f"""
-    {base_context}
-    
-    Customer Scenario:
-    {scenario}
-    """
-    
-    # Find relevant FAQ with improved matching
     try:
-        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
+        # Start timing
+        start_time = time.time()
         
-        # Display FAQ if relevant
-        if relevant_faq and faq_answer and faq_relevance >= 7:
-            st.markdown("### Relevant FAQ")
-            st.markdown(f"""
-            <div style="background-color: #1E1E1E; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                <div style="margin-bottom: 10px;">
-                    <strong>Question:</strong> {relevant_faq}
-                </div>
-                <div class="field-value">
-                    <strong>Answer:</strong> {faq_answer}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Error finding relevant FAQ: {str(e)}")
-        relevant_faq, faq_answer, faq_relevance = None, None, 0
-    
-    # Update the prompt to consider guarantee information and FAQ relevance
-    prompt = f"""You are a Checkatrade customer service expert. Using the provided context and template, generate a helpful response to the customer scenario.
-    Consider all relevant information from FAQs, membership terms, and guarantee terms when crafting your response.
-    
-    Context:
-    {context}
-    
-    Classification:
-    {json.dumps(classification_result, indent=2)}
-    
-    {f'''Relevant FAQ:
-    Question: {relevant_faq}
-    Answer: {faq_answer}''' if relevant_faq and faq_relevance >= 7 else 'No highly relevant FAQ found.'}
-    
-    Response Template:
-    {template}
-    
-    Instructions:
-    1. Be professional and empathetic
-    2. Address all aspects of the customer's query
-    3. Include specific details from relevant terms or policies
-    4. If this involves a guarantee claim or complaint about work quality:
-       - Reference the guarantee terms and eligibility criteria
-       - Explain the claims process
-       - Mention the £1000 coverage limit if applicable
-    5. Provide clear next steps
-    6. Keep the response concise but informative
-    
-    Generate the response:"""
-    
-    # Start timing
-    start_time = time.time()
-    
-    # Generate the response using the OpenAI API
-    try:
+        # Use cached base context
+        base_context = build_base_context()
+        
+        # Get cached response template
+        template = generate_response_template(scenario.get("inbound_route", ""))
+        
+        # Build comprehensive context including guarantee terms
+        context = f"""
+        {base_context}
+        
+        Customer Scenario:
+        {scenario}
+        """
+        
+        # Find relevant FAQ with improved matching
+        try:
+            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
+        except Exception as e:
+            st.error(f"Error finding relevant FAQ: {str(e)}")
+            relevant_faq, faq_answer, faq_relevance = None, None, 0
+        
+        # Generate response using OpenAI
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": context}
             ],
             temperature=0.7,
             max_tokens=500
         )
         
-        # Extract the response text
-        response_text = response.choices[0].message.content
+        # Calculate response time
+        response_time = time.time() - start_time
         
-        # Calculate token usage for output
+        # Extract token usage
+        cached_input_tokens = len(base_context.split())  # Cached context
+        non_cached_input_tokens = len(str(scenario).split())  # Dynamic scenario
         output_tokens = response.usage.completion_tokens
-        cached_input_tokens = response.usage.prompt_tokens
         
-        # Calculate token costs
-        input_cost = calculate_token_cost(cached_input_tokens, "cached_input")
+        # Calculate costs
+        cached_input_cost = calculate_token_cost(cached_input_tokens, "cached_input")
+        non_cached_input_cost = calculate_token_cost(non_cached_input_tokens, "input")
         output_cost = calculate_token_cost(output_tokens, "output")
         
-        return response_text, cached_input_tokens, output_tokens, input_cost, output_cost
-    
+        # Track usage
+        track_token_usage(
+            operation="response_generation",
+            cached_input_tokens=cached_input_tokens,
+            non_cached_input_tokens=non_cached_input_tokens,
+            output_tokens=output_tokens,
+            response_time=response_time
+        )
+        
+        return response.choices[0].message.content
+        
     except Exception as e:
         st.error(f"Error generating response: {str(e)}")
-        return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
+        return "Sorry, I couldn't generate a response at this time. Please try again later."
 
 ###############################################################################
 # 11) STREAMLIT APP UI
@@ -2959,7 +2926,8 @@ def update_analytics():
         with col1:
             st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
         with col2:
-            st.metric("Total Tokens", last_usage.get("total_tokens", 0))
+            total_tokens = last_usage.get("cached_input_tokens", 0) + last_usage.get("non_cached_input_tokens", 0)
+            st.metric("Input Tokens", f"{total_tokens:,} (${total_input_cost:.4f})")
         with col3:
             st.metric("Total Cost", f"${total_cost:.4f}")
         
