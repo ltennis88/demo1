@@ -438,7 +438,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         user_content += "\n\nYou may pick any inbound_route and user_type."
 
     response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  # Replace with a valid model if needed (e.g., "gpt-3.5-turbo")
+        model="gpt-4o-mini",  # Updated to use gpt-4o-mini
         messages=[
             {"role": "system", "content": "You generate diverse and random inbound scenarios for Checkatrade using FAQ topics as inspiration."},
             {"role": "user", "content": user_content}
@@ -522,7 +522,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 def classify_scenario(text):
     prompt = classification_prompt_template.replace("{SCENARIO}", text)
     response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
+        model="gpt-4o-mini",  # Updated to use gpt-4o-mini
         messages=[
             {"role": "system", "content": "You classify inbound queries for Checkatrade."},
             {"role": "user", "content": prompt}
