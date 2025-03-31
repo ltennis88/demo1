@@ -10,89 +10,203 @@ import os
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(
-    layout="wide", 
-    page_title="Contact Center AI Assistant", 
-    initial_sidebar_state="collapsed", 
-    menu_items=None
-)
+st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="collapsed", 
+                 menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Simple custom styling - minimize to avoid any syntax errors
+# Add global CSS for better UI
 st.markdown("""
 <style>
+/* Force dark theme */
+html, body, [class*="css"] {
+    color: white !important;
+    background-color: #121212 !important;
+}
+
+/* Center the main app container */
+.main {
+    align-items: center !important;
+    display: flex !important;
+    justify-content: center !important;
+}
+
+/* Fix main content layout */
+.main .block-container {
+    max-width: 1200px !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Reduce sidebar width */
 [data-testid="stSidebar"] {
     width: 12rem !important;
     min-width: 12rem !important;
     max-width: 12rem !important;
-    background-color: #1E1E1E;
-    border-right: 1px solid #424242;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Add some more styling for content
-st.markdown("""
-<style>
-.main .block-container {
-    max-width: 95%;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    background-color: #1E1E1E !important;
+    border-right: 1px solid #424242 !important;
 }
 
-.info-container {
+[data-testid="stSidebar"] > div:first-child {
+    width: 12rem !important;
+    min-width: 12rem !important;
+    max-width: 12rem !important;
+}
+
+/* More compact sidebar content */
+[data-testid="stSidebar"] .block-container {
+    padding-top: 2rem !important;
+}
+
+/* Improve sidebar headings */
+[data-testid="stSidebar"] h1, 
+[data-testid="stSidebar"] h2, 
+[data-testid="stSidebar"] h3 {
+    font-size: 1.2rem !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.75rem !important;
+    color: #64B5F6 !important;
+}
+
+/* Common styles for detail items */
+.agent-detail, .inquiry-detail {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    color: white;
     background-color: #2C2C2C;
-    border-radius: 8px;
+    border-radius: 5px;
+}
+
+/* Common styles for labels */
+.agent-label, .inquiry-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: #e0e0e0;
+}
+
+/* Common styles for section headers */
+.agent-section, .inquiry-section {
+    margin-top: 20px;
+    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #757575;
+    color: #64B5F6;
+}
+
+/* Additional container styling */
+.info-container {
     padding: 15px;
     margin-bottom: 15px;
+    border-radius: 8px;
     border: 1px solid #424242;
+    background-color: #1E1E1E !important;
 }
 
-.inquiry-label {
-    font-weight: bold;
-    color: #64B5F6;
-    margin-bottom: 5px;
+/* Topic tag styling */
+.tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.inquiry-detail {
-    background-color: #1E1E1E;
-    padding: 8px 12px;
-    border-radius: 5px;
-    margin-bottom: 12px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Add custom CSS to force layout to be truly left-aligned and wide
-st.markdown("""
-<style>
-/* Force dark theme and remove padding */
-body {
+.topic-tag {
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #2979FF;
     color: white !important;
+    border-radius: 20px;
+    font-size: 14px;
+    margin: 5px;
+    font-weight: 500;
+}
+
+/* Override Streamlit's default text color */
+.element-container, .stMarkdown, .stText, .stSubheader {
+    color: white !important;
+}
+
+/* Override header colors */
+h1, h2, h3, h4, h5, h6 {
+    color: white !important;
+}
+
+/* Override text colors */
+p, div, span, li, label {
+    color: white !important;
+}
+
+/* Add styles for charts and expanders */
+.stExpander {
+    border: 1px solid #424242 !important;
+    background-color: #1E1E1E !important;
+}
+
+/* Dark theme for buttons */
+.stButton>button {
+    background-color: #333 !important;
+    color: white !important;
+    border: 1px solid #555 !important;
+}
+
+.stButton>button:hover {
+    background-color: #444 !important;
+    border: 1px solid #777 !important;
+}
+
+/* Set background color to dark */
+.main .block-container, .appview-container {
     background-color: #121212 !important;
-    margin: 0 !important;
-    padding: 0 !important;
 }
 
-/* Override Streamlit container dimensions */
-.main > .block-container {
-    max-width: 100% !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-    padding-top: 0 !important;
+/* Override streamlit radio buttons and checkboxes */
+.stRadio > div, .stCheckbox > div {
+    color: white !important;
 }
 
-/* Make full-width main area */
-section.main {
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
+/* Make select boxes dark */
+.stSelectbox > div > div {
+    background-color: #333 !important;
+    color: white !important;
 }
 
-/* Fix column width for content */
-.row-widget {
-    width: 100% !important;
-    max-width: 100% !important;
+/* Dark header */
+header {
+    background-color: #121212 !important;
+}
+
+/* Force dark theme for all elements */
+div.stApp {
+    background-color: #121212 !important;
+}
+
+.nav-button {
+    background-color: #121212;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-right: 10px;
+    text-decoration: none;
+    display: inline-block;
+    border: 2px solid #555;
+    font-weight: 500;
+}
+.nav-button.active {
+    background-color: transparent;
+    border: 2px solid #0087CC;
+    color: #0087CC;
+}
+.nav-button:hover:not(.active) {
+    background-color: #1E1E1E;
+    border-color: #0087CC;
+    color: #0087CC;
+}
+.nav-container {
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
 }
 
 /* Utility classes for cards and containers */
@@ -135,6 +249,7 @@ section.main {
     color: #4CAF50;
     font-weight: bold;
 }
+/* Style for classification styling */
 .classification-card {
     background-color: #2C2C2C;
     border-radius: 8px;
@@ -162,6 +277,51 @@ section.main {
     margin-bottom: 12px;
     font-family: monospace;
     white-space: pre-wrap;
+}
+
+/* Override entire layout structure */
+.css-18e3th9 {
+    padding-top: 1rem;
+    padding-bottom: 10rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Force main content to take full width */
+.css-1d391kg {
+    width: 100% !important;
+    padding-left: 0 !important;
+}
+
+/* Reset flex layout from Streamlit */
+.css-1y4p8pa {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+}
+
+/* Fix main content layout */
+.main .block-container {
+    max-width: 95% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    margin-left: 0 !important;
+}
+
+/* Push content leftwards and increase width */
+section[data-testid="stSidebar"] ~ .css-1d391kg {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 1rem !important;
+}
+
+/* Container styling for better use of space */
+.stApp > div:not([data-testid="stSidebar"]) {
+    margin-left: 0 !important;
+}
+
+/* Override Streamlit's default column spacing */
+.row-widget.stRadio > div {
+    flex-direction: column;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -214,30 +374,14 @@ elif st.session_state["page"] == "analytics":
 def load_faq_csv():
     """
     Loads the CSV file with FAQ/taxonomy data.
-    Expected columns: Type, Category, Question, Answer.
+    Expected columns: Type, Category, Question.
     """
     try:
-        # Read with explicit encoding to handle special characters
-        df = pd.read_csv("faq_taxonomy.csv", encoding="utf-8")
-        
-        # Check if the required columns exist
-        required_columns = ["Type", "Category", "Question"]
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        
-        if missing_columns:
-            st.error(f"Missing required columns in FAQ taxonomy: {', '.join(missing_columns)}")
-            return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
-            
-        # Ensure the Answer column exists - if not, add it as empty
-        if "Answer" not in df.columns:
-            df["Answer"] = ""
-            st.warning("FAQ data does not contain an Answer column. Adding empty column.")
-
-        return df
+        df = pd.read_csv("faq_taxonomy.csv", sep=';')  # Changed delimiter to semicolon
     except Exception as e:
-        st.error(f"Error loading FAQ taxonomy: {str(e)}")
-        # Return empty dataframe with expected columns
-        return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
+        st.error("Error loading faq_taxonomy.csv. Please ensure the file exists and is in plain text CSV format.")
+        df = pd.DataFrame(columns=["Type", "Category", "Question"])
+    return df
 
 @st.cache_data
 def load_membership_terms():
@@ -301,7 +445,7 @@ def save_inquiries_to_file():
         print(f"Saving {len(json_data)} inquiries to file")
         with open("inquiries.json", "w") as f:
             json.dump(json_data, f, indent=2)
-        
+            
         # Show a success message in the UI
         st.success(f"Successfully saved {len(json_data)} inquiries to local file.")
         
@@ -758,24 +902,24 @@ def generate_scenario(selected_route=None, selected_user_type=None):
             }
         
     except Exception as e:
-            return {
-                "inbound_route": "error",
-                "ivr_flow": "",
-                "ivr_selections": [],
-                "user_type": selected_user_type,
-                "phone_email": "",
-                "membership_id": "",
-                "account_details": {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
-                },
-                "scenario_text": f"API Error: {str(e)}"
-    }
+        return {
+            "inbound_route": "error",
+            "ivr_flow": "",
+            "ivr_selections": [],
+            "user_type": selected_user_type,
+            "phone_email": "",
+            "membership_id": "",
+            "account_details": {
+                "name": "",
+                "surname": "",
+                "location": "",
+                "latest_reviews": "",
+                "latest_jobs": "",
+                "project_cost": "",
+                "payment_status": ""
+            },
+            "scenario_text": f"API Error: {str(e)}"
+        }
 
 ###############################################################################
 # 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
@@ -905,37 +1049,6 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # For demo purposes, we'll use improved keyword matching
     scenario_lower = scenario_text.lower()
     
-    # Special handling for lighting installation/flickering issues
-    if ("lighting" in scenario_lower or "lights" in scenario_lower or "lamp" in scenario_lower) and \
-       ("flicker" in scenario_lower or "flickering" in scenario_lower or "unstable" in scenario_lower or \
-        "problem" in scenario_lower or "issue" in scenario_lower or "guarantee" in scenario_lower):
-        
-        # Look specifically for guarantee or warranty questions for lighting issues
-        lighting_matches = []
-        for _, row in faq_dataframe.iterrows():
-            question = str(row.get("Question", "")).lower()
-            if ("guarantee" in question or "warranty" in question or "repair" in question or 
-                "after installation" in question or "workmanship" in question):
-                overlap_count = 5  # Higher priority for these matches
-                lighting_matches.append((row, overlap_count))
-        
-        if lighting_matches:
-            # Return the best match for lighting guarantee questions
-            best_row = lighting_matches[0][0]
-            question = best_row.get("Question", "")
-            answer = best_row.get("Answer", "") if has_answers else ""
-            return question, answer, 8  # High relevance score
-    
-    # First try to use special keywords relevant to chargeback/guarantees
-    if "chargeback" in scenario_lower or "guarantee" in scenario_lower or "refund" in scenario_lower:
-        for _, row in faq_dataframe.iterrows():
-            question = str(row.get("Question", "")).lower()
-            if "chargeback" in question and "guarantee" in question:
-                question = row.get("Question", "")
-                answer = row.get("Answer", "") if has_answers else ""
-                return question, answer, 9  # Very high relevance for direct match
-                
-    # Regular processing for other scenarios
     # First, look for direct issue mentions in the scenario text
     issue_keywords = {
         "job not completed": ["not completed", "unfinished", "incomplete", "left halfway", "abandoned", "not finished"],
@@ -1339,8 +1452,8 @@ if st.button("Generate New Inquiry", use_container_width=True):
                     f"${latest_generation['total_cost']:.4f}"
                 )
             st.markdown("</div>", unsafe_allow_html=True)
-        
-        st.success("Scenario generated successfully!")
+            
+            st.success("Scenario generated successfully!")
 
 # Create a visual separation before the scenario display
 st.markdown("<hr style='margin: 30px 0px; border-color: #424242;'/>", unsafe_allow_html=True)
@@ -2228,37 +2341,37 @@ with st.expander("View Analytics Dashboard"):
         
         st.plotly_chart(fig3, use_container_width=True)
         
-    with colD:
-        route_counts = df["inbound_route"].value_counts()
-        
-        # Create color mapping for routes
-        route_colors = {
-            "phone": "#4285F4",     # Blue for phone
-            "email": "#DB4437",     # Red for email
-            "whatsapp": "#0F9D58",  # Green for whatsapp
-            "web_form": "#F4B400"   # Yellow for web form
-        }
-        
-        # Create a pie chart using plotly express
-        fig4 = px.pie(
-            values=route_counts.values,
-            names=route_counts.index,
-            title="Inbound Route Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_map=route_colors
-        )
-        
-        # Customize
-        fig4.update_traces(textinfo='percent+label')
-        fig4.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig4, use_container_width=True)
+        with colD:
+            route_counts = df["inbound_route"].value_counts()
+            
+            # Create color mapping for routes
+            route_colors = {
+                "phone": "#4285F4",     # Blue for phone
+                "email": "#DB4437",     # Red for email
+                "whatsapp": "#0F9D58",  # Green for whatsapp
+                "web_form": "#F4B400"   # Yellow for web form
+            }
+            
+            # Create a pie chart using plotly express
+            fig4 = px.pie(
+                values=route_counts.values,
+                names=route_counts.index,
+                title="Inbound Route Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=route_colors
+            )
+            
+            # Customize
+            fig4.update_traces(textinfo='percent+label')
+            fig4.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig4, use_container_width=True)
 
         # Common topics/themes from summaries
         st.subheader("Common Topics & Themes")
