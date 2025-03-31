@@ -116,42 +116,11 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 # Add global CSS for better UI
 st.markdown("""
 <style>
-/* Basic theme overrides */
-.stApp {
-    background-color: #121212;
+/* Force dark theme */
+html, body, [class*="css"] {
+    color: white !important;
+    background-color: #121212 !important;
 }
-
-.main .block-container {
-    padding: 2rem;
-    max-width: 95%;
-}
-
-/* Common styles */
-.info-container {
-    background-color: #1E1E1E;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    border: 1px solid #424242;
-}
-
-.inquiry-label {
-    font-weight: bold;
-    color: #64B5F6;
-    margin-bottom: 5px;
-}
-
-.inquiry-detail {
-    background-color: #2C2C2C;
-    padding: 8px 12px;
-    border-radius: 5px;
-    margin-bottom: 12px;
-}
-
-/* Priority colors */
-.priority-high { color: #F44336; font-weight: bold; }
-.priority-medium { color: #FFA726; font-weight: bold; }
-.priority-low { color: #4CAF50; font-weight: bold; }
 
 /* Center the main app container */
 .main {
@@ -389,7 +358,7 @@ div.stApp {
 }
 .classification-header {
     font-weight: bold;
-    font-size: 14px;
+    font-size: 16px;
     color: #90CAF9;
     margin-bottom: 10px;
     border-bottom: 1px solid #424242;
@@ -407,7 +376,6 @@ div.stApp {
     margin-bottom: 12px;
     font-family: monospace;
     white-space: pre-wrap;
-    font-size: 13px;
 }
 
 /* Override entire layout structure */
@@ -488,236 +456,14 @@ if st.session_state["section"] == "main":
     st.header("Generate New Inquiry")
 elif st.session_state["section"] == "inquiries":
     st.header("View Inquiries")
-    # Display inquiries directly in main app
-    df = st.session_state["inquiries"]
-    if len(df) > 0:
-        # Sort inquiries by timestamp in descending order (most recent first)
-        try:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
-        except:
-            # If timestamp conversion fails, just use the existing order
-            pass
-        
-        # Display all inquiries in a collapsible container
-        for idx, row in df.iterrows():
-            # Use a header for each inquiry instead of a nested expander
-            with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
-                st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
-                    
-                    if 'inbound_route' in row and row['inbound_route']:
-                        st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
-                    
-                    if 'ivr_flow' in row and row['ivr_flow']:
-                        st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
-                    
-                    if 'ivr_selections' in row and row['ivr_selections']:
-                        st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
-                
-                with col2:
-                    if 'user_type' in row and row['user_type']:
-                        st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
-                    
-                    if 'phone_email' in row and row['phone_email']:
-                        st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
-                    
-                    if 'membership_id' in row and row['membership_id']:
-                        st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
-                
-                # Classification summary section only
-                st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
-                
-                if 'classification' in row and row['classification']:
-                    st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
-                
-                if 'priority' in row and row['priority']:
-                    st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
-                
-                if 'summary' in row and row['summary']:
-                    st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
-                
-                # Show scenario text
-                if 'scenario_text' in row and row['scenario_text']:
-                    st.markdown("<div class='inquiry-section'>Scenario Details</div>", unsafe_allow_html=True)
-                    st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
-                
-                st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
-    else:
-        st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
+    # Import functions but display in same page
+    from pages.view_inquiries import show_inquiries_content
+    show_inquiries_content()
 elif st.session_state["section"] == "analytics":
     st.header("Analytics Dashboard")
-    # Display analytics directly in main app
-    df = st.session_state["inquiries"]
-    if len(df) > 0:
-        st.subheader("Summary Analytics")
-        
-        # Row 1: Classification and Priority distribution
-        colA, colB = st.columns(2)
-        with colA:
-            classification_counts = df["classification"].value_counts()
-            
-            # Create pie chart with plotly express
-            fig1 = px.pie(
-                values=classification_counts.values,
-                names=classification_counts.index,
-                title="Classification Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
-            )
-            
-            # Customize
-            fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
-            fig1.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig1, use_container_width=True)
-            
-        with colB:
-            priority_counts = df["priority"].value_counts()
-            
-            # Create color mapping for priorities
-            priority_colors = {
-                "High": "#DB4437",    # Red for high
-                "Medium": "#F4B400",  # Yellow for medium
-                "Low": "#0F9D58"      # Green for low
-            }
-            
-            # Create a pie chart using plotly express
-            fig2 = px.pie(
-                values=priority_counts.values,
-                names=priority_counts.index,
-                title="Priority Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=priority_colors
-            )
-            
-            # Customize
-            fig2.update_traces(textinfo='percent+label')
-            fig2.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig2, use_container_width=True)
-        
-        # Row 2: User type and Route distribution 
-        colC, colD = st.columns(2)
-        with colC:
-            user_type_counts = df["user_type"].value_counts()
-            
-            # Convert value_counts to DataFrame for plotly
-            user_type_df = pd.DataFrame({
-                'User Type': user_type_counts.index,
-                'Count': user_type_counts.values
-            })
-            
-            # Create horizontal bar chart using plotly express
-            fig3 = px.bar(
-                user_type_df,
-                x='Count',
-                y='User Type',
-                orientation='h',
-                title="User Type Distribution",
-                text='Count',
-                color_discrete_sequence=["#4285F4"]
-            )
-            
-            # Customize
-            fig3.update_layout(
-                xaxis_title="Count",
-                yaxis_title="",
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                xaxis=dict(gridcolor="#444"),
-                yaxis=dict(gridcolor="#444")
-            )
-            
-            st.plotly_chart(fig3, use_container_width=True)
-        
-        with colD:
-            route_counts = df["inbound_route"].value_counts()
-            
-            # Create color mapping for routes
-            route_colors = {
-                "phone": "#4285F4",     # Blue for phone
-                "email": "#DB4437",     # Red for email
-                "whatsapp": "#0F9D58",  # Green for whatsapp
-                "web_form": "#F4B400"   # Yellow for web form
-            }
-            
-            # Create a pie chart using plotly express
-            fig4 = px.pie(
-                values=route_counts.values,
-                names=route_counts.index,
-                title="Inbound Route Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=route_colors
-            )
-            
-            # Customize
-            fig4.update_traces(textinfo='percent+label')
-            fig4.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig4, use_container_width=True)
-        
-        # Token Usage Analytics
-        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-            st.subheader("Token Usage Analytics")
-            
-            # Create DataFrame from token usage data
-            df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
-            
-            # Show total tokens and costs
-            col1, col2 = st.columns(2)
-            with col1:
-                total_input_tokens = df_tokens["input_tokens"].sum()
-                total_input_cost = df_tokens["input_cost"].sum()
-                total_output_tokens = df_tokens["output_tokens"].sum()
-                total_output_cost = df_tokens["output_cost"].sum()
-                
-                st.metric("Total Input Tokens", f"{total_input_tokens} (${total_input_cost:.4f})")
-                st.metric("Total Output Tokens", f"{total_output_tokens} (${total_output_cost:.4f})")
-            
-            with col2:
-                total_tokens = total_input_tokens + total_output_tokens
-                total_cost = total_input_cost + total_output_cost
-                
-                st.metric("Total Tokens", f"{total_tokens}")
-                st.metric("Total Cost", f"${total_cost:.4f}")
-    else:
-        st.info("No data available for analytics. Generate scenarios and classifications to see analytics.")
+    # Import functions but display in same page
+    from pages.analytics_dashboard import show_analytics_content
+    show_analytics_content()
 
 ###############################################################################
 # 3) LOAD FAQ / TAXONOMY DATA
@@ -1147,7 +893,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
         user_content += f"\n\nForce inbound_route to '{selected_route}'."
     
     # Always specify the user type now, since we either have it from input or randomly selected it
-    user_content += f"\n\nForce user_type to '{selected_user_type}'."
+        user_content += f"\n\nForce user_type to '{selected_user_type}'."
 
     try:
         response = openai.ChatCompletion.create(
@@ -1161,61 +907,61 @@ def generate_scenario(selected_route=None, selected_user_type=None):
             )
             
             # Calculate token usage and costs
-        input_tokens = response["usage"]["prompt_tokens"]
-        output_tokens = response["usage"]["completion_tokens"]
-        total_tokens = response["usage"]["total_tokens"]
-        
-        # Calculate costs - since we're using cached prompts, use the cached_input rate
-        input_cost = calculate_token_cost(input_tokens, "cached_input")
-        output_cost = calculate_token_cost(output_tokens, "output")
-        total_cost = input_cost + output_cost
-        
-        # Calculate response time
-        response_time = time.time() - start_time
-        
-        # Store usage data
-        usage_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "input_cost": input_cost,
-            "output_cost": output_cost,
-            "total_cost": total_cost,
-            "response_time": response_time,
-        "operation": "generation"
-        }
-        
-        st.session_state["token_usage"]["generations"].append(usage_data)
-        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-        st.session_state["token_usage"]["total_cost"] += total_cost
-        st.session_state["token_usage"]["response_times"].append(response_time)
-        
-        raw_reply = response["choices"][0]["message"]["content"].strip()
-        
-        try:
-            scenario_data = json.loads(raw_reply)
+            input_tokens = response["usage"]["prompt_tokens"]
+            output_tokens = response["usage"]["completion_tokens"]
+            total_tokens = response["usage"]["total_tokens"]
             
-            # Ensure account details match the user type
-            if "prospective" in selected_user_type:
-                scenario_data["account_details"] = {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
-                }
-                scenario_data["membership_id"] = ""
+            # Calculate costs - since we're using cached prompts, use the cached_input rate
+            input_cost = calculate_token_cost(input_tokens, "cached_input")
+            output_cost = calculate_token_cost(output_tokens, "output")
+            total_cost = input_cost + output_cost
             
-            # Force the user type to match what was selected/randomized
-            scenario_data["user_type"] = selected_user_type
+            # Calculate response time
+            response_time = time.time() - start_time
             
-            return scenario_data
+            # Store usage data
+            usage_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+                "input_cost": input_cost,
+                "output_cost": output_cost,
+                "total_cost": total_cost,
+                "response_time": response_time,
+            "operation": "generation"
+            }
+            
+            st.session_state["token_usage"]["generations"].append(usage_data)
+            st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+            st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+            st.session_state["token_usage"]["total_cost"] += total_cost
+            st.session_state["token_usage"]["response_times"].append(response_time)
+            
+            raw_reply = response["choices"][0]["message"]["content"].strip()
+            
+    try:
+                scenario_data = json.loads(raw_reply)
                 
-        except Exception as e:
+                # Ensure account details match the user type
+                if "prospective" in selected_user_type:
+                    scenario_data["account_details"] = {
+                        "name": "",
+                        "surname": "",
+                        "location": "",
+                        "latest_reviews": "",
+                        "latest_jobs": "",
+                        "project_cost": "",
+                        "payment_status": ""
+                    }
+                    scenario_data["membership_id"] = ""
+                
+                # Force the user type to match what was selected/randomized
+                scenario_data["user_type"] = selected_user_type
+                
+                return scenario_data
+                
+    except Exception as e:
             return {
                 "inbound_route": "error",
                         "ivr_flow": "",
@@ -2155,7 +1901,43 @@ if st.session_state["generated_scenario"]:
                         st.markdown(response_card, unsafe_allow_html=True)
                     except Exception as e:
                         st.error(f"Could not generate response suggestion: {str(e)}")
-                        
+
+                # After displaying the classification card, add the agent action area
+                st.markdown("""
+                <div class="classification-card">
+                    <div class="classification-header">Agent Actions</div>
+                """, unsafe_allow_html=True)
+
+                # Case status selection
+                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                selected_status = st.selectbox(
+                    "Update Case Status:",
+                    options=case_status_options,
+                    index=case_status_options.index("New") if st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"] == "New" 
+                    else case_status_options.index(st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"])
+                )
+
+                # Agent notes text area
+                agent_notes = st.text_area(
+                    "Agent Notes:",
+                    value=st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["agent_notes"],
+                    height=150,
+                    placeholder="Enter your notes about the case here..."
+                )
+
+                # Save button for agent updates
+                if st.button("Save Agent Updates", use_container_width=True):
+                    # Update the DataFrame with the new status and notes
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "case_status"] = selected_status
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "agent_notes"] = agent_notes
+                    
+                    # Save to file
+                    save_inquiries_to_file()
+                    
+                    st.success(f"Case {st.session_state['current_case_id']} updated - Status: {selected_status}")
+
+                    st.markdown("</div>", unsafe_allow_html=True)
+
                 # Add metrics for the classification tokens and cost
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
