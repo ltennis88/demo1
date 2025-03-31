@@ -229,6 +229,7 @@ STRICT USER TYPE RULES - THESE MUST BE FOLLOWED:
 1. Prospective Homeowner:
    - CANNOT: Leave reviews, complain about work quality, or reference past jobs
    - CAN: Ask about finding tradespeople, ask about vetting process, inquire about creating account
+   - FORBIDDEN PHRASES: "my account", "my review", "poor quality", "not satisfied"
    - Example valid scenarios:
      * "I'm looking to get my kitchen renovated and want to know how to find reliable tradespeople"
      * "Can you explain how you verify your tradespeople before listing them?"
@@ -237,6 +238,7 @@ STRICT USER TYPE RULES - THESE MUST BE FOLLOWED:
 2. Existing Homeowner:
    - CANNOT: Ask about membership fees, discuss business profile, or offer services
    - CAN: Complain about work quality, leave reviews, discuss ongoing/completed jobs
+   - FORBIDDEN PHRASES: "my business", "insurance details", "trade license", "my customers"
    - Example valid scenarios:
      * "I want to leave a review for the electrician who rewired my house last week"
      * "The plumber hasn't finished the bathroom installation they started"
@@ -245,6 +247,7 @@ STRICT USER TYPE RULES - THESE MUST BE FOLLOWED:
 3. Prospective Tradesperson:
    - CANNOT: Discuss customer reviews, complain about work quality, or reference member benefits
    - CAN: Ask about joining process, membership costs, application requirements
+   - FORBIDDEN PHRASES: "my review", "poor quality", "not satisfied", "in my home"
    - Example valid scenarios:
      * "What are the costs involved in becoming a Checkatrade member?"
      * "How long does the vetting process take for new tradespeople?"
@@ -253,6 +256,7 @@ STRICT USER TYPE RULES - THESE MUST BE FOLLOWED:
 4. Existing Tradesperson:
    - CANNOT: Complain about work quality done FOR them, leave reviews FOR others, or act as a customer
    - CAN: Discuss their membership, update business details, respond to customer reviews
+   - FORBIDDEN PHRASES: "I hired", "done for me", "my home", "my property", "not satisfied with", "poor quality"
    - Example valid scenarios:
      * "I need to update my public liability insurance details"
      * "How do I respond to the customer review I received yesterday?"
@@ -264,22 +268,36 @@ CRITICAL VALIDATION RULES:
    - Leave reviews about other tradespeople
    - Request services as if they were a homeowner
    - Reference having work done in their home
+   - Use phrases like "I hired", "done for me", "in my house"
 
 2. NEVER allow a homeowner (existing or prospective) to:
    - Discuss providing trade services
    - Talk about membership fees
    - Reference having customers or business profiles
    - Mention insurance or trade qualifications
+   - Use phrases like "my business", "my customers", "trade license"
 
 3. Account Details Must Match User Type:
-   - Homeowners: reviews_given should be reviews THEY gave about work done FOR them
-   - Tradespeople: reviews_received should be reviews THEY got from customers
-   - Homeowners: latest_jobs should be work done FOR them
-   - Tradespeople: latest_jobs should be work THEY did for others
+   - Homeowners reviews MUST start with: "Gave", "Left", "Posted"
+   - Tradespeople reviews MUST start with: "Received", "Customer gave", "Client rated"
+   - Homeowners jobs MUST be passive: "Had [work] done", "[Work] completed by", "New [installation] by"
+   - Tradespeople jobs MUST be active: "Completed", "Installed", "Built", "Repaired", "Renovated"
+   - NEVER mix these formats
 
 4. Membership IDs (T-xxxxx):
    - ONLY existing tradespeople can have these
    - Must be empty for ALL other user types
+
+5. Review and Job Format Validation:
+   For Tradespeople:
+   - Reviews MUST be FROM customers TO them
+   - Jobs MUST be work THEY did FOR others
+   - NEVER show reviews they gave or work done for them
+   
+   For Homeowners:
+   - Reviews MUST be FROM them TO tradespeople
+   - Jobs MUST be work done FOR them BY tradespeople
+   - NEVER show reviews they received or work they did for others
 
 Produce a single inbound scenario in STRICT JSON FORMAT ONLY (no extra text).
 The JSON object must have exactly these keys:
