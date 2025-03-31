@@ -1165,35 +1165,143 @@ def get_user_type_prompt(user_type):
 ###############################################################################
 # 8) CLASSIFICATION PROMPT
 ###############################################################################
-classification_prompt_template = """
-You are an AI classification assistant for Checkatrade.
+@st.cache_data
+def get_classification_template():
+    """Cache the classification template including departments and JSON structure"""
+    return """
+Department Options:
+- Consumer Support (Account Issues, Job Issues, Payments, Resolving Issues)
+- Technical Support (App Issues, Website Issues, Integration Issues)
+- Quality Assurance (Tradesperson Vetting, Review Verification, Complaint Investigation)
+- Tradesperson Support (Account Management, Jobs, Payments, Technical Issues)
+- Finance (Billing, Refunds, Financial Disputes)
+- Legal (Contract Issues, Guarantee Claims, Compliance)
 
-Given the scenario text below, please analyze the inquiry and return a JSON object with:
-1. The most appropriate classification
-2. The priority level
-3. A brief summary
-4. Whether this is related to a specific FAQ
-
-Here's how to classify:
-- Classification: Choose the most specific category (e.g., "Billing Dispute", "Job Quality Complaint", "Membership Query", "Technical Support", etc.)
-- Priority: 
-  * "High" for urgent issues affecting customers immediately (complaints, work issues, payment disputes)
-  * "Medium" for important but not critical matters (account questions, general inquiries)
-  * "Low" for informational requests or future-dated concerns
-- Summary: A concise 1-2 sentence summary that captures the key issue
-- FAQ Relation: If the inquiry directly relates to common questions about job issues, payment disputes, finding tradespeople, etc.
-
-Return only valid JSON in this format:
+Required JSON Structure:
 {
   "classification": "...",
+  "department": "...",
+  "subdepartment": "...",
   "priority": "High|Medium|Low",
   "summary": "...",
-  "related_faq_category": "..."  // E.g. "job_issue", "billing", "technical", "membership", or "" if none applies
+  "related_faq_category": "...",
+  "estimated_response_time": "..."
 }
-
-Scenario text:
-"{SCENARIO}"
 """
+
+def classify_scenario(text):
+    """Classify the scenario and return structured classification data."""
+    try:
+        # Start timing
+        start_time = time.time()
+        
+        # Get cached components
+        base_context = build_base_context()
+        classification_template = get_classification_template()
+        
+        # Build minimal dynamic prompt
+        classification_prompt = f"""Based on this scenario and context, classify the inquiry and return ONLY a valid JSON object (no other text).
+
+Context:
+{base_context}
+
+Scenario:
+{text}
+
+Classification Guidelines:
+{classification_template}"""
+        
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a classification system that only returns valid JSON objects."},
+                {"role": "user", "content": classification_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=400
+        )
+        
+        # Calculate token usage and costs
+        input_tokens = response["usage"]["prompt_tokens"]
+        output_tokens = response["usage"]["completion_tokens"]
+        total_tokens = response["usage"]["total_tokens"]
+        
+        # Split input tokens into cached and non-cached portions
+        cached_tokens = len(base_context.split()) + len(classification_template.split())
+        non_cached_tokens = input_tokens - cached_tokens
+        
+        # Calculate costs using appropriate rates
+        cached_input_cost = calculate_token_cost(cached_tokens, "cached_input")
+        non_cached_input_cost = calculate_token_cost(non_cached_tokens, "input")
+        output_cost = calculate_token_cost(output_tokens, "output")
+        total_cost = cached_input_cost + non_cached_input_cost + output_cost
+        
+        # Calculate response time
+        response_time = time.time() - start_time
+        
+        # Store usage data
+        usage_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "input_tokens": input_tokens,
+            "cached_input_tokens": cached_tokens,
+            "non_cached_input_tokens": non_cached_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "cached_input_cost": cached_input_cost,
+            "non_cached_input_cost": non_cached_input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "response_time": response_time,
+            "operation": "classification"
+        }
+        
+        st.session_state["token_usage"]["generations"].append(usage_data)
+        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+        st.session_state["token_usage"]["total_cost"] += total_cost
+        st.session_state["token_usage"]["response_times"].append(response_time)
+        
+        # Parse the classification response
+        try:
+            response_text = response["choices"][0]["message"]["content"].strip()
+            if not response_text:
+                raise json.JSONDecodeError("Empty response", "", 0)
+                
+            classification_data = json.loads(response_text)
+            
+            # Validate required fields
+            required_fields = ["classification", "department", "subdepartment", "priority", 
+                             "summary", "related_faq_category", "estimated_response_time"]
+            missing_fields = [field for field in required_fields if field not in classification_data]
+            
+            if missing_fields:
+                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+                
+            return classification_data
+            
+        except json.JSONDecodeError as e:
+            st.error(f"Error parsing classification JSON: {str(e)}")
+            return {
+                "classification": "General",
+                "department": "Consumer Support",
+                "subdepartment": "General Inquiries",
+                "priority": "Medium",
+                "summary": "Could not parse classification response.",
+                "related_faq_category": "",
+                "estimated_response_time": "48 hours"
+            }
+            
+    except Exception as e:
+        st.error(f"Error in classification: {str(e)}")
+        return {
+            "classification": "General",
+            "department": "Consumer Support",
+            "subdepartment": "General Inquiries",
+            "priority": "Medium",
+            "summary": f"Error during classification: {str(e)}",
+            "related_faq_category": "",
+            "estimated_response_time": "48 hours"
+        }
 
 ###############################################################################
 # 9) HELPER: GENERATE SCENARIO VIA OPENAI
@@ -1440,138 +1548,6 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     except Exception as e:
         st.error(f"Error in FAQ matching: {str(e)}")
         return None, None, 0
-
-def classify_scenario(text):
-    """Classify the scenario and return structured classification data."""
-    try:
-        # Start timing
-        start_time = time.time()
-        
-        # Load FAQ data
-        faq_df, faq_dict = load_faq_csv()
-        
-        # Build comprehensive context including guarantee terms
-        context = build_context(faq_df, text)
-        
-        # Enhanced classification prompt with departments and subdepartments
-        enhanced_classification_prompt = classification_prompt_template.replace("{SCENARIO}", context)
-        enhanced_classification_prompt += """
-        
-        Please also identify:
-        1. Department: The main department that should handle this inquiry
-           Options: "Consumer Support", "Technical Support", "Quality Assurance", "Tradesperson Support", "Finance", "Legal"
-        
-        2. Subdepartment: The specific team within the department
-           For Consumer Support: "Account Issues", "Job Issues", "Payments", "Resolving Issues"
-           For Technical Support: "App Issues", "Website Issues", "Integration Issues"
-           For Quality Assurance: "Tradesperson Vetting", "Review Verification", "Complaint Investigation"
-           For Tradesperson Support: "Account Management", "Jobs", "Payments", "Technical Issues"
-           For Finance: "Billing", "Refunds", "Financial Disputes"
-           For Legal: "Contract Issues", "Guarantee Claims", "Compliance"
-        
-        Return ONLY a valid JSON object with these fields (no other text):
-        {
-          "classification": "...",
-          "department": "...",
-          "subdepartment": "...",
-          "priority": "High|Medium|Low",
-          "summary": "...",
-          "related_faq_category": "...",
-          "estimated_response_time": "..."
-        }
-        """
-        
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a classification system that only returns valid JSON objects."},
-                {"role": "user", "content": enhanced_classification_prompt}
-            ],
-            temperature=0.5,
-            max_tokens=400
-        )
-        
-        # Calculate token usage and costs
-        input_tokens = response["usage"]["prompt_tokens"]
-        output_tokens = response["usage"]["completion_tokens"]
-        total_tokens = response["usage"]["total_tokens"]
-        
-        # Split input tokens into cached and non-cached portions
-        cached_tokens = len(classification_prompt_template.split()) + len(build_base_context().split())
-        non_cached_tokens = input_tokens - cached_tokens
-        
-        # Calculate costs using appropriate rates
-        cached_input_cost = calculate_token_cost(cached_tokens, "cached_input")
-        non_cached_input_cost = calculate_token_cost(non_cached_tokens, "input")
-        output_cost = calculate_token_cost(output_tokens, "output")
-        total_cost = cached_input_cost + non_cached_input_cost + output_cost
-        
-        # Calculate response time
-        response_time = time.time() - start_time
-        
-        # Store usage data
-        usage_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "input_tokens": input_tokens,
-            "cached_input_tokens": cached_tokens,
-            "non_cached_input_tokens": non_cached_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "cached_input_cost": cached_input_cost,
-            "non_cached_input_cost": non_cached_input_cost,
-            "output_cost": output_cost,
-            "total_cost": total_cost,
-            "response_time": response_time,
-            "operation": "classification"
-        }
-        
-        st.session_state["token_usage"]["generations"].append(usage_data)
-        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-        st.session_state["token_usage"]["total_cost"] += total_cost
-        st.session_state["token_usage"]["response_times"].append(response_time)
-        
-        # Parse the classification response
-        try:
-            response_text = response["choices"][0]["message"]["content"].strip()
-            if not response_text:
-                raise json.JSONDecodeError("Empty response", "", 0)
-                
-            classification_data = json.loads(response_text)
-            
-            # Validate required fields
-            required_fields = ["classification", "department", "subdepartment", "priority", 
-                             "summary", "related_faq_category", "estimated_response_time"]
-            missing_fields = [field for field in required_fields if field not in classification_data]
-            
-            if missing_fields:
-                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
-                
-            return classification_data
-            
-        except json.JSONDecodeError as e:
-            st.error(f"Error parsing classification JSON: {str(e)}")
-            return {
-                "classification": "General",
-                "department": "Consumer Support",
-                "subdepartment": "General Inquiries",
-                "priority": "Medium",
-                "summary": "Could not parse classification response.",
-                "related_faq_category": "",
-                "estimated_response_time": "48 hours"
-            }
-            
-    except Exception as e:
-        st.error(f"Error in classification: {str(e)}")
-        return {
-            "classification": "General",
-            "department": "Consumer Support",
-            "subdepartment": "General Inquiries",
-            "priority": "Medium",
-            "summary": f"Error during classification: {str(e)}",
-            "related_faq_category": "",
-            "estimated_response_time": "48 hours"
-        }
 
 ###############################################################################
 # RESPONSE SUGGESTION HELPER FUNCTIONS
