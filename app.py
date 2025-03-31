@@ -1455,99 +1455,104 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 ###############################################################################
 def find_relevant_faq(scenario_text, faq_dataframe):
     """Find the most relevant FAQ for a given scenario using semantic search."""
-    # Use cached base context for the scenario prompt
-    base_context = build_base_context()
-    
-    # Get the optimized FAQ dictionary from session state
-    faq_dict = st.session_state.get('faq_dict', {})
-    if not faq_dict:
-        # If dictionary not found, reload FAQ data
-        _, faq_dict = load_faq_csv()
-    
-    # First try quick keyword matching
-    scenario_keywords = set(word.lower() for word in scenario_text.split() if len(word) > 4)
-    best_match = None
-    best_score = 0
-    best_answer = None
-    
-    # Quick keyword matching first
-    for faq_entry in faq_dict['all_faqs']:
-        question = faq_entry['question'].lower()
-        question_keywords = set(word for word in question.split() if len(word) > 4)
-        score = len(scenario_keywords.intersection(question_keywords))
-        if score > best_score:
-            best_score = score
-            best_match = faq_entry['question']
-            best_answer = faq_entry['answer']
-    
-    # If we found a good keyword match, return it immediately
-    if best_score >= 3:
-        return best_match, best_answer, best_score + 5  # Bonus for quick match
-    
-    # If no good keyword match, use semantic search
-    scenario_prompt = f"""
-    Given this customer scenario and context:
-    
-    {base_context}
-    
-    Customer Scenario:
-    {scenario_text}
-    
-    What are the key issues or topics being discussed? Focus on:
-    1. The specific problem or request
-    2. The type of service involved
-    3. Any urgency or timeline factors
-    4. Customer concerns or complaints
-    """
-    
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a customer service expert helping to match customer inquiries with relevant FAQs."},
-                {"role": "user", "content": scenario_prompt}
-            ],
-            temperature=0,
-            max_tokens=150
-        )
+        # Use cached base context for the scenario prompt
+        base_context = build_base_context()
         
-        # Extract key topics from the response
-        key_topics = response.choices[0].message.content
+        # Get the optimized FAQ dictionary from session state
+        faq_dict = st.session_state.get('faq_dict', {})
+        if not faq_dict:
+            # If dictionary not found, reload FAQ data
+            _, faq_dict = load_faq_csv()
         
-        # Cache the key topics for this scenario
-        if 'faq_key_topics' not in st.session_state:
-            st.session_state['faq_key_topics'] = {}
-        st.session_state['faq_key_topics'][scenario_text] = key_topics
-        
-        # For each FAQ, calculate relevance score
+        # First try quick keyword matching
+        scenario_keywords = set(word.lower() for word in str(scenario_text).split() if len(word) > 4)
         best_match = None
         best_score = 0
         best_answer = None
         
-        # Use ThreadPoolExecutor for parallel scoring
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            futures = []
-            for faq_entry in faq_dict['all_faqs']:
-                futures.append(
-                    executor.submit(
-                        score_faq_relevance,
-                        key_topics,
-                        faq_entry
-                    )
-                )
-            
-            # Process results as they complete
-            for future in concurrent.futures.as_completed(futures):
-                score, question, answer = future.result()
-                if score > best_score:
-                    best_score = score
-                    best_match = question
-                    best_answer = answer
+        # Quick keyword matching first
+        for faq_entry in faq_dict.get('all_faqs', []):
+            question = str(faq_entry.get('question', '')).lower()
+            question_keywords = set(word for word in question.split() if len(word) > 4)
+            score = len(scenario_keywords.intersection(question_keywords))
+            if score > best_score:
+                best_score = score
+                best_match = faq_entry.get('question')
+                best_answer = faq_entry.get('answer')
         
-        # Only return matches that are reasonably relevant
-        if best_score >= 7:
-            return best_match, best_answer, best_score
-        else:
+        # If we found a good keyword match, return it immediately
+        if best_score >= 3:
+            return best_match, best_answer, best_score + 5  # Bonus for quick match
+        
+        # If no good keyword match, use semantic search
+        scenario_prompt = f"""
+        Given this customer scenario and context:
+        
+        {base_context}
+        
+        Customer Scenario:
+        {str(scenario_text)}
+        
+        What are the key issues or topics being discussed? Focus on:
+        1. The specific problem or request
+        2. The type of service involved
+        3. Any urgency or timeline factors
+        4. Customer concerns or complaints
+        """
+        
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a customer service expert helping to match customer inquiries with relevant FAQs."},
+                    {"role": "user", "content": scenario_prompt}
+                ],
+                temperature=0,
+                max_tokens=150
+            )
+            
+            # Extract key topics from the response
+            key_topics = response.choices[0].message.content
+            
+            # Cache the key topics for this scenario
+            if 'faq_key_topics' not in st.session_state:
+                st.session_state['faq_key_topics'] = {}
+            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+            
+            # For each FAQ, calculate relevance score
+            best_match = None
+            best_score = 0
+            best_answer = None
+            
+            # Use ThreadPoolExecutor for parallel scoring
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = []
+                for faq_entry in faq_dict.get('all_faqs', []):
+                    futures.append(
+                        executor.submit(
+                            score_faq_relevance,
+                            key_topics,
+                            faq_entry
+                        )
+                    )
+                
+                # Process results as they complete
+                for future in concurrent.futures.as_completed(futures):
+                    score, question, answer = future.result()
+                    if score > best_score:
+                        best_score = score
+                        best_match = question
+                        best_answer = answer
+            
+            # Only return matches that are reasonably relevant
+            if best_score >= 7:
+                return best_match, best_answer, best_score
+            else:
+                return None, None, 0
+                
+        except Exception as e:
+            st.error(f"Error in semantic search: {str(e)}")
             return None, None, 0
             
     except Exception as e:
@@ -2897,11 +2902,11 @@ def update_analytics():
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Response Time", f"{last_usage['response_time']:.2f}s")
+            st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
         with col2:
-            st.metric("Total Tokens", last_usage["total_tokens"])
+            st.metric("Total Tokens", last_usage.get("total_tokens", 0))
         with col3:
-            st.metric("Total Cost", f"${(total_input_cost + last_usage['output_cost']):.4f}")
+            st.metric("Total Cost", f"${(total_input_cost + last_usage.get('output_cost', 0)):.4f}")
         
         # Detailed token breakdown
         st.write("Token Usage Breakdown:")
@@ -2919,3 +2924,38 @@ def update_analytics():
         st.write(f"- Total Input Cost: ${total_input_cost:.4f}")
         st.write(f"- Total Output Cost: ${last_usage['output_cost']:.4f}")
         st.write(f"- Overall Total: ${(total_input_cost + last_usage['output_cost']):.4f}")
+
+# Display analytics in the main section
+if st.session_state.get("token_usage", {}).get("generations"):
+    with st.expander("📊 Analytics", expanded=True):
+        update_analytics()  # Use our new analytics function
+        
+        # Show historical data
+        if len(st.session_state["token_usage"]["generations"]) > 1:
+            st.write("\n### Historical Usage")
+            
+            # Prepare data for plotting
+            df_history = pd.DataFrame(st.session_state["token_usage"]["generations"])
+            df_history['timestamp'] = pd.to_datetime(df_history['timestamp'])
+            
+            # Calculate total costs correctly
+            df_history['total_input_cost'] = df_history['cached_input_cost'] + df_history['non_cached_input_cost']
+            df_history['total_cost'] = df_history['total_input_cost'] + df_history['output_cost']
+            
+            # Create line chart for token usage over time
+            fig_tokens = px.line(df_history, 
+                               x='timestamp', 
+                               y=['cached_input_tokens', 'non_cached_input_tokens', 'output_tokens'],
+                               title='Token Usage Over Time')
+            st.plotly_chart(fig_tokens)
+            
+            # Create line chart for costs over time
+            fig_costs = px.line(df_history, 
+                              x='timestamp', 
+                              y=['cached_input_cost', 'non_cached_input_cost', 'output_cost', 'total_cost'],
+                              title='Costs Over Time')
+            st.plotly_chart(fig_costs)
+            
+            # Show average response time
+            avg_response_time = df_history['response_time'].mean()
+            st.metric("Average Response Time", f"{avg_response_time:.2f}s")
