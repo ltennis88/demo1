@@ -9,3 +9,4 @@ textColor = "#FFFFFF"
 
 [ui]
 hideTopBar = false
+hideSidebarNav = true

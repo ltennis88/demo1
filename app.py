@@ -10,7 +10,7 @@ import os
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="expanded", 
+st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="collapsed", 
                  menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
@@ -135,11 +135,46 @@ header {
 div.stApp {
     background-color: #121212 !important;
 }
+
+.nav-button {
+    background-color: #333;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-right: 10px;
+    text-decoration: none;
+    display: inline-block;
+    border: 1px solid #555;
+    font-weight: 500;
+}
+.nav-button.active {
+    background-color: #1E88E5;
+    border-color: #1E88E5;
+}
+.nav-button:hover:not(.active) {
+    background-color: #444;
+    border-color: #777;
+}
+.nav-container {
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # Add a clear title for the main page
 st.title("Checkatrade Contact Center AI Assistant")
+
+# Create horizontal navigation with buttons
+st.markdown("""
+<div class="nav-container">
+    <a href="/" class="nav-button active">Main Dashboard</a>
+    <a href="/1_📋_View_Inquiries" class="nav-button">View Inquiries</a>
+    <a href="/2_📊_Dashboard" class="nav-button">Analytics Dashboard</a>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown("**Main Dashboard**")
 
 ###############################################################################

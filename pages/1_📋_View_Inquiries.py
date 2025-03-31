@@ -53,10 +53,44 @@ html, body, [class*="css"] {
     border: 1px solid #424242;
     background-color: #1E1E1E !important;
 }
+
+.nav-button {
+    background-color: #333;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-right: 10px;
+    text-decoration: none;
+    display: inline-block;
+    border: 1px solid #555;
+    font-weight: 500;
+}
+.nav-button.active {
+    background-color: #1E88E5;
+    border-color: #1E88E5;
+}
+.nav-button:hover:not(.active) {
+    background-color: #444;
+    border-color: #777;
+}
+.nav-container {
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+}
 </style>
 """, unsafe_allow_html=True)
 
 st.title("View Inquiries")
+
+# Create horizontal navigation with buttons
+st.markdown("""
+<div class="nav-container">
+    <a href="/" class="nav-button">Main Dashboard</a>
+    <a href="/1_📋_View_Inquiries" class="nav-button active">View Inquiries</a>
+    <a href="/2_📊_Dashboard" class="nav-button">Analytics Dashboard</a>
+</div>
+""", unsafe_allow_html=True)
 
 # Load inquiries
 try:
