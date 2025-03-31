@@ -1302,116 +1302,6 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 ###############################################################################
 # 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
 ###############################################################################
-def classify_scenario(text):
-    # Start timing
-    start_time = time.time()
-    
-    # Load FAQ data
-    faq_df = load_faq_csv()
-    
-    # Build comprehensive context including guarantee terms
-    context = build_context(faq_df, text)
-    
-    # Enhanced classification prompt with departments and subdepartments
-    enhanced_classification_prompt = classification_prompt_template.replace("{SCENARIO}", context)
-    enhanced_classification_prompt += """
-    
-    Please also identify:
-    1. Department: The main department that should handle this inquiry
-       Options: "Consumer Support", "Technical Support", "Quality Assurance", "Tradesperson Support", "Finance", "Legal"
-    
-    2. Subdepartment: The specific team within the department
-       For Consumer Support: "Account Issues", "Job Issues", "Payments", "Resolving Issues"
-       For Technical Support: "App Issues", "Website Issues", "Integration Issues"
-       For Quality Assurance: "Tradesperson Vetting", "Review Verification", "Complaint Investigation"
-       For Tradesperson Support: "Account Management", "Jobs", "Payments", "Technical Issues"
-       For Finance: "Billing", "Refunds", "Financial Disputes"
-       For Legal: "Contract Issues", "Guarantee Claims", "Compliance"
-    
-    Return the enhanced JSON with these additional fields:
-    {
-      "classification": "...",
-      "department": "...",
-      "subdepartment": "...",
-      "priority": "High|Medium|Low",
-      "summary": "...",
-      "related_faq_category": "...",
-      "estimated_response_time": "..." // E.g. "24 hours", "48 hours", "1 week" based on priority
-    }
-    """
-    
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  # Updated to use gpt-4o-mini
-        messages=[
-            {"role": "system", "content": "You classify inbound queries for Checkatrade."},
-            {"role": "user", "content": enhanced_classification_prompt}
-        ],
-        temperature=0.5,
-        max_tokens=400
-    )
-    
-    # Calculate token usage and costs
-    input_tokens = response["usage"]["prompt_tokens"]
-    output_tokens = response["usage"]["completion_tokens"]
-    total_tokens = response["usage"]["total_tokens"]
-    
-    # Calculate costs - since we're using cached prompts, use the cached_input rate
-    input_cost = calculate_token_cost(input_tokens, "cached_input")
-    output_cost = calculate_token_cost(output_tokens, "output")
-    total_cost = input_cost + output_cost
-    
-    # Calculate response time
-    response_time = time.time() - start_time
-    
-    # Store usage data
-    usage_data = {
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "total_tokens": total_tokens,
-        "input_cost": input_cost,
-        "output_cost": output_cost,
-        "total_cost": total_cost,
-        "response_time": response_time,
-        "operation": "classification"  # Add operation type to distinguish from scenario generation
-    }
-    
-    st.session_state["token_usage"]["generations"].append(usage_data)
-    st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-    st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-    st.session_state["token_usage"]["total_cost"] += total_cost
-    st.session_state["token_usage"]["response_times"].append(response_time)
-    
-    raw_reply = response["choices"][0]["message"]["content"].strip()
-    try:
-        classification_data = json.loads(raw_reply)
-        return classification_data
-    except Exception as e:
-        return {
-            "classification": "General",
-            "department": "Consumer Support",
-            "subdepartment": "General Inquiries",
-            "priority": "Medium",
-            "summary": "Could not parse classification JSON.",
-            "related_faq_category": "",
-            "estimated_response_time": "48 hours"
-        }
-
-###############################################################################
-# RESPONSE SUGGESTION HELPER FUNCTIONS
-###############################################################################
-def self_process_ivr_selections(ivr_selections):
-    """
-    Safely process ivr_selections to handle any type that might be received.
-    Returns a string representation suitable for storing in the DataFrame.
-    """
-    if isinstance(ivr_selections, list):
-        return ", ".join(map(str, ivr_selections))
-    elif ivr_selections:
-        return str(ivr_selections)
-    else:
-        return ""
-
 def find_relevant_faq(scenario_text, faq_dataframe):
     """Find the most relevant FAQ for a given scenario using semantic search."""
     
@@ -1453,40 +1343,44 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         best_answer = None
         
         for _, row in faq_dataframe.iterrows():
-            faq_prompt = f"""
-            Compare these two texts and rate their relevance on a scale of 0-10:
-            
-            Customer Issue Summary:
-            {key_topics}
-            
-            FAQ Question:
-            {row['Question']}
-            FAQ Category: {row.get('Category', 'N/A')}
-            FAQ Type: {row.get('Type', 'N/A')}
-            
-            Only respond with a number 0-10, where:
-            0 = Completely unrelated
-            5 = Somewhat related but not directly applicable
-            10 = Highly relevant and directly applicable
-            """
-            
-            score_response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
-                    {"role": "user", "content": faq_prompt}
-                ],
-                temperature=0,
-                max_tokens=10
-            )
-            
             try:
-                relevance_score = float(score_response.choices[0].message.content.strip())
-                if relevance_score > best_score:
-                    best_score = relevance_score
-                    best_match = row['Question']
-                    best_answer = row.get('Answer', '')
-            except ValueError:
+                faq_prompt = f"""
+                Compare these two texts and rate their relevance on a scale of 0-10:
+                
+                Customer Issue Summary:
+                {key_topics}
+                
+                FAQ Question:
+                {row['Question']}
+                FAQ Category: {row.get('Category', 'N/A')}
+                FAQ Type: {row.get('Type', 'N/A')}
+                
+                Only respond with a number 0-10, where:
+                0 = Completely unrelated
+                5 = Somewhat related but not directly applicable
+                10 = Highly relevant and directly applicable
+                """
+                
+                score_response = openai.ChatCompletion.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
+                        {"role": "user", "content": faq_prompt}
+                    ],
+                    temperature=0,
+                    max_tokens=10
+                )
+                
+                try:
+                    relevance_score = float(score_response.choices[0].message.content.strip())
+                    if relevance_score > best_score:
+                        best_score = relevance_score
+                        best_match = row['Question']
+                        best_answer = row.get('Answer', '')
+                except ValueError:
+                    continue
+            except Exception as e:
+                st.error(f"Error scoring FAQ: {str(e)}")
                 continue
         
         # Only return matches that are reasonably relevant
@@ -1498,6 +1392,139 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     except Exception as e:
         st.error(f"Error in FAQ matching: {str(e)}")
         return None, None, 0
+
+def classify_scenario(text):
+    """Classify the scenario and return structured classification data."""
+    try:
+        # Start timing
+        start_time = time.time()
+        
+        # Load FAQ data
+        faq_df = load_faq_csv()
+        
+        # Build comprehensive context including guarantee terms
+        context = build_context(faq_df, text)
+        
+        # Enhanced classification prompt with departments and subdepartments
+        enhanced_classification_prompt = classification_prompt_template.replace("{SCENARIO}", context)
+        enhanced_classification_prompt += """
+        
+        Please also identify:
+        1. Department: The main department that should handle this inquiry
+           Options: "Consumer Support", "Technical Support", "Quality Assurance", "Tradesperson Support", "Finance", "Legal"
+        
+        2. Subdepartment: The specific team within the department
+           For Consumer Support: "Account Issues", "Job Issues", "Payments", "Resolving Issues"
+           For Technical Support: "App Issues", "Website Issues", "Integration Issues"
+           For Quality Assurance: "Tradesperson Vetting", "Review Verification", "Complaint Investigation"
+           For Tradesperson Support: "Account Management", "Jobs", "Payments", "Technical Issues"
+           For Finance: "Billing", "Refunds", "Financial Disputes"
+           For Legal: "Contract Issues", "Guarantee Claims", "Compliance"
+        
+        Return the enhanced JSON with these additional fields:
+        {
+          "classification": "...",
+          "department": "...",
+          "subdepartment": "...",
+          "priority": "High|Medium|Low",
+          "summary": "...",
+          "related_faq_category": "...",
+          "estimated_response_time": "..." // E.g. "24 hours", "48 hours", "1 week" based on priority
+        }
+        """
+        
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You classify inbound queries for Checkatrade."},
+                {"role": "user", "content": enhanced_classification_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=400
+        )
+        
+        # Calculate token usage and costs
+        input_tokens = response["usage"]["prompt_tokens"]
+        output_tokens = response["usage"]["completion_tokens"]
+        total_tokens = response["usage"]["total_tokens"]
+        
+        # Split input tokens into cached and non-cached portions
+        cached_tokens = len(classification_prompt_template.split()) + len(build_base_context().split())
+        non_cached_tokens = input_tokens - cached_tokens
+        
+        # Calculate costs using appropriate rates
+        cached_input_cost = calculate_token_cost(cached_tokens, "cached_input")
+        non_cached_input_cost = calculate_token_cost(non_cached_tokens, "input")
+        output_cost = calculate_token_cost(output_tokens, "output")
+        total_cost = cached_input_cost + non_cached_input_cost + output_cost
+        
+        # Calculate response time
+        response_time = time.time() - start_time
+        
+        # Store usage data
+        usage_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "input_tokens": input_tokens,
+            "cached_input_tokens": cached_tokens,
+            "non_cached_input_tokens": non_cached_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "cached_input_cost": cached_input_cost,
+            "non_cached_input_cost": non_cached_input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "response_time": response_time,
+            "operation": "classification"
+        }
+        
+        st.session_state["token_usage"]["generations"].append(usage_data)
+        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+        st.session_state["token_usage"]["total_cost"] += total_cost
+        st.session_state["token_usage"]["response_times"].append(response_time)
+        
+        # Parse the classification response
+        try:
+            classification_data = json.loads(response["choices"][0]["message"]["content"].strip())
+            return classification_data
+        except json.JSONDecodeError as e:
+            st.error(f"Error parsing classification JSON: {str(e)}")
+            return {
+                "classification": "General",
+                "department": "Consumer Support",
+                "subdepartment": "General Inquiries",
+                "priority": "Medium",
+                "summary": "Could not parse classification response.",
+                "related_faq_category": "",
+                "estimated_response_time": "48 hours"
+            }
+            
+    except Exception as e:
+        st.error(f"Error in classification: {str(e)}")
+        return {
+            "classification": "General",
+            "department": "Consumer Support",
+            "subdepartment": "General Inquiries",
+            "priority": "Medium",
+            "summary": f"Error during classification: {str(e)}",
+            "related_faq_category": "",
+            "estimated_response_time": "48 hours"
+        }
+
+###############################################################################
+# RESPONSE SUGGESTION HELPER FUNCTIONS
+###############################################################################
+def self_process_ivr_selections(ivr_selections):
+    """
+    Safely process ivr_selections to handle any type that might be received.
+    Returns a string representation suitable for storing in the DataFrame.
+    """
+    if isinstance(ivr_selections, list):
+        return ", ".join(map(str, ivr_selections))
+    elif ivr_selections:
+        return str(ivr_selections)
+    else:
+        return ""
 
 def generate_response_suggestion(scenario, classification_result):
     """Generate a response suggestion based on classification and FAQ matching"""
@@ -2600,10 +2627,11 @@ with st.expander("View Analytics Dashboard"):
         if not classification_data.empty:
             st.markdown("### Classification Metrics")
             avg_response_time_class = classification_data['response_time'].mean()
-            avg_input_tokens_class = classification_data['input_tokens'].mean()
+            avg_cached_tokens = classification_data['cached_input_tokens'].mean()
+            avg_non_cached_tokens = classification_data['non_cached_input_tokens'].mean()
             avg_output_tokens_class = classification_data['output_tokens'].mean()
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 st.metric(
@@ -2614,16 +2642,23 @@ with st.expander("View Analytics Dashboard"):
             
             with col2:
                 st.metric(
-                    "Average Input Tokens",
-                    f"{avg_input_tokens_class:,.0f}",
-                    f"Total: {classification_data['input_tokens'].sum():,}"
+                    "Avg Cached Input Tokens",
+                    f"{avg_cached_tokens:,.0f}",
+                    f"${classification_data['cached_input_cost'].sum():.4f}"
                 )
             
             with col3:
                 st.metric(
+                    "Avg Non-Cached Input Tokens",
+                    f"{avg_non_cached_tokens:,.0f}",
+                    f"${classification_data['non_cached_input_cost'].sum():.4f}"
+                )
+            
+            with col4:
+                st.metric(
                     "Average Output Tokens",
                     f"{avg_output_tokens_class:,.0f}",
-                    f"Total: {classification_data['output_tokens'].sum():,}"
+                    f"${classification_data['output_cost'].sum():.4f}"
                 )
         
         # Create line charts for token usage over time
