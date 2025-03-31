@@ -111,6 +111,14 @@ def show_inquiries():
                 st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['classification']}</div>", unsafe_allow_html=True)
             
+            if recent_row['department']:
+                st.markdown("<div class='inquiry-label'>Department:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['department']}</div>", unsafe_allow_html=True)
+            
+            if recent_row['subdepartment']:
+                st.markdown("<div class='inquiry-label'>Subdepartment:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['subdepartment']}</div>", unsafe_allow_html=True)
+            
             if recent_row['priority']:
                 st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['priority']}</div>", unsafe_allow_html=True)
@@ -119,6 +127,75 @@ def show_inquiries():
                 st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['summary']}</div>", unsafe_allow_html=True)
             
+            # Add case status and agent notes section
+            st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
+            
+            # Show current case status with color coding
+            case_status = recent_row.get('case_status', 'New')
+            status_color = "#64B5F6"  # Default blue
+            if case_status == "Resolved" or case_status == "Closed":
+                status_color = "#4CAF50"  # Green
+            elif case_status == "In Progress":
+                status_color = "#FFA726"  # Orange
+            elif case_status == "Awaiting Customer" or case_status == "Awaiting Tradesperson":
+                status_color = "#FFD54F"  # Amber
+            
+            st.markdown("<div class='inquiry-label'>Case Status:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail' style='color: {status_color}; font-weight: bold;'>{case_status}</div>", unsafe_allow_html=True)
+            
+            # Allow agent to update case status and notes
+            with st.expander("Update Case", expanded=False):
+                # Case status selection
+                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                selected_status = st.selectbox(
+                    "Update Case Status:",
+                    options=case_status_options,
+                    index=case_status_options.index(case_status) if case_status in case_status_options else 0,
+                    key=f"status_{df.index[0]}"
+                )
+                
+                # Agent notes text area
+                agent_notes = st.text_area(
+                    "Agent Notes:",
+                    value=recent_row.get('agent_notes', ''),
+                    height=150,
+                    placeholder="Enter your notes about the case here...",
+                    key=f"notes_{df.index[0]}"
+                )
+                
+                # Save button for agent updates
+                if st.button("Save Updates", key=f"save_{df.index[0]}"):
+                    # Get the index in the original DataFrame
+                    idx = df.index[0]
+                    
+                    # Update the parent session state DataFrame
+                    st.session_state["inquiries"].at[idx, "case_status"] = selected_status
+                    st.session_state["inquiries"].at[idx, "agent_notes"] = agent_notes
+                    
+                    # Save changes to file
+                    try:
+                        # Convert timestamps to strings to make JSON serializable
+                        df_copy = st.session_state["inquiries"].copy()
+                        if 'timestamp' in df_copy.columns and not df_copy.empty:
+                            df_copy['timestamp'] = df_copy['timestamp'].astype(str)
+                        
+                        # Save to file
+                        json_data = df_copy.to_dict(orient="records")
+                        with open("inquiries.json", "w") as f:
+                            json.dump(json_data, f, indent=2)
+                        
+                        st.success(f"Case updated - Status: {selected_status}")
+                        
+                        # Refresh the page to show updated data
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Failed to save updates: {str(e)}")
+            
+            # Display existing agent notes if any
+            if recent_row.get('agent_notes'):
+                st.markdown("<div class='inquiry-label'>Current Agent Notes:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{recent_row.get('agent_notes', '')}</div>", unsafe_allow_html=True)
+            
             st.markdown("</div>", unsafe_allow_html=True)
         
         # Show previous inquiries
@@ -126,7 +203,19 @@ def show_inquiries():
             st.subheader("Previous Inquiries")
             with st.expander("See More Inquiries", expanded=True):
                 for idx, row in df.iloc[1:].iterrows():
-                    st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin: 20px 0 10px 0;'>Inquiry #{idx} - {row['classification']} (Priority: {row['priority']})</div>", unsafe_allow_html=True)
+                    # Add a similar update section for each previous inquiry
+                    case_status = row.get('case_status', 'New')
+                    status_color = "#64B5F6"  # Default blue
+                    if case_status == "Resolved" or case_status == "Closed":
+                        status_color = "#4CAF50"  # Green
+                    elif case_status == "In Progress":
+                        status_color = "#FFA726"  # Orange
+                    elif case_status == "Awaiting Customer" or case_status == "Awaiting Tradesperson":
+                        status_color = "#FFD54F"  # Amber
+                    
+                    st.markdown(f"<div style='font-size: 18px; font-weight: bold; margin: 20px 0 10px 0;'>Inquiry #{idx} - {row['classification']} (Priority: {row['priority']}) - <span style='color: {status_color};'>{case_status}</span></div>", unsafe_allow_html=True)
+                    
+                    # Rest of the code for displaying inquiry details
                     st.markdown("<div class='info-container'>", unsafe_allow_html=True)
                     
                     col1, col2 = st.columns(2)
@@ -162,5 +251,55 @@ def show_inquiries():
                     
                     # Display relevant data
                     st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Add status update for this inquiry too
+                    with st.expander(f"Update Case #{idx}", expanded=False):
+                        # Case status selection
+                        case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                        selected_status = st.selectbox(
+                            "Update Case Status:",
+                            options=case_status_options,
+                            index=case_status_options.index(case_status) if case_status in case_status_options else 0,
+                            key=f"status_{idx}"
+                        )
+                        
+                        # Agent notes text area
+                        agent_notes = st.text_area(
+                            "Agent Notes:",
+                            value=row.get('agent_notes', ''),
+                            height=150,
+                            placeholder="Enter your notes about the case here...",
+                            key=f"notes_{idx}"
+                        )
+                        
+                        # Save button for agent updates
+                        if st.button("Save Updates", key=f"save_{idx}"):
+                            # Update the parent session state DataFrame
+                            st.session_state["inquiries"].at[idx, "case_status"] = selected_status
+                            st.session_state["inquiries"].at[idx, "agent_notes"] = agent_notes
+                            
+                            # Save changes to file
+                            try:
+                                # Convert timestamps to strings to make JSON serializable
+                                df_copy = st.session_state["inquiries"].copy()
+                                if 'timestamp' in df_copy.columns and not df_copy.empty:
+                                    df_copy['timestamp'] = df_copy['timestamp'].astype(str)
+                                
+                                # Save to file
+                                json_data = df_copy.to_dict(orient="records")
+                                with open("inquiries.json", "w") as f:
+                                    json.dump(json_data, f, indent=2)
+                                
+                                st.success(f"Case {idx} updated - Status: {selected_status}")
+                                
+                                # Refresh the page to show updated data
+                                st.experimental_rerun()
+                            except Exception as e:
+                                st.error(f"Failed to save updates: {str(e)}")
+                        
+                        # Display existing agent notes if any
+                        if row.get('agent_notes'):
+                            st.markdown("<div class='inquiry-label'>Current Agent Notes:</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='inquiry-detail' style='white-space: pre-wrap;'>{row.get('agent_notes', '')}</div>", unsafe_allow_html=True)
     else:
         st.info("No inquiries found. Generate and classify some scenarios first.") 

@@ -260,8 +260,9 @@ def load_dummy_inquiries():
         return pd.DataFrame(columns=[
             "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
             "phone_email", "membership_id", "scenario_text", "classification",
-            "priority", "summary", "account_name", "account_location",
-            "account_reviews", "account_jobs", "project_cost", "payment_status"
+            "department", "subdepartment", "priority", "summary", "account_name", 
+            "account_location", "account_reviews", "account_jobs", "project_cost", 
+            "payment_status", "estimated_response_time", "agent_notes", "case_status"
         ])
 
 def save_inquiries_to_file():
@@ -306,12 +307,16 @@ if "inquiries" not in st.session_state:
         st.session_state["inquiries"] = pd.DataFrame(columns=[
             "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
             "phone_email", "membership_id", "scenario_text", "classification",
-            "priority", "summary", "account_name", "account_location",
-            "account_reviews", "account_jobs", "project_cost", "payment_status"
+            "department", "subdepartment", "priority", "summary", "account_name", 
+            "account_location", "account_reviews", "account_jobs", "project_cost", 
+            "payment_status", "estimated_response_time", "agent_notes", "case_status"
         ])
 
 if "generated_scenario" not in st.session_state:
     st.session_state["generated_scenario"] = None
+
+if "current_case_id" not in st.session_state:
+    st.session_state["current_case_id"] = None
 
 # Add these constants at the top of the file after the imports
 TOKEN_COSTS = {
@@ -1642,13 +1647,18 @@ if st.session_state["generated_scenario"]:
                     "account_jobs": account_details.get("latest_jobs", ""),
                     "project_cost": account_details.get("project_cost", ""),
                     "payment_status": account_details.get("payment_status", ""),
-                    "estimated_response_time": classification_result.get("estimated_response_time", "48 hours")
+                    "estimated_response_time": classification_result.get("estimated_response_time", "48 hours"),
+                    "agent_notes": "",  # Initialize with empty agent notes
+                    "case_status": "New"  # Initial case status
                 }
 
                 st.session_state["inquiries"] = pd.concat(
                     [st.session_state["inquiries"], pd.DataFrame([new_row])],
                     ignore_index=True
                 )
+                
+                # Store the case index for reference
+                st.session_state["current_case_id"] = len(st.session_state["inquiries"]) - 1
                 
                 # Save to file
                 save_inquiries_to_file()
@@ -1824,6 +1834,42 @@ if st.session_state["generated_scenario"]:
                         <div class="field-value" style="white-space: pre-wrap;">""" + response_suggestion + """</div>
                     </div>
                     """, unsafe_allow_html=True)
+
+                # After displaying the classification card, add the agent action area
+                st.markdown("""
+                <div class="classification-card">
+                    <div class="classification-header">Agent Actions</div>
+                """, unsafe_allow_html=True)
+
+                # Case status selection
+                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
+                selected_status = st.selectbox(
+                    "Update Case Status:",
+                    options=case_status_options,
+                    index=case_status_options.index("New") if st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"] == "New" 
+                    else case_status_options.index(st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"])
+                )
+
+                # Agent notes text area
+                agent_notes = st.text_area(
+                    "Agent Notes:",
+                    value=st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["agent_notes"],
+                    height=150,
+                    placeholder="Enter your notes about the case here..."
+                )
+
+                # Save button for agent updates
+                if st.button("Save Agent Updates", use_container_width=True):
+                    # Update the DataFrame with the new status and notes
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "case_status"] = selected_status
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "agent_notes"] = agent_notes
+                    
+                    # Save to file
+                    save_inquiries_to_file()
+                    
+                    st.success(f"Case {st.session_state['current_case_id']} updated - Status: {selected_status}")
+
+                st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.warning("No scenario text found. Generate a scenario first.")
 else:
