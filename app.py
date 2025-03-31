@@ -1402,212 +1402,102 @@ def self_process_ivr_selections(ivr_selections):
         return ""
 
 def find_relevant_faq(scenario_text, faq_dataframe):
+    """Find the most relevant FAQ for a given scenario using semantic search."""
+    
+    # Create the embedding for the scenario
+    scenario_prompt = f"""
+    Given this customer scenario:
+    {scenario_text}
+    
+    What are the key issues or topics being discussed? Focus on:
+    1. The specific problem or request
+    2. The type of service involved
+    3. Any urgency or timeline factors
+    4. Customer concerns or complaints
     """
-    Find the most relevant FAQ based on the scenario text.
-    Returns a tuple (question, answer, relevance_score) if found, or (None, None, 0) if no good match
-    """
-    if faq_dataframe is None or isinstance(faq_dataframe, str) or (hasattr(faq_dataframe, 'empty') and faq_dataframe.empty):
-        return None, None, 0
     
-    # Check if required columns exist
-    required_columns = ["Type", "Category", "Question"]
-    if not all(col in faq_dataframe.columns for col in required_columns):
-        st.warning("FAQ data is missing required columns. Expected: Type, Category, Question")
-        return None, None, 0
-    
-    # Check if Answer column exists
-    has_answers = "Answer" in faq_dataframe.columns
-    
-    # In a real implementation, this would use embedding similarity
-    # For demo purposes, we'll use improved keyword matching
-    scenario_lower = str(scenario_text).lower() if scenario_text is not None else ""
-    
-    # First, look for direct issue mentions in the scenario text
-    issue_keywords = {
-        "job not completed": ["not completed", "unfinished", "incomplete", "left halfway", "abandoned", "not finished"],
-        "quality issues": ["poor quality", "bad workmanship", "not satisfied", "poor standard", "substandard", "quality issue", "poor work", "faulty"],
-        "delayed work": ["delayed", "late", "behind schedule", "taking too long", "missed deadline", "overdue"],
-        "billing dispute": ["overcharged", "invoice", "billing", "payment dispute", "charge", "refund", "overpriced", "cost dispute"],
-        "tradesperson communication": ["not responding", "ghosted", "won't return calls", "can't reach", "no communication", "stopped responding", "no reply"],
-        "complaint": ["unhappy", "disappointed", "complaint", "not happy", "issue", "problem", "dissatisfied"],
-        "account access": ["can't login", "password", "reset", "access", "account", "sign in", "login failed"],
-        "app technical": ["app", "website", "technical", "error", "not working", "glitch", "broken"],
-        "find tradesperson": ["looking for", "need to find", "searching for", "recommend", "suggestion", "need a", "looking to hire"],
-        "membership": ["membership", "subscribe", "join", "renewal", "cancel subscription", "subscription fee"],
-        "warranty issues": ["warranty", "guarantee", "promised warranty", "no warranty", "warranty claim", "coverage", "warranty period"],
-        "tradesperson qualifications": ["qualifications", "certified", "licensed", "accredited", "training", "skills", "experience"],
-        "repair issues": ["repair failed", "still broken", "not fixed", "same issue", "recurring problem", "issue persists"]
-    }
-    
-    # Special case for warranty issues which are particularly sensitive
-    if "warranty" in scenario_lower or "guarantee" in scenario_lower:
-        # Look for FAQs specifically about warranties
-        warranty_matches = []
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a customer service expert helping to match customer inquiries with relevant FAQs."},
+                {"role": "user", "content": scenario_prompt}
+            ],
+            temperature=0,
+            max_tokens=150
+        )
+        
+        # Extract key topics from the response
+        key_topics = response.choices[0].message.content
+        
+        # For each FAQ, calculate relevance score
+        best_match = None
+        best_score = 0
+        best_answer = None
+        
         for _, row in faq_dataframe.iterrows():
-            question = str(row.get("Question", "")).lower()
-            if "warranty" in question or "guarantee" in question:
-                # Count how many words overlap between scenario and question
-                scenario_words = set(scenario_lower.split())
-                question_words = set(question.split())
-                overlap_count = len(scenario_words.intersection(question_words))
-                warranty_matches.append((row, overlap_count + 5))  # Bonus for warranty match
-        
-        if warranty_matches:
-            # Return the one with highest score
-            warranty_matches.sort(key=lambda x: x[1], reverse=True)
-            if warranty_matches[0][1] >= 6:  # Higher threshold for relevance
-                best_row = warranty_matches[0][0]
-                question = best_row.get("Question", "")
-                answer = best_row.get("Answer", "") if has_answers else ""
-                return question, answer, warranty_matches[0][1]
-    
-    # Try direct issue matching first - this has the highest relevance score
-    for issue, keywords in issue_keywords.items():
-        # Count how many keywords from this issue are in the scenario
-        matches = sum(1 for keyword in keywords if keyword in scenario_lower)
-        if matches >= 2:  # If we have at least 2 matching keywords for an issue type
-            # Find FAQs related to this issue
-            for _, row in faq_dataframe.iterrows():
-                question = str(row.get("Question", "")).lower()
-                # If the issue matches keywords in the question, return it with high relevance
-                keyword_matches = sum(1 for keyword in keywords if keyword in question)
-                if keyword_matches >= 2:
-                    question = row.get("Question", "")
-                    answer = row.get("Answer", "") if has_answers else ""
-                    return question, answer, 8  # High relevance for direct issue match
-    
-    # If no direct issue match, try matching by category with improved categories
-    category_keywords = {
-        "complaint": ["complaint", "dissatisfied", "poor service", "issue", "problem", "unhappy", "disappointed"],
-        "tradesperson": ["tradesperson", "trade", "contractor", "professional", "worker", "electrician", "plumber", "roofer", "builder"],
-        "job quality": ["job", "work", "quality", "standard", "workmanship", "completed", "finished", "done", "performed"],
-        "warranty": ["warranty", "guarantee", "coverage", "protection", "promised", "assured", "certified"],
-        "billing": ["bill", "payment", "invoice", "charge", "cost", "price", "fee", "refund"],
-        "account": ["account", "login", "password", "credentials", "sign in", "profile", "dashboard"],
-        "membership": ["membership", "subscription", "renewal", "join", "register", "member"],
-        "reviews": ["review", "rating", "feedback", "star", "comment", "testimonial", "reputation"],
-        "technical": ["technical", "app", "website", "online", "digital", "error", "malfunction"]
-    }
-    
-    # Find matching category with improved scoring
-    matching_categories = []
-    for category, terms in category_keywords.items():
-        # Use weighted matching - exact matches worth more than partial matches
-        exact_matches = sum(1 for term in terms if f" {term} " in f" {scenario_lower} ")
-        contains_matches = sum(1 for term in terms if term in scenario_lower) - exact_matches
-        total_score = (exact_matches * 2) + contains_matches
-        
-        if total_score > 0:
-            # Give extra weight to certain important categories
-            if category in ["warranty", "job quality", "complaint"] and total_score > 1:
-                total_score += 2
+            faq_prompt = f"""
+            Compare these two texts and rate their relevance on a scale of 0-10:
             
-            matching_categories.append((category, total_score))
-    
-    # Sort categories by number of matches
-    matching_categories.sort(key=lambda x: x[1], reverse=True)
-    
-    # If we have matching categories, find FAQs in those categories
-    if matching_categories:
-        for category, category_match_count in matching_categories:
+            Customer Issue Summary:
+            {key_topics}
+            
+            FAQ Question:
+            {row['Question']}
+            FAQ Category: {row.get('Category', 'N/A')}
+            FAQ Type: {row.get('Type', 'N/A')}
+            
+            Only respond with a number 0-10, where:
+            0 = Completely unrelated
+            5 = Somewhat related but not directly applicable
+            10 = Highly relevant and directly applicable
+            """
+            
+            score_response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
+                    {"role": "user", "content": faq_prompt}
+                ],
+                temperature=0,
+                max_tokens=10
+            )
+            
             try:
-                # Look for matches in both the main category and subcategory columns
-                matched_rows = faq_dataframe[
-                    faq_dataframe["Type"].str.lower().str.contains(category.lower(), na=False) |  # Main category
-                    faq_dataframe["Category"].str.lower().str.contains(category.lower(), na=False)  # Subcategory
-                ]
-                
-                if not matched_rows.empty:
-                    # Find the FAQ that best matches specific words in the scenario
-                    best_match = None
-                    best_match_score = 0
-                    best_row = None
-                    
-                    for _, row in matched_rows.iterrows():
-                        question = str(row.get("Question", "")).lower()
-                        
-                        # Enhanced scoring system:
-                        # 1. More weight for matching significant words
-                        # 2. Bonus for multiple word matches
-                        # 3. Penalty for questions with irrelevant topics
-                        
-                        # Get significant words (longer words carry more meaning)
-                        scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
-                        
-                        # Count matches
-                        word_matches = sum(1 for word in scenario_words if word in question)
-                        
-                        # Bonus for consecutive words matching (phrases)
-                        phrase_bonus = 0
-                        for i in range(len(scenario_words) - 1):
-                            if scenario_words[i] in question and scenario_words[i+1] in question:
-                                phrase_bonus += 1
-                                
-                        # Calculate final score with category match bonus
-                        match_score = word_matches + phrase_bonus + category_match_count
-                        
-                        if match_score > best_match_score:
-                            best_match_score = match_score
-                            best_match = row.get("Question", "")
-                            best_row = row
-                    
-                    # If we found a good match, use it
-                    if best_match and best_match_score >= 2:  # Threshold for relevance
-                        # Get the answer if available
-                        has_answers = "Answer" in faq_dataframe.columns
-                        answer = best_row.get("Answer", "") if has_answers and best_row is not None else ""
-                        relevance = best_match_score
-                        return best_match, answer, relevance
-            except Exception as e:
-                st.warning(f"Error processing category {category}: {str(e)}")
+                relevance_score = float(score_response.choices[0].message.content.strip())
+                if relevance_score > best_score:
+                    best_score = relevance_score
+                    best_match = row['Question']
+                    best_answer = row.get('Answer', '')
+            except ValueError:
                 continue
-    
-    # Last resort: look for any significant word matches with improved scoring
-    best_match = None
-    best_score = 0
-    best_row = None
-    
-    # Important topic words that should be given more weight
-    important_topics = ["warranty", "guarantee", "electrician", "complaint", "quality", "problem", "issue"]
-    
-    for _, row in faq_dataframe.iterrows():
-        question = str(row.get("Question", "")).lower()
         
-        # Check if any significant words from the scenario appear in the question
-        scenario_words = [word for word in scenario_lower.split() if len(word) > 4]
-        
-        # Basic matching score
-        matches = sum(1 for word in scenario_words if word in question)
-        
-        # Bonus for important topics
-        topic_bonus = sum(2 for word in important_topics if word in scenario_lower and word in question)
-        
-        # Penalty for likely irrelevant topics
-        irrelevant_terms = ["drone", "survey", "partnership", "newsletter", "marketing"]
-        irrelevance_penalty = sum(3 for term in irrelevant_terms if term in question)
-        
-        # Final score
-        total_score = matches + topic_bonus - irrelevance_penalty
-        
-        if total_score > best_score:
-            best_score = total_score
-            best_match = row.get("Question", "")
-            best_row = row
-    
-    if best_match and best_score >= 3:  # Higher threshold for relevance
-        answer = best_row.get("Answer", "") if has_answers and best_row is not None else ""
-        return best_match, answer, best_score
-    
-    return None, None, 0
+        # Only return matches that are reasonably relevant
+        if best_score >= 7:
+            return best_match, best_answer, best_score
+        else:
+            return None, None, 0
+            
+    except Exception as e:
+        st.error(f"Error in FAQ matching: {str(e)}")
+        return None, None, 0
 
 def generate_response_suggestion(scenario, classification_result):
+    """Generate a response suggestion based on classification and FAQ matching"""
     # Load FAQ data
     faq_df = load_faq_csv()
     
     # Build comprehensive context including guarantee terms
     context = build_context(faq_df, scenario)
     
-    # Update the prompt to consider guarantee information
+    # Find relevant FAQ with improved matching
+    try:
+        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, faq_df)
+    except Exception as e:
+        st.error(f"Error finding relevant FAQ: {str(e)}")
+        relevant_faq, faq_answer, faq_relevance = None, None, 0
+    
+    # Update the prompt to consider guarantee information and FAQ relevance
     prompt = f"""You are a Checkatrade customer service expert. Using the provided context, generate a helpful response to the customer scenario.
     Consider all relevant information from FAQs, membership terms, and guarantee terms when crafting your response.
     
@@ -1617,12 +1507,20 @@ def generate_response_suggestion(scenario, classification_result):
     Classification:
     {json.dumps(classification_result, indent=2)}
     
+    {f'''Relevant FAQ:
+    Question: {relevant_faq}
+    Answer: {faq_answer}''' if relevant_faq and faq_relevance >= 7 else 'No highly relevant FAQ found.'}
+    
     Instructions:
     1. Be professional and empathetic
     2. Address all aspects of the customer's query
     3. Include specific details from relevant terms or policies
-    4. Provide clear next steps if applicable
-    5. Keep the response concise but informative
+    4. If this involves a guarantee claim or complaint about work quality:
+       - Reference the guarantee terms and eligibility criteria
+       - Explain the claims process
+       - Mention the £1000 coverage limit if applicable
+    5. Provide clear next steps
+    6. Keep the response concise but informative
     
     Generate the response:"""
     
