@@ -92,7 +92,7 @@ if st.session_state["inquiries_loaded"] is None:
 TOKEN_COSTS = {
     "input": 0.15,      # $0.15 per 1M tokens
     "cached_input": 0.075,  # $0.075 per 1M tokens
-    "output": 0.60      # $0.60 per 1000 tokens
+    "output": 0.60      # $0.60 per 1M tokens
 }
 
 # Initialize cached values
@@ -847,7 +847,7 @@ def build_base_context():
     """Cache the base context that doesn't change per request"""
     faq_df, faq_dict = load_faq_csv()
     faq_context = build_faq_context(faq_dict)
-    membership_terms = load_membership_terms()
+membership_terms = load_membership_terms()
     guarantee_terms = load_guarantee_terms()
     
     return f"""
@@ -1192,84 +1192,147 @@ Required JSON Structure:
 """
 
 def classify_scenario(text):
-    """Classify the scenario using GPT-4."""
+    """Classify the scenario and return structured classification data."""
     try:
+        # Start timing
         start_time = time.time()
         
-        # Get the classification template
+        # Get cached components
+        base_context = build_base_context()
         classification_template = get_classification_template()
         
-        # Build the messages for the API call
-        messages = [{"role": "system", "content": classification_template},
-                   {"role": "user", "content": text}]
+        # Build minimal dynamic prompt
+        classification_prompt = f"""Based on this scenario and context, classify the inquiry and return ONLY a valid JSON object (no other text).
+
+Context:
+{base_context}
+
+Scenario:
+{text}
+
+Classification Guidelines:
+{classification_template}"""
         
-        # Make the API call
         response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0,
-            response_format={ "type": "json_object" }
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a classification system that only returns valid JSON objects."},
+                {"role": "user", "content": classification_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=400
         )
+        
+        # Calculate token usage and costs
+        input_tokens = response["usage"]["prompt_tokens"]
+        output_tokens = response["usage"]["completion_tokens"]
+        total_tokens = response["usage"]["total_tokens"]
+        
+        # Split input tokens into cached and non-cached portions
+        cached_tokens = len(base_context.split()) + len(classification_template.split())
+        non_cached_tokens = input_tokens - cached_tokens
+        
+        # Calculate costs using appropriate rates
+        cached_input_cost = calculate_token_cost(cached_tokens, "cached_input")
+        non_cached_input_cost = calculate_token_cost(non_cached_tokens, "input")
+        output_cost = calculate_token_cost(output_tokens, "output")
+        total_cost = cached_input_cost + non_cached_input_cost + output_cost
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Get completion tokens
-        completion_tokens = response.usage.completion_tokens
-        prompt_tokens = response.usage.prompt_tokens
+        # Store usage data
+        usage_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "input_tokens": input_tokens,
+            "cached_input_tokens": cached_tokens,
+            "non_cached_input_tokens": non_cached_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "cached_input_cost": cached_input_cost,
+            "non_cached_input_cost": non_cached_input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "response_time": response_time,
+            "operation": "classification"
+        }
         
-        # Track token usage
-        track_token_usage(
-            operation="classification",
-            non_cached_input_tokens=prompt_tokens,
-            output_tokens=completion_tokens,
-            response_time=response_time
-        )
+        st.session_state["token_usage"]["generations"].append(usage_data)
+        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+        st.session_state["token_usage"]["total_cost"] += total_cost
+        st.session_state["token_usage"]["response_times"].append(response_time)
         
-        # Display token usage
-        st.markdown("#### Classification Metrics")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Response Time", f"{response_time:.2f}s")
-        with col2:
-            st.metric("Input Tokens", f"{prompt_tokens:,}", f"£{calculate_token_cost(prompt_tokens, 'input'):.4f}")
-        with col3:
-            st.metric("Output Tokens", f"{completion_tokens:,}", f"£{calculate_token_cost(completion_tokens, 'output'):.4f}")
-        
+        # Parse the classification response
         try:
-            # Parse the response
-            result = json.loads(response.choices[0].message.content)
-            return result
+            response_text = response["choices"][0]["message"]["content"].strip()
+            if not response_text:
+                raise json.JSONDecodeError("Empty response", "", 0)
+                
+            classification_data = json.loads(response_text)
+            
+            # Validate required fields
+            required_fields = ["classification", "department", "subdepartment", "priority", 
+                             "summary", "related_faq_category", "estimated_response_time"]
+            missing_fields = [field for field in required_fields if field not in classification_data]
+            
+            if missing_fields:
+                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+                
+            return classification_data
+            
         except json.JSONDecodeError as e:
-            st.error(f"Error parsing classification response: {str(e)}")
-            return None
+            st.error(f"Error parsing classification JSON: {str(e)}")
+            return {
+                "classification": "General",
+                "department": "Consumer Support",
+                "subdepartment": "General Inquiries",
+                "priority": "Medium",
+                "summary": "Could not parse classification response.",
+                "related_faq_category": "",
+                "estimated_response_time": "48 hours"
+            }
             
     except Exception as e:
-        st.error(f"Error during classification: {str(e)}")
-        return None
+        st.error(f"Error in classification: {str(e)}")
+        return {
+            "classification": "General",
+            "department": "Consumer Support",
+            "subdepartment": "General Inquiries",
+            "priority": "Medium",
+            "summary": f"Error during classification: {str(e)}",
+            "related_faq_category": "",
+            "estimated_response_time": "48 hours"
+        }
 
 ###############################################################################
 # 9) HELPER: GENERATE SCENARIO VIA OPENAI
 ###############################################################################
 def calculate_token_cost(tokens, token_type):
-    """Calculate the cost for tokens based on type.
+    """Calculate the cost for tokens based on their type.
     
     Args:
         tokens (int): Number of tokens
         token_type (str): Type of tokens ('input', 'cached_input', or 'output')
     
     Returns:
-        float: Cost in GBP
+        float: Cost in dollars
     """
-    # Prices per token (converted from USD to GBP)
-    # USD to GBP conversion rate: 0.77
-    PRICES = {
-        'input': (0.150 * 0.77) / 1_000_000,  # £0.1155 per 1M tokens
-        'cached_input': (0.075 * 0.77) / 1_000_000,  # £0.05775 per 1M tokens
-        'output': (0.600 * 0.77) / 1_000_000,  # £0.462 per 1M tokens
+    # GPT-4o mini pricing per 1M tokens:
+    # Input: $0.150 / 1M tokens
+    # Cached input: $0.075 / 1M tokens
+    # Output: $0.600 / 1M tokens
+    
+    cost_per_million = {
+        'input': 0.150,  # $0.150 per 1M tokens
+        'cached_input': 0.075,  # $0.075 per 1M tokens
+        'output': 0.600,  # $0.600 per 1M tokens
     }
     
-    return tokens * PRICES.get(token_type, 0)
+    # Convert cost per million to cost per token
+    cost_per_token = cost_per_million[token_type] / 1_000_000
+    
+    return tokens * cost_per_token
 
 def track_token_usage(operation, cached_input_tokens=0, non_cached_input_tokens=0, output_tokens=0, response_time=0):
     """Track token usage and costs in session state"""
@@ -1319,54 +1382,141 @@ def track_token_usage(operation, cached_input_tokens=0, non_cached_input_tokens=
     return usage_data
 
 def generate_scenario(selected_route=None, selected_user_type=None):
-    """Generate a scenario based on the selected route and user type."""
+    """
+    Generates a scenario using OpenAI's ChatCompletion.
+    If selected_route is provided (phone, whatsapp, email, web_form), force that route.
+    If selected_user_type is provided, force that user type.
+    """
+    # Start timing
+    start_time = time.time()
+    
+    # For random user type, we'll randomize it ourselves to ensure true randomness
+    should_randomize_user_type = selected_user_type is None
+    
+    # If we're randomizing, do it now so we can get the correct prompt
+    if should_randomize_user_type:
+        user_types = ["existing_homeowner", "existing_tradesperson", 
+                    "prospective_homeowner", "prospective_tradesperson"]
+        selected_user_type = random.choice(user_types)
+    
+    # Get the appropriate user type prompt - this is now guaranteed to have a user type
+    user_type_prompt = get_user_type_prompt(selected_user_type)
+    
+    # Start with base prompt
+    user_content = base_prompt + "\n\n" + user_type_prompt
+    
+    # Add route and user type instructions
+    if selected_route:
+        user_content += f"\n\nForce inbound_route to '{selected_route}'."
+    
+    # Always specify the user type now, since we either have it from input or randomly selected it
+    user_content += f"\n\nForce user_type to '{selected_user_type}'."
+
     try:
-        start_time = time.time()
-        
-        # Get the appropriate prompt based on user type
-        user_type_prompt = get_user_type_prompt(selected_user_type)
-        
-        messages = [
-            {"role": "system", "content": user_type_prompt},
-            {"role": "user", "content": f"Generate a scenario for route: {selected_route}"}
-        ]
-        
         response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.7
-        )
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
+                    {"role": "user", "content": user_content}
+                ],
+                temperature=1.0,
+                max_tokens=500
+            )
+            
+            # Calculate token usage and costs
+        input_tokens = response["usage"]["prompt_tokens"]
+        output_tokens = response["usage"]["completion_tokens"]
+        total_tokens = response["usage"]["total_tokens"]
+        
+        # Calculate costs - since we're using cached prompts, use the cached_input rate
+        input_cost = calculate_token_cost(input_tokens, "cached_input")
+        output_cost = calculate_token_cost(output_tokens, "output")
+        total_cost = input_cost + output_cost
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Get completion tokens
-        completion_tokens = response.usage.completion_tokens
-        prompt_tokens = response.usage.prompt_tokens
+        # Store usage data
+        usage_data = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "input_cost": input_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "response_time": response_time,
+        "operation": "generation"
+        }
         
-        # Track token usage
-        track_token_usage(
-            operation="scenario_generation",
-            non_cached_input_tokens=prompt_tokens,
-            output_tokens=completion_tokens,
-            response_time=response_time
-        )
+        st.session_state["token_usage"]["generations"].append(usage_data)
+        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
+        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
+        st.session_state["token_usage"]["total_cost"] += total_cost
+        st.session_state["token_usage"]["response_times"].append(response_time)
         
-        # Display token usage
-        st.markdown("#### Scenario Generation Metrics")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Response Time", f"{response_time:.2f}s")
-        with col2:
-            st.metric("Input Tokens", f"{prompt_tokens:,}", f"£{calculate_token_cost(prompt_tokens, 'input'):.4f}")
-        with col3:
-            st.metric("Output Tokens", f"{completion_tokens:,}", f"£{calculate_token_cost(completion_tokens, 'output'):.4f}")
+        raw_reply = response["choices"][0]["message"]["content"].strip()
         
-        return response.choices[0].message.content
-        
+        try:
+            scenario_data = json.loads(raw_reply)
+            
+            # Ensure account details match the user type
+            if "prospective" in selected_user_type:
+                scenario_data["account_details"] = {
+                    "name": "",
+                    "surname": "",
+                    "location": "",
+                    "latest_reviews": "",
+                    "latest_jobs": "",
+                    "project_cost": "",
+                    "payment_status": ""
+                }
+                scenario_data["membership_id"] = ""
+            
+            # Force the user type to match what was selected/randomized
+            scenario_data["user_type"] = selected_user_type
+            
+            return scenario_data
+                
+        except Exception as e:
+            return {
+                "inbound_route": "error",
+                        "ivr_flow": "",
+                        "ivr_selections": [],
+                        "user_type": selected_user_type,
+                        "phone_email": "",
+                        "membership_id": "",
+                        "account_details": {
+                            "name": "",
+                            "surname": "",
+                            "location": "",
+                            "latest_reviews": "",
+                            "latest_jobs": "",
+                            "project_cost": "",
+                            "payment_status": ""
+                        },
+                        "scenario_text": f"Error parsing scenario JSON: {str(e)}"
+                    }
+            
     except Exception as e:
-        st.error(f"Error generating scenario: {str(e)}")
-        return None
+        return {
+            "inbound_route": "error",
+                    "ivr_flow": "",
+                    "ivr_selections": [],
+            "user_type": selected_user_type,
+                    "phone_email": "",
+                    "membership_id": "",
+                    "account_details": {
+                        "name": "",
+                        "surname": "",
+                        "location": "",
+                        "latest_reviews": "",
+                        "latest_jobs": "",
+                        "project_cost": "",
+                        "payment_status": ""
+                    },
+                    "scenario_text": f"API Error: {str(e)}"
+    }
 
 ###############################################################################
 # 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
@@ -1420,9 +1570,9 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         """
         
         try:
-            response = openai.ChatCompletion.create(
+    response = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
-                messages=[
+        messages=[
                     {"role": "system", "content": "You are a customer service expert helping to match customer inquiries with relevant FAQs."},
                     {"role": "user", "content": scenario_prompt}
                 ],
@@ -1469,7 +1619,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
             else:
                 return None, None, 0
                 
-        except Exception as e:
+    except Exception as e:
             st.error(f"Error in semantic search: {str(e)}")
             return None, None, 0
             
@@ -1564,40 +1714,69 @@ def generate_response_template(inbound_route):
     return templates.get(inbound_route, "")
 
 def generate_response_suggestion(scenario, classification_result):
-    """Generate a response suggestion based on the scenario and classification."""
+    """Generate a response suggestion based on classification and FAQ matching"""
     try:
+        # Start timing
         start_time = time.time()
         
-        # Get the base context (cached)
+        # Use cached base context
         base_context = build_base_context()
         
-        # Build the response template based on inbound route
-        response_template = generate_response_template(scenario.get("inbound_route", ""))
+        # Get cached response template
+        template = generate_response_template(scenario.get("inbound_route", ""))
         
-        # Find relevant FAQs
-        relevant_faqs = find_relevant_faq(scenario.get("scenario_text", ""), faq_df)
+        # Build comprehensive context including guarantee terms
+        context = f"""
+        {base_context}
         
-        # Build the comprehensive context
-        context = build_context(relevant_faqs, scenario.get("scenario_text", ""))
+        Customer Scenario:
+        {scenario}
         
-        # Calculate token counts
-        cached_input_tokens = len(base_context.split())  # Cached context
-        non_cached_input_tokens = len(str(scenario).split()) + len(json.dumps(classification_result).split())  # Dynamic content
+        Classification:
+        {json.dumps(classification_result, indent=2)}
         
-        # Make the API call
+        Instructions:
+        1. Be professional and empathetic
+        2. Address all aspects of the customer's query
+        3. Include specific details from relevant terms or policies
+        4. If this involves a guarantee claim or complaint about work quality:
+           - Reference the guarantee terms and eligibility criteria
+           - Explain the claims process
+           - Mention the £1000 coverage limit if applicable
+        5. Provide clear next steps
+        6. Keep the response concise but informative
+        """
+        
+        # Find relevant FAQ with improved matching
+        try:
+            relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
+            if relevant_faq and faq_answer and faq_relevance >= 7:
+                context += f"""
+                Relevant FAQ:
+                Question: {relevant_faq}
+                Answer: {faq_answer}
+                """
+    except Exception as e:
+        st.error(f"Error finding relevant FAQ: {str(e)}")
+        relevant_faq, faq_answer, faq_relevance = None, None, 0
+    
+        # Generate response using OpenAI
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": context},
-                {"role": "user", "content": f"Generate a response for this scenario using the following template:\n\n{response_template}"}
+                {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
+                {"role": "user", "content": context}
             ],
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=500
         )
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Get completion tokens
+        # Extract token usage
+        cached_input_tokens = len(base_context.split())  # Cached context
+        non_cached_input_tokens = len(str(scenario).split()) + len(json.dumps(classification_result).split())  # Dynamic content
         output_tokens = response.usage.completion_tokens
         
         # Calculate costs
@@ -1605,7 +1784,7 @@ def generate_response_suggestion(scenario, classification_result):
         non_cached_input_cost = calculate_token_cost(non_cached_input_tokens, "input")
         output_cost = calculate_token_cost(output_tokens, "output")
         
-        # Track token usage
+        # Track usage
         track_token_usage(
             operation="response_generation",
             cached_input_tokens=cached_input_tokens,
@@ -1614,11 +1793,21 @@ def generate_response_suggestion(scenario, classification_result):
             response_time=response_time
         )
         
-        return response.choices[0].message.content
+        # For backward compatibility, return total input tokens and total input cost
+        total_input_tokens = cached_input_tokens + non_cached_input_tokens
+        total_input_cost = cached_input_cost + non_cached_input_cost
         
+        return (
+            response.choices[0].message.content,
+            total_input_tokens,
+            output_tokens,
+            total_input_cost,
+            output_cost
+        )
+    
     except Exception as e:
         st.error(f"Error generating response: {str(e)}")
-        return None
+        return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
 
 ###############################################################################
 # 11) STREAMLIT APP UI
@@ -2519,80 +2708,80 @@ with st.expander("View Analytics Dashboard"):
         )
         
         st.plotly_chart(fig3, use_container_width=True)
-    
-    with colD:
-        route_counts = df["inbound_route"].value_counts()
         
-        # Create color mapping for routes
-        route_colors = {
-            "phone": "#4285F4",     # Blue for phone
-            "email": "#DB4437",     # Red for email
-            "whatsapp": "#0F9D58",  # Green for whatsapp
-            "web_form": "#F4B400"   # Yellow for web form
-        }
-        
-        # Create a pie chart using plotly express
-        fig4 = px.pie(
-            values=route_counts.values,
-            names=route_counts.index,
-            title="Inbound Route Distribution",
-            hole=0.4,  # Makes it a donut chart
-            color_discrete_map=route_colors
-        )
-        
-        # Customize
-        fig4.update_traces(textinfo='percent+label')
-        fig4.update_layout(
-            legend=dict(orientation="h", y=-0.1),
-            height=300,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white")
-        )
-        
-        st.plotly_chart(fig4, use_container_width=True)
+        with colD:
+            route_counts = df["inbound_route"].value_counts()
+            
+            # Create color mapping for routes
+            route_colors = {
+                "phone": "#4285F4",     # Blue for phone
+                "email": "#DB4437",     # Red for email
+                "whatsapp": "#0F9D58",  # Green for whatsapp
+                "web_form": "#F4B400"   # Yellow for web form
+            }
+            
+            # Create a pie chart using plotly express
+            fig4 = px.pie(
+                values=route_counts.values,
+                names=route_counts.index,
+                title="Inbound Route Distribution",
+                hole=0.4,  # Makes it a donut chart
+                color_discrete_map=route_colors
+            )
+            
+            # Customize
+            fig4.update_traces(textinfo='percent+label')
+            fig4.update_layout(
+                legend=dict(orientation="h", y=-0.1),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white")
+            )
+            
+            st.plotly_chart(fig4, use_container_width=True)
 
-    # Common topics/themes from summaries
-    st.subheader("Common Topics & Themes")
-    topics_container = st.container()
-    with topics_container:
-        # Extract keywords from summaries to create topic tags
-        all_summaries = " ".join(df["summary"].dropna())
-        
-        # Display a word cloud-like representation with the most common words
-        common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
-                       "technical", "login", "access", "website", "app", "mobile", "payment",
-                       "renewal", "subscription", "complaint", "feedback", "review", "rating",
-                       "tradesperson", "homeowner", "service", "quality", "delay"]
-        
-        # Create a container with improved styling for a horizontal tag layout
-        st.markdown("""
-        <div class='info-container'>
-            <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
-        """, unsafe_allow_html=True)
-        
-        # Filter to only show words that appear in the summaries
-        matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
-        
-        # Generate random counts for demo purposes
-        for word in matching_words:
-            count = random.randint(1, len(df))
-            if count > 0:
-                # Calculate opacity based on count (more frequent = more opaque)
-                opacity = min(0.5 + (count / len(df)), 1.0)
-                # Create the tag with improved styling
-                st.markdown(f"""
-                    <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
-                         color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
-                         opacity: {opacity}; margin-bottom: 10px;">
-                        {word.title()} ({count})
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        st.markdown("""
+        # Common topics/themes from summaries
+        st.subheader("Common Topics & Themes")
+        topics_container = st.container()
+        with topics_container:
+            # Extract keywords from summaries to create topic tags
+            all_summaries = " ".join(df["summary"].dropna())
+            
+            # Display a word cloud-like representation with the most common words
+            common_words = ["account", "issue", "problem", "help", "request", "billing", "membership", 
+                           "technical", "login", "access", "website", "app", "mobile", "payment",
+                           "renewal", "subscription", "complaint", "feedback", "review", "rating",
+                           "tradesperson", "homeowner", "service", "quality", "delay"]
+            
+            # Create a container with improved styling for a horizontal tag layout
+            st.markdown("""
+            <div class='info-container'>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start;">
+            """, unsafe_allow_html=True)
+            
+            # Filter to only show words that appear in the summaries
+            matching_words = [word for word in common_words if word.lower() in all_summaries.lower()]
+            
+            # Generate random counts for demo purposes
+            for word in matching_words:
+                count = random.randint(1, len(df))
+                if count > 0:
+                    # Calculate opacity based on count (more frequent = more opaque)
+                    opacity = min(0.5 + (count / len(df)), 1.0)
+                    # Create the tag with improved styling
+                    st.markdown(f"""
+                        <div style="display: inline-block; padding: 8px 16px; background-color: #2979FF; 
+                             color: white; border-radius: 20px; font-size: 14px; font-weight: 500;
+                             opacity: {opacity}; margin-bottom: 10px;">
+                            {word.title()} ({count})
+                        </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("""
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
     # Add new Token Usage Analytics section
     st.subheader("Token Usage Analytics")
@@ -2783,34 +2972,30 @@ def update_analytics(section="main"):
         st.markdown("### 📊 Analytics")
         
         # Display current metrics
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
         with col2:
-            cached_input = last_usage.get("cached_input_tokens", 0)
-            non_cached_input = last_usage.get("non_cached_input_tokens", 0)
-            cached_cost = last_usage.get("cached_input_cost", 0)
-            non_cached_cost = last_usage.get("non_cached_input_cost", 0)
-            total_input = cached_input + non_cached_input
-            st.metric("Input Tokens", f"{total_input:,}", f"£{(cached_cost + non_cached_cost):.4f}")
+            total_tokens = (
+                last_usage.get("cached_input_tokens", 0) + 
+                last_usage.get("non_cached_input_tokens", 0) + 
+                last_usage.get("output_tokens", 0)
+            )
+            st.metric("Total Tokens", f"{total_tokens:,}")
         with col3:
-            output_tokens = last_usage.get("output_tokens", 0)
-            output_cost = last_usage.get("output_cost", 0)
-            st.metric("Output Tokens", f"{output_tokens:,}", f"£{output_cost:.4f}")
-        with col4:
-            st.metric("Total Cost", f"£{total_cost:.4f}")
+            st.metric("Total Cost", f"${total_cost:.4f}")
         
         # Detailed token breakdown
         st.markdown("#### Current Usage Breakdown")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**Input Tokens:**")
-            st.markdown(f"- Cached: {cached_input:,} (£{cached_cost:.4f})")
-            st.markdown(f"- Non-cached: {non_cached_input:,} (£{non_cached_cost:.4f})")
-            st.markdown(f"- Total Input: {total_input:,} (£{(cached_cost + non_cached_cost):.4f})")
+            st.markdown(f"- Cached: {last_usage.get('cached_input_tokens', 0):,} (${last_usage.get('cached_input_cost', 0):.4f})")
+            st.markdown(f"- Non-cached: {last_usage.get('non_cached_input_tokens', 0):,} (${last_usage.get('non_cached_input_cost', 0):.4f})")
+            st.markdown(f"- Total Input: {last_usage.get('cached_input_tokens', 0) + last_usage.get('non_cached_input_tokens', 0):,} (${total_input_cost:.4f})")
         with col2:
             st.markdown("**Output Tokens:**")
-            st.markdown(f"- Total: {output_tokens:,} (£{output_cost:.4f})")
+            st.markdown(f"- Total: {last_usage.get('output_tokens', 0):,} (${last_usage.get('output_cost', 0):.4f})")
         
         # Show historical data if available
         if len(st.session_state["token_usage"]["generations"]) > 1:
@@ -2832,8 +3017,7 @@ def update_analytics(section="main"):
                                labels={
                                    'cached_input_tokens': 'Cached Input',
                                    'non_cached_input_tokens': 'Non-cached Input',
-                                   'output_tokens': 'Output',
-                                   'value': 'Tokens'
+                                   'output_tokens': 'Output'
                                })
             st.plotly_chart(fig_tokens, use_container_width=True, key=f"tokens_{section}")
             
@@ -2841,12 +3025,11 @@ def update_analytics(section="main"):
             fig_costs = px.line(df_history, 
                               x='timestamp', 
                               y=['total_input_cost', 'output_cost', 'total_cost'],
-                              title='Costs Over Time (GBP)',
+                              title='Costs Over Time',
                               labels={
                                   'total_input_cost': 'Total Input Cost',
                                   'output_cost': 'Output Cost',
-                                  'total_cost': 'Total Cost',
-                                  'value': 'Cost (£)'
+                                  'total_cost': 'Total Cost'
                               })
             st.plotly_chart(fig_costs, use_container_width=True, key=f"costs_{section}")
             
@@ -2858,10 +3041,10 @@ def update_analytics(section="main"):
                 st.metric("Average Response Time", f"{avg_response_time:.2f}s")
             with col2:
                 total_cost_sum = df_history['total_cost'].sum()
-                st.metric("Total Cost (All Sessions)", f"£{total_cost_sum:.4f}")
+                st.metric("Total Cost (All Sessions)", f"${total_cost_sum:.4f}")
             with col3:
                 avg_cost = df_history['total_cost'].mean()
-                st.metric("Average Cost per Request", f"£{avg_cost:.4f}")
+                st.metric("Average Cost per Request", f"${avg_cost:.4f}")
     else:
         st.info("No analytics data available yet. Generate some responses to see usage statistics.")
 
@@ -2879,100 +3062,3 @@ if st.button("Generate Response"):
         # Display analytics with unique section identifier
         if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
             update_analytics("response")
-
-# Update the metrics display section
-def display_operation_metrics(operation_data):
-    """Display metrics for a specific operation."""
-    # Calculate total input tokens correctly
-    input_tokens = operation_data.get("cached_input_tokens", 0) + operation_data.get("non_cached_input_tokens", 0)
-    output_tokens = operation_data.get("output_tokens", 0)
-    
-    # Calculate costs
-    input_cost = operation_data.get("cached_input_cost", 0) + operation_data.get("non_cached_input_cost", 0)
-    output_cost = operation_data.get("output_cost", 0)
-    total_cost = input_cost + output_cost
-    
-    # Display metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Response Time", f"{operation_data.get('response_time', 0):.2f}s")
-    with col2:
-        st.metric("Input Tokens", f"{input_tokens:,}", f"£{input_cost:.4f}")
-    with col3:
-        st.metric("Output Tokens", f"{output_tokens:,}", f"£{output_cost:.4f}")
-    with col4:
-        st.metric("Total Cost", f"£{total_cost:.4f}")
-    
-    # Show detailed breakdown
-    with st.expander("View Detailed Token Breakdown"):
-        st.markdown("**Input Token Details:**")
-        st.markdown(f"- Cached: {operation_data.get('cached_input_tokens', 0):,} tokens (£{operation_data.get('cached_input_cost', 0):.4f})")
-        st.markdown(f"- Non-cached: {operation_data.get('non_cached_input_tokens', 0):,} tokens (£{operation_data.get('non_cached_input_cost', 0):.4f})")
-        st.markdown(f"- Total Input: {input_tokens:,} tokens (£{input_cost:.4f})")
-        st.markdown("\n**Output Token Details:**")
-        st.markdown(f"- Total: {output_tokens:,} tokens (£{output_cost:.4f})")
-        st.markdown(f"\n**Total Cost: £{total_cost:.4f}**")
-
-# In the classification section
-if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-    last_classification = next(
-        (usage for usage in reversed(st.session_state["token_usage"]["generations"])
-         if usage.get("operation") == "classification"),
-        None
-    )
-    if last_classification:
-        st.markdown("#### Classification Metrics")
-        display_operation_metrics(last_classification)
-
-# In the scenario generation section
-if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-    last_generation = next(
-        (usage for usage in reversed(st.session_state["token_usage"]["generations"])
-         if usage.get("operation") == "scenario_generation"),
-        None
-    )
-    if last_generation:
-        st.markdown("#### Scenario Generation Metrics")
-        display_operation_metrics(last_generation)
-
-# In the response generation section
-if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-    last_response = next(
-        (usage for usage in reversed(st.session_state["token_usage"]["generations"])
-         if usage.get("operation") == "response_generation"),
-        None
-    )
-    if last_response:
-        st.markdown("#### Response Generation Metrics")
-        display_operation_metrics(last_response)
-
-# Display metrics for the latest generation
-if latest_generation:
-    st.markdown("### Latest Generation Metrics")
-    metric_col1, metric_col2, metric_col3 = st.columns(3)
-    with metric_col1:
-        st.metric(
-            "Response Time",
-            f"{latest_generation.get('response_time', 0):.2f}s"
-        )
-    with metric_col2:
-        # Calculate total input tokens
-        total_input_tokens = (
-            latest_generation.get('cached_input_tokens', 0) +
-            latest_generation.get('non_cached_input_tokens', 0)
-        )
-        total_input_cost = (
-            latest_generation.get('cached_input_cost', 0) +
-            latest_generation.get('non_cached_input_cost', 0)
-        )
-        st.metric(
-            "Input Tokens",
-            f"{total_input_tokens:,}",
-            f"£{total_input_cost:.4f}"
-        )
-    with metric_col3:
-        st.metric(
-            "Output Tokens",
-            f"{latest_generation.get('output_tokens', 0):,}",
-            f"£{latest_generation.get('output_cost', 0):.4f}"
-        )
