@@ -685,6 +685,18 @@ def validate_scenario_rules(scenario_data):
     ivr_flow = scenario_data.get("ivr_flow", "")
     ivr_selections = scenario_data.get("ivr_selections", [])
 
+    # Check that existing users have account details
+    if "existing" in user_type:
+        # Check required fields for existing users
+        required_fields = ["name", "surname", "location"]
+        for field in required_fields:
+            if not account_details.get(field):
+                return False, f"Existing user missing required account detail: {field}"
+        
+        # At least one of these must be non-empty for existing users
+        if not (account_details.get("latest_reviews") or account_details.get("latest_jobs")):
+            return False, "Existing user must have either reviews or jobs in their history"
+
     # Define valid IVR flows and their corresponding valid selections
     valid_ivr_flows = {
         "homeowner": {
@@ -1539,13 +1551,39 @@ if st.button("Generate New Inquiry", use_container_width=True):
         # Get the most recent generation data
         latest_generation = st.session_state["token_usage"]["generations"][-1]
         
-        # Display success message with token usage and costs
-        st.success(f"""Scenario generated!
+        # Create columns for metrics display
+        st.markdown("### Generation Metrics")
+        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
         
-Response Time: {latest_generation['response_time']:.2f} seconds
-Input Tokens: {latest_generation['input_tokens']:,} (${latest_generation['input_cost']:.4f})
-Output Tokens: {latest_generation['output_tokens']:,} (${latest_generation['output_cost']:.4f})
-Total Cost: ${latest_generation['total_cost']:.4f}""")
+        with metric_col1:
+            st.metric(
+                "Response Time",
+                f"{latest_generation['response_time']:.2f}s"
+            )
+        
+        with metric_col2:
+            st.metric(
+                "Input Tokens",
+                f"{latest_generation['input_tokens']:,}",
+                f"${latest_generation['input_cost']:.4f}"
+            )
+        
+        with metric_col3:
+            st.metric(
+                "Output Tokens",
+                f"{latest_generation['output_tokens']:,}",
+                f"${latest_generation['output_cost']:.4f}"
+            )
+        
+        with metric_col4:
+            st.metric(
+                "Total Cost",
+                f"${latest_generation['total_cost']:.4f}"
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.success("Scenario generated successfully!")
 
 # Create a visual separation before the scenario display
 st.markdown("<hr style='margin: 30px 0px; border-color: #424242;'/>", unsafe_allow_html=True)
