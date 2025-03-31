@@ -202,8 +202,14 @@ def save_inquiries_to_file():
     Saves the current inquiries DataFrame to inquiries.json
     """
     try:
+        # Convert timestamps to strings to make them JSON serializable
+        df_copy = st.session_state["inquiries"].copy()
+        # Check if timestamp column exists and convert to string format
+        if 'timestamp' in df_copy.columns and not df_copy.empty:
+            df_copy['timestamp'] = df_copy['timestamp'].astype(str)
+        
         # Convert DataFrame to JSON and save with nice formatting
-        json_data = st.session_state["inquiries"].to_dict(orient="records")
+        json_data = df_copy.to_dict(orient="records")
         with open("inquiries.json", "w") as f:
             json.dump(json_data, f, indent=2)
             
@@ -839,7 +845,7 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                     "payment_status": ""
                 },
                 "scenario_text": f"API Error: {str(e)}"
-    }}
+    }
 
 ###############################################################################
 # 8) HELPER: CLASSIFY SCENARIO VIA OPENAI
