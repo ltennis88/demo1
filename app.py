@@ -808,32 +808,47 @@ with col5:
 
 # User Type Selection
 st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3, col4 = st.columns([1, 0.75, 0.75, 0.75])
 
 with col1:
     st.markdown("<div class='inquiry-label'>Customer Type:</div>", unsafe_allow_html=True)
     user_random = st.checkbox("Random Type", value=True, key="user_random")
 
+# Enable user type options only if Random is not selected
+user_disabled = user_random
+
 with col2:
-    # Create a horizontal layout for user type selection - always show but disable if random is checked
-    user_type = st.radio(
-        "Select customer type:",
-        options=["Existing Homeowner", "Existing Tradesperson", "Unknown/New Contact"],
-        horizontal=True,
-        label_visibility="collapsed",
-        disabled=user_random  # Disable the radio buttons when Random Type is checked
-    )
+    st.markdown("<div class='inquiry-label'>Existing Homeowner</div>", unsafe_allow_html=True)
+    user_homeowner = st.checkbox("", key="user_homeowner", disabled=user_disabled)
+
+with col3:
+    st.markdown("<div class='inquiry-label'>Existing Tradesperson</div>", unsafe_allow_html=True)
+    user_tradesperson = st.checkbox("", key="user_tradesperson", disabled=user_disabled)
+
+with col4:
+    st.markdown("<div class='inquiry-label'>Unknown/New Contact</div>", unsafe_allow_html=True)
+    user_unknown = st.checkbox("", key="user_unknown", disabled=user_disabled)
 
 # Map the selection to the correct user_type value
 selected_user_type = None
 if not user_random:
-    if user_type == "Existing Homeowner":
+    if user_homeowner:
         selected_user_type = "existing_homeowner"
-    elif user_type == "Existing Tradesperson":
+        # Disable other options if this one is selected
+        if user_tradesperson:
+            st.warning("Multiple types selected. Using Existing Homeowner as priority.")
+        if user_unknown:
+            st.warning("Multiple types selected. Using Existing Homeowner as priority.")
+    elif user_tradesperson:
         selected_user_type = "existing_tradesperson"
-    elif user_type == "Unknown/New Contact":
+        # Disable other options if this one is selected
+        if user_unknown:
+            st.warning("Multiple types selected. Using Existing Tradesperson as priority.")
+    elif user_unknown:
         # For unknown/new, randomly choose between prospective homeowner or tradesperson
         selected_user_type = random.choice(["prospective_homeowner", "prospective_tradesperson"])
+    else:
+        selected_user_type = "existing_homeowner"  # Default if none selected
 
 # Determine selected route
 selected_route = None
