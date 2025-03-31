@@ -920,16 +920,19 @@ def self_process_ivr_selections(ivr_selections):
 def find_relevant_faq(scenario_text, faq_dataframe):
     """
     Find the most relevant FAQ based on the scenario text.
-    Returns a tuple (question, relevance_score) if found, or (None, 0) if no good match
+    Returns a tuple (question, answer, relevance_score) if found, or (None, None, 0) if no good match
     """
     if faq_dataframe.empty:
-        return None, 0
+        return None, None, 0
     
     # Check if required columns exist
     required_columns = ["Type", "Category", "Question"]
     if not all(col in faq_dataframe.columns for col in required_columns):
         st.warning("FAQ data is missing required columns. Expected: Type, Category, Question")
-        return None, 0
+        return None, None, 0
+    
+    # Check if Answer column exists
+    has_answers = "Answer" in faq_dataframe.columns
     
     # In a real implementation, this would use embedding similarity
     # For demo purposes, we'll use improved keyword matching
@@ -963,13 +966,16 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 scenario_words = set(scenario_lower.split())
                 question_words = set(question.split())
                 overlap_count = len(scenario_words.intersection(question_words))
-                warranty_matches.append((row.get("Question", ""), overlap_count + 5))  # Bonus for warranty match
+                warranty_matches.append((row, overlap_count + 5))  # Bonus for warranty match
         
         if warranty_matches:
             # Return the one with highest score
             warranty_matches.sort(key=lambda x: x[1], reverse=True)
             if warranty_matches[0][1] >= 6:  # Higher threshold for relevance
-                return warranty_matches[0]
+                best_row = warranty_matches[0][0]
+                question = best_row.get("Question", "")
+                answer = best_row.get("Answer", "") if has_answers else ""
+                return question, answer, warranty_matches[0][1]
     
     # Try direct issue matching first - this has the highest relevance score
     for issue, keywords in issue_keywords.items():
@@ -982,7 +988,9 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 # If the issue matches keywords in the question, return it with high relevance
                 keyword_matches = sum(1 for keyword in keywords if keyword in question)
                 if keyword_matches >= 2:
-                    return row.get("Question", ""), 8  # High relevance for direct issue match
+                    question = row.get("Question", "")
+                    answer = row.get("Answer", "") if has_answers else ""
+                    return question, answer, 8  # High relevance for direct issue match
     
     # If no direct issue match, try matching by category with improved categories
     category_keywords = {
@@ -1029,6 +1037,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                     # Find the FAQ that best matches specific words in the scenario
                     best_match = None
                     best_match_score = 0
+                    best_row = None
                     
                     for _, row in matched_rows.iterrows():
                         question = str(row.get("Question", "")).lower()
@@ -1061,11 +1070,13 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                         if score > best_match_score:
                             best_match_score = score
                             best_match = row.get("Question", "")
+                            best_row = row
                     
                     if best_match and best_match_score >= 3:  # Higher threshold for relevance
                         # Relevance is based on both category match and word match
                         relevance = best_match_score
-                        return best_match, relevance
+                        answer = best_row.get("Answer", "") if has_answers and best_row is not None else ""
+                        return best_match, answer, relevance
             except Exception as e:
                 st.warning(f"Error processing category {category}: {str(e)}")
                 continue
@@ -1073,6 +1084,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     # Last resort: look for any significant word matches with improved scoring
     best_match = None
     best_score = 0
+    best_row = None
     
     # Important topic words that should be given more weight
     important_topics = ["warranty", "guarantee", "electrician", "complaint", "quality", "problem", "issue"]
@@ -1099,185 +1111,115 @@ def find_relevant_faq(scenario_text, faq_dataframe):
         if total_score > best_score:
             best_score = total_score
             best_match = row.get("Question", "")
+            best_row = row
     
     if best_match and best_score >= 3:  # Higher threshold for relevance
-        return best_match, best_score
+        answer = best_row.get("Answer", "") if has_answers and best_row is not None else ""
+        return best_match, answer, best_score
     
-    return None, 0
+    return None, None, 0
 
 def generate_response_suggestion(scenario, classification_result):
-    """
-    Generate a suggested response based on scenario type (email/whatsapp)
-    """
-    inbound_route = scenario.get("inbound_route", "")
-    scenario_text = scenario.get("scenario_text", "").lower()
-    user_type = scenario.get("user_type", "")
-    classification = classification_result.get("classification", "")
+    """Generate a response suggestion based on classification and FAQ matching"""
+    # Load FAQ data
+    faq_data = load_faq_csv()
     
-    # Get account details if available
-    account_details = scenario.get("account_details", {})
-    name = f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip()
-    first_name = name.split()[0] if name else ""
-    latest_jobs = account_details.get("latest_jobs", "")
-    latest_reviews = account_details.get("latest_reviews", "")
-    project_cost = account_details.get("project_cost", "")
+    # Find the most relevant FAQ
+    relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, faq_data)
     
-    # Check if this is a membership-related query
-    is_membership_query = any(word in scenario_text for word in ["membership", "join", "sign up", "register", "become a member"])
+    # Start with scenario tone and urgency analysis
+    scenario_tone = classification_result.get("tone", "neutral")
+    scenario_urgency = classification_result.get("urgency", "medium")
+    user_type = classification_result.get("user_type", "homeowner")
+    priority = classification_result.get("priority", "medium")
     
-    # If it's a membership query, get relevant terms
-    membership_info = ""
-    if is_membership_query and "tradesperson" in user_type:
-        # Find relevant membership terms based on the query
-        relevant_terms = []
-        for section in membership_terms.get("sections", []):
-            # Safely get content from section
-            section_content = section.get("content", "")
-            if section_content and any(word in scenario_text for word in section.get("title", "").lower().split()):
-                relevant_terms.append(section_content)
-            
-            # Safely handle subsections
-            for subsection in section.get("subsections", []):
-                subsection_content = subsection.get("content", "")
-                if subsection_content and any(word in scenario_text for word in subsection.get("title", "").lower().split()):
-                    relevant_terms.append(subsection_content)
+    # Check if there's a related FAQ that we can use
+    faq_prompt = ""
+    if relevant_faq and faq_relevance >= 3:
+        faq_prompt = f"""
+        Include information from this relevant FAQ:
+        Question: {relevant_faq}
+        Answer: {faq_answer}
+        """
+    
+    # Generate response with cached prompt template
+    if "cached_response_prompt" in st.session_state and st.session_state.cached_response_prompt:
+        # Use cached prompt
+        prompt = st.session_state.cached_response_prompt
         
-        if relevant_terms:
-            membership_info = " ".join(relevant_terms)
-
-    # Generate appropriate greeting based on route type and available information
-    greeting = ""
-    if inbound_route in ["email", "whatsapp"]:
-        if first_name:
-            greeting = f"Hi {first_name},"
+        # Modify the cached prompt to include our specific details
+        prompt = prompt.replace("{{USER_TYPE}}", user_type)
+        prompt = prompt.replace("{{TONE}}", scenario_tone)
+        prompt = prompt.replace("{{URGENCY}}", scenario_urgency)
+        prompt = prompt.replace("{{PRIORITY}}", priority)
+        prompt = prompt.replace("{{FAQ}}", faq_prompt)
+        
+        # Add the scenario at the appropriate placeholder
+        prompt = prompt.replace("{{SCENARIO}}", scenario)
+        
+        # Token count already considered in the session state
+        input_tokens = st.session_state.cached_response_prompt_tokens
     else:
-            greeting = "Hi there,"
-    
-    # Generate response body based on classification and scenario context
-    body = ""
-    
-    # Reference job details if relevant to the issue
-    job_reference = ""
-    if "complaint" in classification.lower() or "job" in scenario_text or "issue" in scenario_text:
-        # Extract job type from latest_jobs if available
-        job_type = ""
-        if latest_jobs:
-            # Try to extract job type (e.g., "roof repair", "kitchen renovation")
-            job_words = ["renovation", "repair", "installation", "fitting", "refurbishment", "plumbing", "electrical", "roofing", "bathroom", "kitchen"]
-            for word in job_words:
-                if word in latest_jobs.lower():
-                    job_type = word
-                    break
-            
-            # If we have a job type, reference it specifically
-            if job_type:
-                job_reference = f"I can see this relates to your recent {job_type} work. "
-            else:
-                job_reference = f"I can see from your account that you've recently had work completed. "
-                
-            job_reference += "Could you confirm which specific aspects of the job you're experiencing issues with? "
-    
-    # Extract specific details from scenario for context
-    specific_details = extract_specific_details(scenario_text)
-    
-    # Main response body based on classification
-    if "complaint" in classification.lower():
-        body = f"Thank you for contacting Checkatrade about your concerns. {job_reference}We're sorry to hear you're experiencing problems and want to help resolve this for you as quickly as possible."
+        # Create prompt from scratch using a template
+        prompt = f"""
+        As a Customer Support Agent for Checkatrade, create a response to the following inquiry.
         
-        # Add follow-up questions specific to complaints
-        body += "\n\nTo help us address your concerns effectively, could you please provide:"
-        body += "\n- Details of what specifically hasn't met your expectations"
-        body += "\n- Any communication you've had with the tradesperson about these issues"
-        if project_cost:
-            body += f"\n- Whether you've made any payments toward the {project_cost} project cost"
+        User Type: {user_type}
+        Tone of Inquiry: {scenario_tone}
+        Urgency Level: {scenario_urgency}
+        Priority Level: {priority}
         
-    elif "billing" in classification.lower():
-        body = f"Thank you for contacting Checkatrade about your billing query. {specific_details}We'll look into this for you right away."
+        {faq_prompt}
         
-        # Add follow-up questions for billing
-        if project_cost:
-            body += f"\n\nI can see the project cost is {project_cost}. Could you please confirm which aspect of the payment you'd like assistance with?"
-        else:
-            body += "\n\nTo help resolve this quickly, could you provide details of the specific payment or charge you're inquiring about?"
-            
-    elif "membership" in classification.lower() or "insurance" in scenario_text.lower() or "account" in scenario_text.lower():
-        if "insurance" in scenario_text.lower() or "public liability" in scenario_text.lower():
-            body = f"Thank you for contacting Checkatrade about updating your Public Liability Insurance details. I'd be happy to help you with this important account update."
-            body += "\n\nTo update your insurance information, I'll need the following details:"
-            body += "\n- Your new insurance provider name"
-            body += "\n- Policy number"
-            body += "\n- Coverage amount"
-            body += "\n- Effective dates of the policy"
-            body += "\n\nOnce you provide these details, I can update your account immediately. Alternatively, you can update this information directly through your account dashboard by going to the 'Insurance Details' section."
-        elif "existing" in user_type:
-            body = f"Thank you for your query about your Checkatrade membership. {specific_details}"
-            body += "\n\nI'll take a look at your account and make sure everything is updated correctly. If you have any specific details or documents you need to upload, please let me know and I can guide you through the process."
-        else:
-            body = f"Thank you for your interest in becoming a Checkatrade member. {specific_details}"
-            body += "\n\nTo proceed with your membership application, we'll need to gather some information about your business and services. Would you like me to outline the steps involved, or do you have specific questions about the membership process?"
-            
-    elif "technical" in classification.lower():
-        body = f"I understand you're experiencing technical difficulties with {specific_details}. Let me help resolve this for you."
-        body += "\n\nCould you please share what specific error messages you're seeing or what functionality isn't working as expected? Screenshots can be helpful if available."
-        body += "\n\nIn the meantime, you might try clearing your browser cache or using our mobile app as an alternative."
+        Inquiry: {scenario}
         
-    else:
-        if job_reference:
-            body = f"Thank you for contacting Checkatrade. {job_reference}We're happy to help with your inquiry."
-        else:
-            body = f"Thank you for contacting Checkatrade. {specific_details}We're happy to help with your inquiry."
+        Write a professional and helpful response that:
+        1. Acknowledges the customer's concern
+        2. Provides specific, actionable information to resolve their issue
+        3. Includes any relevant policy details or next steps
+        4. Maintains a supportive and solution-oriented tone
+        5. If the inquiry involves a complaint about a tradesperson, explain that Checkatrade takes quality seriously and outline the specific steps you'll take to investigate
+        6. Ends with a clear call to action or next steps
+        
+        Format the response in a clean, professional style suitable for customer communication. 
+        Don't use placeholder text or generic responses - be specific to their situation.
+        """
+        
+        # Get token count for new prompt
+        input_tokens = len(prompt) // 4  # Approximate token count
+        
+        # Cache this prompt for future use
+        st.session_state.cached_response_prompt = prompt
+        st.session_state.cached_response_prompt_tokens = input_tokens
     
-    # Add review reference if relevant
-    if "review" in scenario_text.lower() and latest_reviews:
-        body += f"\n\nI can see you've recently provided feedback on our service. Your reviews are important to us and help maintain our high standards."
+    # Generate the response using the OpenAI API
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        # Extract the response text
+        response_text = response.choices[0].message.content
+        
+        # Calculate token usage for output
+        output_tokens = response.usage.completion_tokens
+        cached_input_tokens = response.usage.prompt_tokens
+        
+        # Calculate token costs
+        input_cost = calculate_token_cost(cached_input_tokens, "cached_input")
+        output_cost = calculate_token_cost(output_tokens, "output")
+        
+        return response_text, cached_input_tokens, output_tokens, input_cost, output_cost
     
-    # Add FAQ link section with more prominent and friendly message
-    faq_link = ""
-    
-    if "membership" in classification.lower():
-        faq_link = "\n\n📚 **For your convenience:** Many of our members find our Membership FAQ helpful for quick answers. Please check our comprehensive guide at [Checkatrade.com/MembershipFAQ] which covers common questions about account management, benefits, and renewal processes."
-    elif "insurance" in scenario_text.lower():
-        faq_link = "\n\n📚 **For your convenience:** We've put together detailed information about insurance requirements and coverage at [Checkatrade.com/InsuranceInfo]. This resource explains all our insurance policies and answers common questions you might have."
-    elif "billing" in classification.lower():
-        faq_link = "\n\n📚 **For your convenience:** Our billing FAQ section at [Checkatrade.com/BillingFAQ] provides detailed guidance on payment processes, invoice questions, and subscription details that may help answer your questions immediately."
-    elif "complaint" in classification.lower() or "job" in classification.lower():
-        faq_link = "\n\n📚 **For your convenience:** We have a dedicated help section about resolving job quality issues at [Checkatrade.com/JobResolutionHelp] which offers step-by-step guidance on our resolution process."
-    elif "technical" in classification.lower():
-        faq_link = "\n\n📚 **For your convenience:** Our technical support hub at [Checkatrade.com/TechSupport] contains troubleshooting guides, video tutorials, and solutions to common technical issues you may encounter."
-    else:
-        faq_link = "\n\n📚 **For your convenience:** You may find immediate answers to your questions in our FAQ section at [Checkatrade.com/FAQ]. Our help center is available 24/7 with searchable solutions to common questions."
-    
-    # Add the FAQ link to the body
-    body += faq_link
-    
-    # Different closing based on channel
-    closing = ""
-    if inbound_route == "email":
-        closing = "\n\nWe're committed to ensuring your issue is resolved satisfactorily. I'll personally look into this and get back to you within 24 hours.\n\nBest regards,\nThe Checkatrade Team"
-    elif inbound_route == "whatsapp":
-        closing = "\n\nWe're here to help resolve this for you. Is there anything else you can tell me about the situation that would help us address your concerns more effectively?"
-    
-    return f"{greeting}\n\n{body}{closing}"
-
-def extract_specific_details(scenario_text):
-    """
-    Extract specific details from the scenario text to include in the response
-    """
-    # This is a simple version - in a real system this could use NER or other techniques
-    specific_details = ""
-    
-    if "insurance" in scenario_text.lower() or "public liability" in scenario_text.lower():
-        specific_details = "I understand you need assistance with updating your Public Liability Insurance details. "
-    elif "password" in scenario_text.lower() or "login" in scenario_text.lower():
-        specific_details = "I understand you're having trouble accessing your account. "
-    elif "payment" in scenario_text.lower() or "bill" in scenario_text.lower():
-        specific_details = "I understand you have a query about your payment or billing. "
-    elif "membership" in scenario_text.lower():
-        specific_details = "I understand you have a question about your membership. "
-    elif "tradesperson" in scenario_text.lower() or "contractor" in scenario_text.lower():
-        specific_details = "I understand you have a concern regarding a tradesperson. "
-    
-    return specific_details
+    except Exception as e:
+        st.error(f"Error generating response: {str(e)}")
+        return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
 
 ###############################################################################
 # 9) STREAMLIT APP UI
@@ -1718,11 +1660,12 @@ if st.session_state["generated_scenario"]:
 
                 # If no FAQ found via category or low relevance, use our keyword matching function
                 if not relevant_faq or faq_relevance_score < 3:
-                    keyword_faq, keyword_score = find_relevant_faq(scenario_text, df_faq)
+                    keyword_faq, keyword_answer, keyword_score = find_relevant_faq(scenario_text, df_faq)
                     if keyword_faq and keyword_score >= 3:  # Higher threshold for keyword matching
                         # If we already have a FAQ but this one is more relevant, replace it
                         if keyword_score > faq_relevance_score:
                             relevant_faq = keyword_faq
+                            relevant_answer = keyword_answer
                             faq_relevance_score = keyword_score
 
                 # Only display FAQ if we have a sufficiently relevant match
@@ -1730,9 +1673,16 @@ if st.session_state["generated_scenario"]:
                     st.markdown("""
                     <div class="classification-card">
                         <div class="classification-header">Relevant FAQ</div>
-                        <div class="field-value">""" + relevant_faq + """</div>
-                    </div>
+                        <div class="field-value"><strong>Question:</strong> """ + relevant_faq + """</div>
                     """, unsafe_allow_html=True)
+                    
+                    # If we have an answer, display it as well
+                    if 'relevant_answer' in locals() and relevant_answer:
+                        st.markdown("""
+                        <div class="field-value"><strong>Answer:</strong> """ + relevant_answer + """</div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
                 # Generate response suggestion for email or whatsapp
                 inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
@@ -1822,7 +1772,10 @@ if st.session_state["generated_scenario"]:
                 if relevant_faq and faq_relevance_score >= 3:
                     st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq"] = relevant_faq
                     st.session_state["inquiries"].at[st.session_state["current_case_id"], "faq_relevance_score"] = faq_relevance_score
-                    
+                    # Also save the FAQ answer if available
+                    if 'relevant_answer' in locals() and relevant_answer:
+                        st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq_answer"] = relevant_answer
+                
                 # Save to file again to ensure all classification fields are stored
                 save_inquiries_to_file()
         else:
@@ -1954,12 +1907,16 @@ if len(df) > 0:
         except:
             pass
             
-        relevant_faq, faq_score = find_relevant_faq(recent_row['scenario_text'], df_faq)
+        relevant_faq, faq_answer, faq_score = find_relevant_faq(recent_row['scenario_text'], df_faq)
         
         # Only display FAQ if it meets the relevance threshold
         if relevant_faq and faq_score >= 3:
             st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'><strong>Question:</strong> {relevant_faq}</div>", unsafe_allow_html=True)
+            
+            # If we have an answer, display it as well
+            if faq_answer:
+                st.markdown(f"<div class='inquiry-detail'><strong>Answer:</strong> {faq_answer}</div>", unsafe_allow_html=True)
         
         # Generate response suggestion for email or whatsapp
         inbound_route = recent_row['inbound_route']
@@ -2087,13 +2044,17 @@ if len(df) > 0:
                     st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
                 
                 # Add FAQ suggestion
-                relevant_faq, faq_score = find_relevant_faq(row['scenario_text'], df_faq)
+                relevant_faq, faq_answer, faq_score = find_relevant_faq(row['scenario_text'], df_faq)
                 
                 # Only display FAQ if it meets the relevance threshold
                 if relevant_faq and faq_score >= 3:
                     st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
                     st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{relevant_faq}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'><strong>Question:</strong> {relevant_faq}</div>", unsafe_allow_html=True)
+                    
+                    # If we have an answer, display it as well
+                    if faq_answer:
+                        st.markdown(f"<div class='inquiry-detail'><strong>Answer:</strong> {faq_answer}</div>", unsafe_allow_html=True)
                 
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
 else:
