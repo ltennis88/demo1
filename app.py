@@ -168,16 +168,42 @@ div.stApp {
 # Add a clear title for the main page
 st.title("Checkatrade Contact Center AI Assistant")
 
-# Create horizontal navigation with buttons
-st.markdown("""
-<div class="nav-container">
-    <a href="/" class="nav-button active">🏠 Main Dashboard</a>
-    <a href="1_📋_View_Inquiries" class="nav-button">📋 View Inquiries</a>
-    <a href="2_📊_Dashboard" class="nav-button">📊 Analytics Dashboard</a>
-</div>
-""", unsafe_allow_html=True)
+# Create horizontal navigation with buttons - using Streamlit buttons directly
+col1, col2, col3 = st.columns(3)
+with col1:
+    main_btn = st.button("🏠 Main Dashboard", use_container_width=True, 
+                      type="primary" if st.session_state.get("page", "main") == "main" else "secondary")
+with col2:
+    inquiries_btn = st.button("📋 View Inquiries", use_container_width=True,
+                          type="primary" if st.session_state.get("page", "main") == "inquiries" else "secondary")
+with col3:
+    analytics_btn = st.button("📊 Analytics Dashboard", use_container_width=True,
+                          type="primary" if st.session_state.get("page", "main") == "analytics" else "secondary")
 
-st.markdown("**Main Dashboard**")
+# Handle navigation
+if "page" not in st.session_state:
+    st.session_state["page"] = "main"
+
+if main_btn:
+    st.session_state["page"] = "main"
+if inquiries_btn:
+    st.session_state["page"] = "inquiries"
+if analytics_btn:
+    st.session_state["page"] = "analytics"
+
+# Show the current page content
+if st.session_state["page"] == "main":
+    st.markdown("**Main Dashboard**")
+elif st.session_state["page"] == "inquiries":
+    # Import and run view inquiries code
+    from pages.view_inquiries import show_inquiries
+    show_inquiries()
+    st.stop()  # Stop execution of the rest of the script
+elif st.session_state["page"] == "analytics":
+    # Import and run analytics code
+    from pages.analytics_dashboard import show_analytics
+    show_analytics()
+    st.stop()  # Stop execution of the rest of the script
 
 ###############################################################################
 # 2) LOAD FAQ / TAXONOMY DATA
