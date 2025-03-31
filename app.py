@@ -166,7 +166,7 @@ div.stApp {
 """, unsafe_allow_html=True)
 
 # Add a clear title for the main page
-st.title("Checkatrade Contact Center AI Assistant")
+st.title("Contact Center AI Assistant")
 
 # Create horizontal navigation with buttons - using Streamlit buttons directly
 col1, col2, col3 = st.columns(3)
@@ -193,7 +193,8 @@ if analytics_btn:
 
 # Show the current page content
 if st.session_state["page"] == "main":
-    st.markdown("**Main Dashboard**")
+    # Remove the duplicate title, just generate the new inquiry section directly
+    st.header("Generate New Inquiry")
 elif st.session_state["page"] == "inquiries":
     # Import and run view inquiries code
     from pages.view_inquiries import show_inquiries
