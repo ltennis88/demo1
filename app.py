@@ -930,15 +930,42 @@ def classify_scenario(text):
     # Start timing
     start_time = time.time()
     
-    prompt = classification_prompt_template.replace("{SCENARIO}", text)
+    # Enhanced classification prompt with departments and subdepartments
+    enhanced_classification_prompt = classification_prompt_template.replace("{SCENARIO}", text)
+    enhanced_classification_prompt += """
+    
+    Please also identify:
+    1. Department: The main department that should handle this inquiry
+       Options: "Consumer Support", "Technical Support", "Quality Assurance", "Tradesperson Support", "Finance", "Legal"
+    
+    2. Subdepartment: The specific team within the department
+       For Consumer Support: "Account Issues", "Job Issues", "Payments", "Resolving Issues"
+       For Technical Support: "App Issues", "Website Issues", "Integration Issues"
+       For Quality Assurance: "Tradesperson Vetting", "Review Verification", "Complaint Investigation"
+       For Tradesperson Support: "Account Management", "Jobs", "Payments", "Technical Issues"
+       For Finance: "Billing", "Refunds", "Financial Disputes"
+       For Legal: "Contract Issues", "Guarantee Claims", "Compliance"
+    
+    Return the enhanced JSON with these additional fields:
+    {
+      "classification": "...",
+      "department": "...",
+      "subdepartment": "...",
+      "priority": "High|Medium|Low",
+      "summary": "...",
+      "related_faq_category": "...",
+      "estimated_response_time": "..." // E.g. "24 hours", "48 hours", "1 week" based on priority
+    }
+    """
+    
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",  # Updated to use gpt-4o-mini
         messages=[
             {"role": "system", "content": "You classify inbound queries for Checkatrade."},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": enhanced_classification_prompt}
         ],
         temperature=0.5,
-        max_tokens=300
+        max_tokens=400
     )
     
     # Calculate token usage and costs
@@ -980,9 +1007,12 @@ def classify_scenario(text):
     except Exception as e:
         return {
             "classification": "General",
+            "department": "Consumer Support",
+            "subdepartment": "General Inquiries",
             "priority": "Medium",
             "summary": "Could not parse classification JSON.",
-            "related_faq_category": ""
+            "related_faq_category": "",
+            "estimated_response_time": "48 hours"
         }
 
 ###############################################################################
@@ -1602,6 +1632,8 @@ if st.session_state["generated_scenario"]:
                     "membership_id": st.session_state["generated_scenario"].get("membership_id", ""),
                     "scenario_text": scenario_text,
                     "classification": classification_result.get("classification", "General"),
+                    "department": classification_result.get("department", "Consumer Support"),
+                    "subdepartment": classification_result.get("subdepartment", "General Inquiries"),
                     "priority": classification_result.get("priority", "Medium"),
                     "summary": classification_result.get("summary", ""),
                     "account_name": account_details.get("name", ""),
@@ -1609,7 +1641,8 @@ if st.session_state["generated_scenario"]:
                     "account_reviews": account_details.get("latest_reviews", ""),
                     "account_jobs": account_details.get("latest_jobs", ""),
                     "project_cost": account_details.get("project_cost", ""),
-                    "payment_status": account_details.get("payment_status", "")
+                    "payment_status": account_details.get("payment_status", ""),
+                    "estimated_response_time": classification_result.get("estimated_response_time", "48 hours")
                 }
 
                 st.session_state["inquiries"] = pd.concat(
@@ -1617,10 +1650,99 @@ if st.session_state["generated_scenario"]:
                     ignore_index=True
                 )
                 
-                # Save to file and push to git
+                # Save to file
                 save_inquiries_to_file()
                 
-                st.success(f"Scenario classified as {new_row['classification']} (Priority: {new_row['priority']}) and saved to database.")
+                # Create a detailed classification display
+                st.markdown("""
+                <style>
+                .classification-card {
+                    background-color: #1E1E1E;
+                    border-radius: 10px;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    border: 1px solid #424242;
+                }
+                .classification-header {
+                    font-size: 18px;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                    color: white;
+                    border-bottom: 1px solid #555;
+                    padding-bottom: 8px;
+                }
+                .classification-field {
+                    margin-bottom: 12px;
+                }
+                .field-label {
+                    font-weight: bold;
+                    color: #64B5F6;
+                    margin-bottom: 3px;
+                }
+                .field-value {
+                    padding: 5px 10px;
+                    background-color: #2C2C2C;
+                    border-radius: 4px;
+                    color: white;
+                }
+                .priority-high {
+                    color: #ff5252;
+                    font-weight: bold;
+                }
+                .priority-medium {
+                    color: #ffab40;
+                    font-weight: bold;
+                }
+                .priority-low {
+                    color: #69f0ae;
+                    font-weight: bold;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Determine priority class
+                priority_class = "priority-medium"
+                if new_row["priority"] == "High":
+                    priority_class = "priority-high"
+                elif new_row["priority"] == "Low":
+                    priority_class = "priority-low"
+                
+                # Render the classification card
+                st.markdown(f"""
+                <div class="classification-card">
+                    <div class="classification-header">Classification Results</div>
+                    
+                    <div class="classification-field">
+                        <div class="field-label">Classification:</div>
+                        <div class="field-value">{new_row["classification"]}</div>
+                    </div>
+                    
+                    <div class="classification-field">
+                        <div class="field-label">Department:</div>
+                        <div class="field-value">{new_row["department"]}</div>
+                    </div>
+                    
+                    <div class="classification-field">
+                        <div class="field-label">Subdepartment:</div>
+                        <div class="field-value">{new_row["subdepartment"]}</div>
+                    </div>
+                    
+                    <div class="classification-field">
+                        <div class="field-label">Priority:</div>
+                        <div class="field-value"><span class="{priority_class}">{new_row["priority"]}</span></div>
+                    </div>
+                    
+                    <div class="classification-field">
+                        <div class="field-label">Estimated Response Time:</div>
+                        <div class="field-value">{new_row["estimated_response_time"]}</div>
+                    </div>
+                    
+                    <div class="classification-field">
+                        <div class="field-label">Summary:</div>
+                        <div class="field-value">{new_row["summary"]}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 # Get relevant FAQ based on the classification result and scenario text
                 faq_category = classification_result.get("related_faq_category", "")
@@ -1682,7 +1804,12 @@ if st.session_state["generated_scenario"]:
 
                 # Only display FAQ if we have a sufficiently relevant match
                 if relevant_faq and faq_relevance_score >= 3:
-                    st.info(f"**Suggested FAQ:** {relevant_faq}")
+                    st.markdown("""
+                    <div class="classification-card">
+                        <div class="classification-header">Relevant FAQ</div>
+                        <div class="field-value">""" + relevant_faq + """</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 # Generate response suggestion for email or whatsapp
                 inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
@@ -1691,10 +1818,12 @@ if st.session_state["generated_scenario"]:
                         st.session_state["generated_scenario"], 
                         classification_result
                     )
-                    st.markdown("<div class='info-container'>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='agent-section'>Suggested {inbound_route.capitalize()} Response</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='agent-detail' style='white-space: pre-wrap;'>{response_suggestion}</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("""
+                    <div class="classification-card">
+                        <div class="classification-header">Suggested """ + inbound_route.capitalize() + """ Response</div>
+                        <div class="field-value" style="white-space: pre-wrap;">""" + response_suggestion + """</div>
+                    </div>
+                    """, unsafe_allow_html=True)
         else:
             st.warning("No scenario text found. Generate a scenario first.")
 else:
