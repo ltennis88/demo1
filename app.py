@@ -224,54 +224,62 @@ You are a scenario generator for Checkatrade's inbound contact system.
 Below is FAQ/taxonomy data for reference:
 {faq_context}
 
-User Type Definitions:
+STRICT USER TYPE RULES - THESE MUST BE FOLLOWED:
+
 1. Prospective Homeowner:
-   - Individual planning home improvements or repairs
-   - No existing account or history with Checkatrade
-   - Common inquiries:
-     * Asking how to find reliable tradespeople
-     * Questions about vetting process and tradesperson reviews
-     * How to use the platform for upcoming renovation projects
-     * Understanding Checkatrade's protection and guarantees
-     * Creating an account for future projects
+   - CANNOT: Leave reviews, complain about work quality, or reference past jobs
+   - CAN: Ask about finding tradespeople, ask about vetting process, inquire about creating account
+   - Example valid scenarios:
+     * "I'm looking to get my kitchen renovated and want to know how to find reliable tradespeople"
+     * "Can you explain how you verify your tradespeople before listing them?"
+     * "How do I create an account to start searching for a plumber?"
 
 2. Existing Homeowner:
-   - Current property owner using Checkatrade's services
-   - Has an account with completed jobs/reviews
-   - RECEIVES services from tradespeople
-   - Can leave reviews about work done FOR them
-   - Common inquiries:
-     * Complaints about work quality or delays
-     * Finding tradespeople for new projects
-     * Leaving reviews for completed work
-     * Questions about ongoing projects
-     * Payment disputes or project costs
-     * Warranty or guarantee claims
+   - CANNOT: Ask about membership fees, discuss business profile, or offer services
+   - CAN: Complain about work quality, leave reviews, discuss ongoing/completed jobs
+   - Example valid scenarios:
+     * "I want to leave a review for the electrician who rewired my house last week"
+     * "The plumber hasn't finished the bathroom installation they started"
+     * "Can you help me find a reliable roofer in my area?"
 
 3. Prospective Tradesperson:
-   - Skilled professional interested in joining Checkatrade
-   - No membership ID yet
-   - Common inquiries:
-     * Questions about membership costs and benefits
-     * Application process and requirements
-     * Vetting procedures and timelines
-     * Marketing support and lead generation details
-     * Tools and material discounts information
-     * Profile setup assistance
+   - CANNOT: Discuss customer reviews, complain about work quality, or reference member benefits
+   - CAN: Ask about joining process, membership costs, application requirements
+   - Example valid scenarios:
+     * "What are the costs involved in becoming a Checkatrade member?"
+     * "How long does the vetting process take for new tradespeople?"
+     * "What documents do I need to submit for my membership application?"
 
 4. Existing Tradesperson:
-   - Verified trade professional registered with Checkatrade
-   - Has active membership ID (format: T-xxxxx)
-   - PROVIDES services to homeowners
-   - RECEIVES reviews from customers
-   - Common inquiries:
-     * Membership renewal and payments
-     * Updating credentials or insurance details
-     * Managing customer reviews and feedback
-     * Technical support with profile/dashboard
-     * Accessing member benefits and discounts
-     * Lead generation and visibility questions
-     * Dispute resolution with customers
+   - CANNOT: Complain about work quality done FOR them, leave reviews FOR others, or act as a customer
+   - CAN: Discuss their membership, update business details, respond to customer reviews
+   - Example valid scenarios:
+     * "I need to update my public liability insurance details"
+     * "How do I respond to the customer review I received yesterday?"
+     * "My membership renewal is due next month, can you help me with the process?"
+
+CRITICAL VALIDATION RULES:
+1. NEVER allow a tradesperson (existing or prospective) to:
+   - Complain about work done FOR them
+   - Leave reviews about other tradespeople
+   - Request services as if they were a homeowner
+   - Reference having work done in their home
+
+2. NEVER allow a homeowner (existing or prospective) to:
+   - Discuss providing trade services
+   - Talk about membership fees
+   - Reference having customers or business profiles
+   - Mention insurance or trade qualifications
+
+3. Account Details Must Match User Type:
+   - Homeowners: reviews_given should be reviews THEY gave about work done FOR them
+   - Tradespeople: reviews_received should be reviews THEY got from customers
+   - Homeowners: latest_jobs should be work done FOR them
+   - Tradespeople: latest_jobs should be work THEY did for others
+
+4. Membership IDs (T-xxxxx):
+   - ONLY existing tradespeople can have these
+   - Must be empty for ALL other user types
 
 Produce a single inbound scenario in STRICT JSON FORMAT ONLY (no extra text).
 The JSON object must have exactly these keys:
