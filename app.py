@@ -377,11 +377,32 @@ def load_faq_csv():
     Expected columns: Type, Category, Question.
     """
     try:
-        df = pd.read_csv("faq_taxonomy.csv", sep=';')  # Changed delimiter to semicolon
+        # First try with semicolon delimiter
+        try:
+            df = pd.read_csv("faq_taxonomy.csv", sep=';', encoding='utf-8')
+        except:
+            # If that fails, try with comma
+            df = pd.read_csv("faq_taxonomy.csv", sep=',', encoding='utf-8')
+            
+        # Check if we have the expected columns
+        required_columns = ["Type", "Category", "Question"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            st.error(f"CSV file is missing required columns: {', '.join(missing_columns)}")
+            return pd.DataFrame(columns=required_columns + ["Answer"])
+            
+        # If no Answer column exists, add an empty one
+        if "Answer" not in df.columns:
+            df["Answer"] = ""
+            
+        return df
     except Exception as e:
-        st.error("Error loading faq_taxonomy.csv. Please ensure the file exists and is in plain text CSV format.")
-        df = pd.DataFrame(columns=["Type", "Category", "Question"])
-    return df
+        error_message = f"Error loading faq_taxonomy.csv: {str(e)}. Please ensure the file exists and is in plain text CSV format."
+        st.error(error_message)
+        print(error_message)  # Also log to console for debugging
+        # Return empty DataFrame with the expected columns
+        return pd.DataFrame(columns=["Type", "Category", "Question", "Answer"])
 
 @st.cache_data
 def load_membership_terms():
@@ -445,7 +466,7 @@ def save_inquiries_to_file():
         print(f"Saving {len(json_data)} inquiries to file")
         with open("inquiries.json", "w") as f:
             json.dump(json_data, f, indent=2)
-            
+        
         # Show a success message in the UI
         st.success(f"Successfully saved {len(json_data)} inquiries to local file.")
         
@@ -459,20 +480,9 @@ def save_inquiries_to_file():
         st.error(f"Failed to save inquiries to file: {str(e)}")
         return False
 
-if "inquiries" not in st.session_state:
-    # Try to load dummy data first
-    dummy_data = load_dummy_inquiries()
-    if not dummy_data.empty:
-        st.session_state["inquiries"] = dummy_data
-    else:
-        # If no dummy data, initialize with empty DataFrame
-        st.session_state["inquiries"] = pd.DataFrame(columns=[
-            "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
-            "phone_email", "membership_id", "scenario_text", "classification",
-            "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
-            "account_location", "account_reviews", "account_jobs", "project_cost", 
-            "payment_status", "estimated_response_time", "agent_notes", "case_status"
-        ])
+# Initialize all session state variables to avoid SessionInfo errors
+if "page" not in st.session_state:
+    st.session_state["page"] = "main"
 
 if "generated_scenario" not in st.session_state:
     st.session_state["generated_scenario"] = None
@@ -496,6 +506,29 @@ if "token_usage" not in st.session_state:
         "response_times": [],
         "generations": []
     }
+
+# Initialize response suggestion related values
+if "cached_response_prompt" not in st.session_state:
+    st.session_state["cached_response_prompt"] = ""
+    
+if "cached_response_prompt_tokens" not in st.session_state:
+    st.session_state["cached_response_prompt_tokens"] = 0
+
+# Initialize inquiries if not already present
+if "inquiries" not in st.session_state:
+    # Try to load dummy data first
+    dummy_data = load_dummy_inquiries()
+    if not dummy_data.empty:
+        st.session_state["inquiries"] = dummy_data
+    else:
+        # If no dummy data, initialize with empty DataFrame
+        st.session_state["inquiries"] = pd.DataFrame(columns=[
+            "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
+            "phone_email", "membership_id", "scenario_text", "classification",
+            "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
+            "account_location", "account_reviews", "account_jobs", "project_cost", 
+            "payment_status", "estimated_response_time", "agent_notes", "case_status"
+        ])
 
 ###############################################################################
 # 4) BUILD FAQ CONTEXT STRING FROM CSV
