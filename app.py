@@ -9,6 +9,8 @@ import os
 import asyncio
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
+import re
+from collections import Counter
 
 ###############################################################################
 # 1) EARLY INITIALIZATION - To prevent SessionInfo errors
@@ -574,126 +576,32 @@ elif st.session_state["section"] == "analytics":
         colA, colB = st.columns(2)
         with colA:
             classification_counts = df["classification"].value_counts()
-            
-            # Create pie chart with plotly express
-            fig1 = px.pie(
-                values=classification_counts.values,
-                names=classification_counts.index,
-                title="Classification Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_sequence=["#4285F4", "#DB4437", "#F4B400", "#0F9D58", "#9C27B0", "#3F51B5", "#03A9F4", "#8BC34A"]
-            )
-            
-            # Customize
-            fig1.update_traces(textinfo='percent+label', pull=[0.05 if i == classification_counts.values.argmax() else 0 for i in range(len(classification_counts))])
-            fig1.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig1, use_container_width=True)
-            
+            for classification, count in classification_counts.items():
+                percentage = (count / len(df)) * 100
+                st.markdown(f"{classification}: {count} ({percentage:.1f}%)")
+        
         with colB:
             priority_counts = df["priority"].value_counts()
-            
-            # Create color mapping for priorities
-            priority_colors = {
-                "High": "#DB4437",    # Red for high
-                "Medium": "#F4B400",  # Yellow for medium
-                "Low": "#0F9D58"      # Green for low
-            }
-            
-            # Create a pie chart using plotly express
-            fig2 = px.pie(
-                values=priority_counts.values,
-                names=priority_counts.index,
-                title="Priority Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=priority_colors
-            )
-            
-            # Customize
-            fig2.update_traces(textinfo='percent+label')
-            fig2.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig2, use_container_width=True)
+            st.markdown("#### Priority Distribution")
+            for priority, count in priority_counts.items():
+                percentage = (count / len(df)) * 100
+                st.markdown(f"{priority}: {count} ({percentage:.1f}%)")
         
-        # Row 2: User type and Route distribution 
-        colC, colD = st.columns(2)
-        with colC:
-            user_type_counts = df["user_type"].value_counts()
+        # Common topics/themes from summaries
+        st.subheader("Common Topics & Themes")
+        if "summary" in df.columns:
+            # Extract and count common words/phrases
+            summaries = " ".join(df["summary"].fillna("")).lower()
+            words = re.findall(r'\b\w+\b', summaries)
+            word_counts = Counter(words)
             
-            # Convert value_counts to DataFrame for plotly
-            user_type_df = pd.DataFrame({
-                'User Type': user_type_counts.index,
-                'Count': user_type_counts.values
-            })
+            # Filter out common stop words and show top themes
+            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with'])
+            themes = [(word, count) for word, count in word_counts.most_common(10) 
+                     if word not in stop_words and len(word) > 3]
             
-            # Create horizontal bar chart using plotly express
-            fig3 = px.bar(
-                user_type_df,
-                x='Count',
-                y='User Type',
-                orientation='h',
-                title="User Type Distribution",
-                text='Count',
-                color_discrete_sequence=["#4285F4"]
-            )
-            
-            # Customize
-            fig3.update_layout(
-                xaxis_title="Count",
-                yaxis_title="",
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white"),
-                xaxis=dict(gridcolor="#444"),
-                yaxis=dict(gridcolor="#444")
-            )
-            
-            st.plotly_chart(fig3, use_container_width=True)
-        
-        with colD:
-            route_counts = df["inbound_route"].value_counts()
-            
-            # Create color mapping for routes
-            route_colors = {
-                "phone": "#4285F4",     # Blue for phone
-                "email": "#DB4437",     # Red for email
-                "whatsapp": "#0F9D58",  # Green for whatsapp
-                "web_form": "#F4B400"   # Yellow for web form
-            }
-            
-            # Create a pie chart using plotly express
-            fig4 = px.pie(
-                values=route_counts.values,
-                names=route_counts.index,
-                title="Inbound Route Distribution",
-                hole=0.4,  # Makes it a donut chart
-                color_discrete_map=route_colors
-            )
-            
-            # Customize
-            fig4.update_traces(textinfo='percent+label')
-            fig4.update_layout(
-                legend=dict(orientation="h", y=-0.1),
-                height=300,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="white")
-            )
-            
-            st.plotly_chart(fig4, use_container_width=True)
+            for word, count in themes:
+                st.markdown(f"{word.title()} ({count})")
         
         # Token Usage Analytics
         if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
@@ -702,25 +610,42 @@ elif st.session_state["section"] == "analytics":
             # Create DataFrame from token usage data
             df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
             
-            # Show total tokens and costs
-            col1, col2 = st.columns(2)
+            # Classification Metrics
+            st.markdown("#### Classification Metrics")
+            col1, col2, col3, col4 = st.columns(4)
+            
             with col1:
-                total_input_tokens = df_tokens["input_tokens"].sum()
-                total_input_cost = df_tokens["input_cost"].sum()
-                total_output_tokens = df_tokens["output_tokens"].sum()
-                total_output_cost = df_tokens["output_cost"].sum()
-                
-                st.metric("Total Input Tokens", f"{total_input_tokens} (${total_input_cost:.4f})")
-                st.metric("Total Output Tokens", f"{total_output_tokens} (${total_output_cost:.4f})")
+                avg_response_time = df_tokens['response_time'].mean()
+                total_response_time = df_tokens['response_time'].sum()
+                st.metric("Average Response Time", f"{avg_response_time:.2f}s", f"Total: {total_response_time:.2f}s")
             
             with col2:
-                total_tokens = total_input_tokens + total_output_tokens
-                total_cost = total_input_cost + total_output_cost
-                
-                st.metric("Total Tokens", f"{total_tokens}")
-                st.metric("Total Cost", f"${total_cost:.4f}")
+                avg_cached_tokens = df_tokens['cached_input_tokens'].mean()
+                cached_cost = df_tokens['cached_input_cost'].sum()
+                st.metric("Avg Cached Input Tokens", f"{avg_cached_tokens:,.0f}", f"${cached_cost:.4f}")
+            
+            with col3:
+                avg_non_cached_tokens = df_tokens['non_cached_input_tokens'].mean()
+                non_cached_cost = df_tokens['non_cached_input_cost'].sum()
+                st.metric("Avg Non-Cached Input Tokens", f"{avg_non_cached_tokens:,.0f}", f"${non_cached_cost:.4f}")
+            
+            with col4:
+                avg_output_tokens = df_tokens['output_tokens'].mean()
+                output_cost = df_tokens['output_cost'].sum()
+                st.metric("Average Output Tokens", f"{avg_output_tokens:,.0f}", f"${output_cost:.4f}")
+            
+            # Cost Breakdown
+            st.markdown("#### Cost Breakdown")
+            total_input_cost = cached_cost + non_cached_cost
+            total_cost = total_input_cost + output_cost
+            
+            st.markdown(f"Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}")
+            st.markdown(f"Total Output Cost: ${output_cost:.4f}")
+            st.markdown(f"Total Cost: ${total_cost:.4f}")
     else:
         st.info("No data available for analytics. Generate scenarios and classifications to see analytics.")
+else:
+    st.info("Generate a scenario above before classification.")
 
 ###############################################################################
 # 3) LOAD FAQ / TAXONOMY DATA
@@ -1599,12 +1524,12 @@ def find_relevant_faq(scenario_text, faq_dataframe):
             st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
             
             # Score each FAQ
-            for question, faq_data in faq_dict.items():
-                score = score_faq_relevance(key_topics, faq_data)
+            for faq_entry in faq_dict['all_faqs']:
+                score = score_faq_relevance(key_topics, faq_entry)
                 if score > best_score:
                     best_score = score
-                    best_match = question
-                    best_answer = faq_data.get('answer', '')
+                    best_match = faq_entry['question']
+                    best_answer = faq_entry['answer']
             
             if best_match and best_score >= 7:
                 return best_match, best_answer, best_score
@@ -1613,14 +1538,15 @@ def find_relevant_faq(scenario_text, faq_dataframe):
             st.error(f"Error in semantic search: {str(e)}")
             
         # If semantic search fails or no good match, try keyword matching
-        for question, faq_data in faq_dict.items():
-            faq_keywords = set(word.lower() for word in str(question).split())
+        for faq_entry in faq_dict['all_faqs']:
+            question = str(faq_entry['question']).lower()
+            faq_keywords = set(word.lower() for word in question.split())
             common_words = scenario_keywords & faq_keywords
             score = len(common_words)
             if score > best_score:
                 best_score = score
-                best_match = question
-                best_answer = faq_data.get('answer', '')
+                best_match = faq_entry['question']
+                best_answer = faq_entry['answer']
         
         if best_match and best_score > 0:
             return best_match, best_answer, best_score
@@ -2941,8 +2867,6 @@ def update_analytics(section="main"):
         total_input_cost = last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0)
         total_cost = total_input_cost + last_usage.get("output_cost", 0)
         
-        st.markdown("### 📊 Analytics")
-        
         # Display current metrics
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -2973,39 +2897,7 @@ def update_analytics(section="main"):
         if len(st.session_state["token_usage"]["generations"]) > 1:
             st.markdown("#### Historical Usage")
             
-            # Prepare data for plotting
-            df_history = pd.DataFrame(st.session_state["token_usage"]["generations"])
-            df_history['timestamp'] = pd.to_datetime(df_history['timestamp'])
-            
-            # Calculate total costs correctly
-            df_history['total_input_cost'] = df_history['cached_input_cost'].fillna(0) + df_history['non_cached_input_cost'].fillna(0)
-            df_history['total_cost'] = df_history['total_input_cost'] + df_history['output_cost'].fillna(0)
-            
-            # Token usage over time with unique key
-            fig_tokens = px.line(df_history, 
-                               x='timestamp', 
-                               y=['cached_input_tokens', 'non_cached_input_tokens', 'output_tokens'],
-                               title='Token Usage Over Time',
-                               labels={
-                                   'cached_input_tokens': 'Cached Input',
-                                   'non_cached_input_tokens': 'Non-cached Input',
-                                   'output_tokens': 'Output'
-                               })
-            st.plotly_chart(fig_tokens, use_container_width=True, key=f"tokens_{section}")
-            
-            # Costs over time with unique key
-            fig_costs = px.line(df_history, 
-                              x='timestamp', 
-                              y=['total_input_cost', 'output_cost', 'total_cost'],
-                              title='Costs Over Time',
-                              labels={
-                                  'total_input_cost': 'Total Input Cost',
-                                  'output_cost': 'Output Cost',
-                                  'total_cost': 'Total Cost'
-                              })
-            st.plotly_chart(fig_costs, use_container_width=True, key=f"costs_{section}")
-            
-            # Summary statistics
+            # Calculate summary statistics
             st.markdown("#### Summary Statistics")
             col1, col2, col3 = st.columns(3)
             with col1:
