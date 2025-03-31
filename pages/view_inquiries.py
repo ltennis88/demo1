@@ -105,71 +105,97 @@ def show_inquiries():
             # Classification results section
             st.markdown("<div class='inquiry-section'>Classification Results</div>", unsafe_allow_html=True)
             
-            # Create a container with dark background for classification results
-            with st.container():
-                # Apply custom styling to the container
-                st.markdown("""
-                <style>
-                .classification-container {
-                    background-color: rgba(30, 30, 30, 0.7);
-                    border-radius: 5px;
-                    padding: 15px;
-                    margin-bottom: 20px;
-                }
-                </style>
+            # Create a styled container for the classification results
+            st.markdown("""
+            <style>
+            .styled-container {
+                background-color: #1E1E1E;
+                border-radius: 10px;
+                padding: 20px;
+                margin-bottom: 20px;
+                border: 1px solid #424242;
+            }
+            .result-row {
+                display: flex;
+                margin-bottom: 12px;
+            }
+            .result-label {
+                width: 220px;
+                font-weight: bold;
+                color: #64B5F6;
+            }
+            .result-value {
+                flex-grow: 1;
+                background-color: #2C2C2C;
+                padding: 5px 10px;
+                border-radius: 4px;
+            }
+            .priority-high {
+                color: #ff5252;
+                font-weight: bold;
+            }
+            .priority-medium {
+                color: #ffab40;
+                font-weight: bold;
+            }
+            .priority-low {
+                color: #69f0ae;
+                font-weight: bold;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Start the styled container
+            st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
+            
+            # Create each classification field with proper formatting
+            st.markdown(f"""
+            <div class='result-row'>
+                <div class='result-label'>Classification:</div>
+                <div class='result-value'>{recent_row.get("classification", "Unknown")}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Department:</div>
+                <div class='result-value'>{recent_row.get("department", "Unknown")}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Subdepartment:</div>
+                <div class='result-value'>{recent_row.get("subdepartment", "Unknown")}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Priority:</div>
+                <div class='result-value'>
+                    <span class='priority-{recent_row.get("priority", "medium").lower()}'>
+                        {recent_row.get("priority", "Medium")}
+                    </span>
+                </div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Estimated Response Time:</div>
+                <div class='result-value'>{recent_row.get("estimated_response_time", "Unknown")}</div>
+            </div>
+            
+            <div class='result-row'>
+                <div class='result-label'>Summary:</div>
+                <div class='result-value'>{recent_row.get("summary", "No summary available")}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Add related FAQ category if available
+            if recent_row.get('related_faq_category'):
+                st.markdown(f"""
+                <div class='result-row'>
+                    <div class='result-label'>Related FAQ Category:</div>
+                    <div class='result-value'>{recent_row.get("related_faq_category", "")}</div>
+                </div>
                 """, unsafe_allow_html=True)
-                
-                st.markdown("<div class='classification-container'>", unsafe_allow_html=True)
-                
-                # Use native Streamlit components instead of HTML
-                # Create two columns for each field: label and value
-                for field, value in [
-                    ("Classification", recent_row['classification']),
-                    ("Department", recent_row['department']),
-                    ("Subdepartment", recent_row['subdepartment'])
-                ]:
-                    col1, col2 = st.columns([1, 3])
-                    with col1:
-                        st.markdown(f"**{field}:**")
-                    with col2:
-                        st.markdown(f"{value}")
-                
-                # Priority with color coding using native Streamlit
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.markdown("**Priority:**")
-                with col2:
-                    priority = recent_row['priority']
-                    if priority == "High":
-                        st.markdown(f"<span style='color: #ff5252;'>{priority}</span>", unsafe_allow_html=True)
-                    elif priority == "Medium":
-                        st.markdown(f"<span style='color: #ffab40;'>{priority}</span>", unsafe_allow_html=True)
-                    else:  # Low
-                        st.markdown(f"<span style='color: #69f0ae;'>{priority}</span>", unsafe_allow_html=True)
-                
-                # Estimated response time
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.markdown("**Estimated Response Time:**")
-                with col2:
-                    st.markdown(f"{recent_row['estimated_response_time']}")
-                
-                # Summary field
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.markdown("**Summary:**")
-                with col2:
-                    st.markdown(f"{recent_row['summary']}")
-                
-                # Related FAQ category if available
-                if 'related_faq_category' in recent_row and recent_row['related_faq_category']:
-                    col1, col2 = st.columns([1, 3])
-                    with col1:
-                        st.markdown("**Related FAQ Category:**")
-                    with col2:
-                        st.markdown(f"{recent_row['related_faq_category']}")
-                
-                st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Close the container
+            st.markdown("</div>", unsafe_allow_html=True)
             
             # Case Management section
             st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
@@ -259,71 +285,57 @@ def show_inquiries():
                     # Classification results in same format as main inquiry
                     st.markdown("<div class='inquiry-section'>Classification Results</div>", unsafe_allow_html=True)
                     
-                    # Create a container with dark background for classification results
-                    with st.container():
-                        # Apply custom styling to the container
-                        st.markdown("""
-                        <style>
-                        .classification-container {
-                            background-color: rgba(30, 30, 30, 0.7);
-                            border-radius: 5px;
-                            padding: 15px;
-                            margin-bottom: 20px;
-                        }
-                        </style>
+                    # Start the styled container
+                    st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
+                    
+                    # Create each classification field with proper formatting
+                    st.markdown(f"""
+                    <div class='result-row'>
+                        <div class='result-label'>Classification:</div>
+                        <div class='result-value'>{row.get("classification", "Unknown")}</div>
+                    </div>
+                    
+                    <div class='result-row'>
+                        <div class='result-label'>Department:</div>
+                        <div class='result-value'>{row.get("department", "Unknown")}</div>
+                    </div>
+                    
+                    <div class='result-row'>
+                        <div class='result-label'>Subdepartment:</div>
+                        <div class='result-value'>{row.get("subdepartment", "Unknown")}</div>
+                    </div>
+                    
+                    <div class='result-row'>
+                        <div class='result-label'>Priority:</div>
+                        <div class='result-value'>
+                            <span class='priority-{row.get("priority", "medium").lower()}'>
+                                {row.get("priority", "Medium")}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class='result-row'>
+                        <div class='result-label'>Estimated Response Time:</div>
+                        <div class='result-value'>{row.get("estimated_response_time", "Unknown")}</div>
+                    </div>
+                    
+                    <div class='result-row'>
+                        <div class='result-label'>Summary:</div>
+                        <div class='result-value'>{row.get("summary", "No summary available")}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Add related FAQ category if available
+                    if row.get('related_faq_category'):
+                        st.markdown(f"""
+                        <div class='result-row'>
+                            <div class='result-label'>Related FAQ Category:</div>
+                            <div class='result-value'>{row.get("related_faq_category", "")}</div>
+                        </div>
                         """, unsafe_allow_html=True)
-                        
-                        st.markdown("<div class='classification-container'>", unsafe_allow_html=True)
-                        
-                        # Use native Streamlit components instead of HTML
-                        # Create two columns for each field: label and value
-                        for field, value in [
-                            ("Classification", row['classification']),
-                            ("Department", row['department']),
-                            ("Subdepartment", row['subdepartment'])
-                        ]:
-                            col1, col2 = st.columns([1, 3])
-                            with col1:
-                                st.markdown(f"**{field}:**")
-                            with col2:
-                                st.markdown(f"{value}")
-                        
-                        # Priority with color coding using native Streamlit
-                        col1, col2 = st.columns([1, 3])
-                        with col1:
-                            st.markdown("**Priority:**")
-                        with col2:
-                            priority = row['priority']
-                            if priority == "High":
-                                st.markdown(f"<span style='color: #ff5252;'>{priority}</span>", unsafe_allow_html=True)
-                            elif priority == "Medium":
-                                st.markdown(f"<span style='color: #ffab40;'>{priority}</span>", unsafe_allow_html=True)
-                            else:  # Low
-                                st.markdown(f"<span style='color: #69f0ae;'>{priority}</span>", unsafe_allow_html=True)
-                        
-                        # Estimated response time
-                        col1, col2 = st.columns([1, 3])
-                        with col1:
-                            st.markdown("**Estimated Response Time:**")
-                        with col2:
-                            st.markdown(f"{row['estimated_response_time']}")
-                        
-                        # Summary field
-                        col1, col2 = st.columns([1, 3])
-                        with col1:
-                            st.markdown("**Summary:**")
-                        with col2:
-                            st.markdown(f"{row['summary']}")
-                        
-                        # Related FAQ category if available
-                        if 'related_faq_category' in row and row['related_faq_category']:
-                            col1, col2 = st.columns([1, 3])
-                            with col1:
-                                st.markdown("**Related FAQ Category:**")
-                            with col2:
-                                st.markdown(f"{row['related_faq_category']}")
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Close the container
+                    st.markdown("</div>", unsafe_allow_html=True)
                     
                     # Case Management for this inquiry
                     case_status = row.get('case_status', 'New')
