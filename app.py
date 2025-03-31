@@ -1070,7 +1070,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     Find the most relevant FAQ based on the scenario text.
     Returns a tuple (question, answer, relevance_score) if found, or (None, None, 0) if no good match
     """
-    if faq_dataframe.empty:
+    if faq_dataframe is None or isinstance(faq_dataframe, str) or (hasattr(faq_dataframe, 'empty') and faq_dataframe.empty):
         return None, None, 0
     
     # Check if required columns exist
@@ -1084,7 +1084,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     
     # In a real implementation, this would use embedding similarity
     # For demo purposes, we'll use improved keyword matching
-    scenario_lower = scenario_text.lower()
+    scenario_lower = str(scenario_text).lower() if scenario_text is not None else ""
     
     # First, look for direct issue mentions in the scenario text
     issue_keywords = {
@@ -1273,24 +1273,29 @@ def generate_response_suggestion(scenario, classification_result):
     faq_data = load_faq_csv()
     
     # Extract scenario text from the scenario object if it's a dictionary
-    scenario_text = scenario.get("scenario_text", "") if isinstance(scenario, dict) else scenario
+    scenario_text = scenario.get("scenario_text", "") if isinstance(scenario, dict) else str(scenario)
     
     # Find the most relevant FAQ
-    relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_text, faq_data)
+    try:
+        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_text, faq_data)
+    except Exception as e:
+        st.error(f"Error finding relevant FAQ: {str(e)}")
+        relevant_faq, faq_answer, faq_relevance = None, None, 0
     
     # Start with scenario tone and urgency analysis
-    scenario_tone = classification_result.get("tone", "neutral")
-    scenario_urgency = classification_result.get("urgency", "medium")
-    user_type = classification_result.get("user_type", "homeowner")
-    priority = classification_result.get("priority", "medium")
+    scenario_tone = str(classification_result.get("tone", "neutral"))
+    scenario_urgency = str(classification_result.get("urgency", "medium"))
+    user_type = str(classification_result.get("user_type", "homeowner"))
+    priority = str(classification_result.get("priority", "medium"))
     
     # Check if there's a related FAQ that we can use
     faq_prompt = ""
     if relevant_faq and faq_relevance >= 3:
+        faq_answer_str = str(faq_answer) if faq_answer else "No specific answer available - please address the question based on general policies."
         faq_prompt = f"""
         Include information from this relevant FAQ:
-        Question: {relevant_faq}
-        Answer: {faq_answer if faq_answer else "No specific answer available - please address the question based on general policies."}
+        Question: {str(relevant_faq)}
+        Answer: {faq_answer_str}
         
         When referencing this FAQ in your response, include both the question and answer where appropriate.
         """
@@ -2065,12 +2070,13 @@ if len(df) > 0:
         
         # Only display FAQ if it meets the relevance threshold
         if relevant_faq and faq_score >= 3:
+            st.markdown("<div class='inquiry-section'>Assistance Information</div>", unsafe_allow_html=True)
             st.markdown("<div class='inquiry-label'>Suggested FAQ:</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-detail'><strong>Question:</strong> {relevant_faq}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='inquiry-detail'><strong>Question:</strong> {str(relevant_faq)}</div>", unsafe_allow_html=True)
             
             # If we have an answer, display it as well
             if faq_answer:
-                st.markdown(f"<div class='inquiry-detail'><strong>Answer:</strong> {faq_answer}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'><strong>Answer:</strong> {str(faq_answer)}</div>", unsafe_allow_html=True)
         
         # Generate response suggestion for email or whatsapp
         inbound_route = recent_row['inbound_route']
