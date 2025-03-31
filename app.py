@@ -358,7 +358,7 @@ div.stApp {
 }
 .classification-header {
     font-weight: bold;
-    font-size: 16px;
+    font-size: 14px;
     color: #90CAF9;
     margin-bottom: 10px;
     border-bottom: 1px solid #424242;
@@ -376,6 +376,7 @@ div.stApp {
     margin-bottom: 12px;
     font-family: monospace;
     white-space: pre-wrap;
+    font-size: 13px;
 }
 
 /* Override entire layout structure */
@@ -1901,43 +1902,7 @@ if st.session_state["generated_scenario"]:
                         st.markdown(response_card, unsafe_allow_html=True)
                     except Exception as e:
                         st.error(f"Could not generate response suggestion: {str(e)}")
-
-                # After displaying the classification card, add the agent action area
-                st.markdown("""
-                <div class="classification-card">
-                    <div class="classification-header">Agent Actions</div>
-                """, unsafe_allow_html=True)
-
-                # Case status selection
-                case_status_options = ["New", "In Progress", "Awaiting Customer", "Awaiting Tradesperson", "Resolved", "Closed"]
-                selected_status = st.selectbox(
-                    "Update Case Status:",
-                    options=case_status_options,
-                    index=case_status_options.index("New") if st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"] == "New" 
-                    else case_status_options.index(st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["case_status"])
-                )
-
-                # Agent notes text area
-                agent_notes = st.text_area(
-                    "Agent Notes:",
-                    value=st.session_state["inquiries"].iloc[st.session_state["current_case_id"]]["agent_notes"],
-                    height=150,
-                    placeholder="Enter your notes about the case here..."
-                )
-
-                # Save button for agent updates
-                if st.button("Save Agent Updates", use_container_width=True):
-                    # Update the DataFrame with the new status and notes
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "case_status"] = selected_status
-                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "agent_notes"] = agent_notes
-                    
-                    # Save to file
-                    save_inquiries_to_file()
-                    
-                    st.success(f"Case {st.session_state['current_case_id']} updated - Status: {selected_status}")
-
-                    st.markdown("</div>", unsafe_allow_html=True)
-
+                        
                 # Add metrics for the classification tokens and cost
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
