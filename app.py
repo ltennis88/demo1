@@ -1418,7 +1418,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
     
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4-0125-preview",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a customer service expert helping to match customer inquiries with relevant FAQs."},
                 {"role": "user", "content": scenario_prompt}
@@ -1454,7 +1454,7 @@ def find_relevant_faq(scenario_text, faq_dataframe):
             """
             
             score_response = openai.ChatCompletion.create(
-                model="gpt-4-0125-preview",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
                     {"role": "user", "content": faq_prompt}
@@ -1530,7 +1530,7 @@ def generate_response_suggestion(scenario, classification_result):
     # Generate the response using the OpenAI API
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4-0125-preview",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a Customer Support Agent for Checkatrade."},
                 {"role": "user", "content": prompt}
