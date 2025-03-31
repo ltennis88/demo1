@@ -23,6 +23,44 @@ html, body, [class*="css"] {
     background-color: #121212 !important;
 }
 
+/* Reduce sidebar width to half */
+[data-testid="stSidebar"] {
+    width: 12rem !important;
+    min-width: 12rem !important;
+    max-width: 12rem !important;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    width: 12rem !important;
+    min-width: 12rem !important;
+    max-width: 12rem !important;
+}
+
+/* Sidebar content styling */
+[data-testid="stSidebar"] {
+    background-color: #1E1E1E !important;
+    border-right: 1px solid #424242 !important;
+}
+
+[data-testid="stSidebar"] .element-container {
+    padding-right: 1rem;
+}
+
+/* More compact sidebar content */
+[data-testid="stSidebar"] .block-container {
+    padding-top: 2rem !important;
+}
+
+/* Improve sidebar headings */
+[data-testid="stSidebar"] h1, 
+[data-testid="stSidebar"] h2, 
+[data-testid="stSidebar"] h3 {
+    font-size: 1.2rem !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.75rem !important;
+    color: #64B5F6 !important;
+}
+
 /* Common styles for detail items */
 .agent-detail, .inquiry-detail {
     margin-bottom: 12px;
