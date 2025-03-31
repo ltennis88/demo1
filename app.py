@@ -243,9 +243,10 @@ Existing Homeowner:
 Prospective Tradesperson:
     Allowed Actions: Inquire about the joining process, ask about membership costs, and request details on application requirements and the vetting process.
     Forbidden Actions: Discussing customer reviews, complaining about work quality, or referencing work performed in a home.
-    Forbidden Phrases: "my review", "poor quality", "not satisfied", "in my home", "I hired".
+    Forbidden Phrases: "my review", "poor quality", "not satisfied", "in my home", "I hired", "buy a home", "verify tradespeople", "find tradespeople", "reliable tradespeople", "home improvement", "renovation", "repair".
     Valid Example: "What documents do I need to submit for my membership application and what are the associated costs?"
     Account Details: Must be empty (no name, location, reviews, jobs, etc.)
+    CRITICAL: Must ONLY ask about joining Checkatrade as a tradesperson, membership process, or business requirements. Never ask about finding or verifying tradespeople, as that's for homeowners only.
 
 Existing Tradesperson:
     Allowed Actions: Ask about membership renewal, update business details, or respond to customer reviews.
