@@ -10,7 +10,7 @@ import os
 ###############################################################################
 # 1) PAGE CONFIGURATION & OPENAI SETUP
 ###############################################################################
-st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="collapsed", 
+st.set_page_config(layout="wide", page_title="Contact Center AI Assistant", initial_sidebar_state="expanded", 
                  menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
@@ -137,6 +137,10 @@ div.stApp {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# Add a clear title for the main page
+st.title("Checkatrade Contact Center AI Assistant")
+st.markdown("**Main Dashboard**")
 
 ###############################################################################
 # 2) LOAD FAQ / TAXONOMY DATA

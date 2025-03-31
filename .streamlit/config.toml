@@ -1,0 +1,11 @@
+[server]
+headless = true
+enableXsrfProtection = false
+
+[theme]
+primaryColor = "#1E88E5"
+backgroundColor = "#121212"
+textColor = "#FFFFFF"
+
+[ui]
+hideTopBar = false
