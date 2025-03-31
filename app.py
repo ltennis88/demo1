@@ -1714,11 +1714,31 @@ def generate_response_suggestion(scenario, classification_result):
         
         Customer Scenario:
         {scenario}
+        
+        Classification:
+        {json.dumps(classification_result, indent=2)}
+        
+        Instructions:
+        1. Be professional and empathetic
+        2. Address all aspects of the customer's query
+        3. Include specific details from relevant terms or policies
+        4. If this involves a guarantee claim or complaint about work quality:
+           - Reference the guarantee terms and eligibility criteria
+           - Explain the claims process
+           - Mention the £1000 coverage limit if applicable
+        5. Provide clear next steps
+        6. Keep the response concise but informative
         """
         
         # Find relevant FAQ with improved matching
         try:
             relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario, load_faq_csv())
+            if relevant_faq and faq_answer and faq_relevance >= 7:
+                context += f"""
+                Relevant FAQ:
+                Question: {relevant_faq}
+                Answer: {faq_answer}
+                """
         except Exception as e:
             st.error(f"Error finding relevant FAQ: {str(e)}")
             relevant_faq, faq_answer, faq_relevance = None, None, 0
@@ -1739,7 +1759,7 @@ def generate_response_suggestion(scenario, classification_result):
         
         # Extract token usage
         cached_input_tokens = len(base_context.split())  # Cached context
-        non_cached_input_tokens = len(str(scenario).split())  # Dynamic scenario
+        non_cached_input_tokens = len(str(scenario).split()) + len(json.dumps(classification_result).split())  # Dynamic content
         output_tokens = response.usage.completion_tokens
         
         # Calculate costs
@@ -1756,11 +1776,21 @@ def generate_response_suggestion(scenario, classification_result):
             response_time=response_time
         )
         
-        return response.choices[0].message.content
+        # For backward compatibility, return total input tokens and total input cost
+        total_input_tokens = cached_input_tokens + non_cached_input_tokens
+        total_input_cost = cached_input_cost + non_cached_input_cost
+        
+        return (
+            response.choices[0].message.content,
+            total_input_tokens,
+            output_tokens,
+            total_input_cost,
+            output_cost
+        )
         
     except Exception as e:
         st.error(f"Error generating response: {str(e)}")
-        return "Sorry, I couldn't generate a response at this time. Please try again later."
+        return "Sorry, I couldn't generate a response at this time. Please try again later.", 0, 0, 0, 0
 
 ###############################################################################
 # 11) STREAMLIT APP UI
