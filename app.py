@@ -260,7 +260,7 @@ def load_dummy_inquiries():
         return pd.DataFrame(columns=[
             "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
             "phone_email", "membership_id", "scenario_text", "classification",
-            "department", "subdepartment", "priority", "summary", "account_name", 
+            "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
             "account_location", "account_reviews", "account_jobs", "project_cost", 
             "payment_status", "estimated_response_time", "agent_notes", "case_status"
         ])
@@ -307,7 +307,7 @@ if "inquiries" not in st.session_state:
         st.session_state["inquiries"] = pd.DataFrame(columns=[
             "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
             "phone_email", "membership_id", "scenario_text", "classification",
-            "department", "subdepartment", "priority", "summary", "account_name", 
+            "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
             "account_location", "account_reviews", "account_jobs", "project_cost", 
             "payment_status", "estimated_response_time", "agent_notes", "case_status"
         ])
@@ -1641,7 +1641,8 @@ if st.session_state["generated_scenario"]:
                     "subdepartment": classification_result.get("subdepartment", "General Inquiries"),
                     "priority": classification_result.get("priority", "Medium"),
                     "summary": classification_result.get("summary", ""),
-                    "account_name": account_details.get("name", ""),
+                    "related_faq_category": classification_result.get("related_faq_category", ""),
+                    "account_name": f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip(),
                     "account_location": account_details.get("location", ""),
                     "account_reviews": account_details.get("latest_reviews", ""),
                     "account_jobs": account_details.get("latest_jobs", ""),

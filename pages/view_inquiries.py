@@ -127,6 +127,11 @@ def show_inquiries():
                 st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['summary']}</div>", unsafe_allow_html=True)
             
+            # Display related FAQ category if available
+            if 'related_faq_category' in recent_row and recent_row['related_faq_category']:
+                st.markdown("<div class='inquiry-label'>Related FAQ Category:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{recent_row['related_faq_category']}</div>", unsafe_allow_html=True)
+            
             # Add case status and agent notes section
             st.markdown("<div class='inquiry-section'>Case Management</div>", unsafe_allow_html=True)
             
