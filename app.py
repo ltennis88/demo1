@@ -2415,33 +2415,59 @@ if len(df) > 0:
             if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
                 df = st.session_state["inquiries"]
                 
-                # Classification distribution with graph
-                st.write("##### Classification Distribution")
-                if "classification" in df.columns and not df["classification"].isna().all():
-                    classification_counts = df["classification"].value_counts()
-                    fig_class = px.bar(
-                        x=classification_counts.index,
-                        y=classification_counts.values,
-                        labels={"x": "Classification", "y": "Count"},
-                        title="Classification Distribution"
-                    )
-                    fig_class.update_layout(showlegend=False)
-                    st.plotly_chart(fig_class, use_container_width=True)
+                # Create two columns for the pie charts
+                pie_col1, pie_col2 = st.columns(2)
                 
-                # Priority distribution with graph
-                st.write("##### Priority Distribution")
-                if "priority" in df.columns and not df["priority"].isna().all():
-                    priority_counts = df["priority"].value_counts()
-                    fig_priority = px.bar(
-                        x=priority_counts.index,
-                        y=priority_counts.values,
-                        labels={"x": "Priority", "y": "Count"},
-                        title="Priority Distribution"
-                    )
-                    fig_priority.update_layout(showlegend=False)
-                    st.plotly_chart(fig_priority, use_container_width=True)
+                with pie_col1:
+                    # Classification distribution with pie chart
+                    st.write("##### Classification Distribution")
+                    if "classification" in df.columns and not df["classification"].isna().all():
+                        classification_counts = df["classification"].value_counts()
+                        fig_class = px.pie(
+                            values=classification_counts.values,
+                            names=classification_counts.index,
+                            title="Classification Distribution"
+                        )
+                        fig_class.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_class, use_container_width=True)
                 
-                # Common topics analysis
+                with pie_col2:
+                    # Priority distribution with pie chart
+                    st.write("##### Priority Distribution")
+                    if "priority" in df.columns and not df["priority"].isna().all():
+                        priority_counts = df["priority"].value_counts()
+                        fig_priority = px.pie(
+                            values=priority_counts.values,
+                            names=priority_counts.index,
+                            title="Priority Distribution",
+                            color_discrete_map={
+                                "High": "#FF4B4B",
+                                "Medium": "#FFA726",
+                                "Low": "#4CAF50"
+                            }
+                        )
+                        fig_priority.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_priority, use_container_width=True)
+                
+                # Common topics analysis with bubble tags
                 st.write("##### Common Topics & Themes")
                 if "summary" in df.columns and not df["summary"].isna().all():
                     summaries = " ".join(df["summary"].fillna("")).lower()
@@ -2454,15 +2480,46 @@ if len(df) > 0:
                              if word not in stop_words and len(word) > 3]
                     
                     if themes:
-                        words, counts = zip(*themes)
-                        fig_themes = px.bar(
-                            x=words,
-                            y=counts,
-                            labels={"x": "Topic", "y": "Frequency"},
-                            title="Most Common Topics"
-                        )
-                        fig_themes.update_layout(showlegend=False)
-                        st.plotly_chart(fig_themes, use_container_width=True)
+                        # Create bubble tags HTML
+                        st.markdown("""
+                        <style>
+                        .bubble-container {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 10px;
+                            margin-top: 10px;
+                        }
+                        .bubble-tag {
+                            background-color: #2979FF;
+                            color: white;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            font-size: 14px;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        }
+                        .bubble-count {
+                            background-color: rgba(255, 255, 255, 0.2);
+                            padding: 2px 8px;
+                            border-radius: 10px;
+                            font-size: 12px;
+                        }
+                        </style>
+                        <div class="bubble-container">
+                        """, unsafe_allow_html=True)
+                        
+                        # Generate bubble tags
+                        bubble_tags = []
+                        for word, count in themes:
+                            bubble_tags.append(f"""
+                            <div class="bubble-tag">
+                                {word.title()}
+                                <span class="bubble-count">{count}</span>
+                            </div>
+                            """)
+                        
+                        st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
                     else:
                         st.text("No common themes found yet")
         else:
