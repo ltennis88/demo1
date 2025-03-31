@@ -2940,8 +2940,11 @@ with st.expander("View Analytics Dashboard"):
     else:
         st.info("No token usage data available yet. Generate some scenarios to see analytics.")
 
-def update_analytics():
-    """Update the analytics display with token usage and costs"""
+def update_analytics(section="main"):
+    """Update the analytics display with token usage and costs.
+    Args:
+        section (str): Section identifier to ensure unique chart IDs
+    """
     if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
         last_usage = st.session_state["token_usage"]["generations"][-1]
         
@@ -2956,8 +2959,12 @@ def update_analytics():
         with col1:
             st.metric("Response Time", f"{last_usage.get('response_time', 0):.2f}s")
         with col2:
-            total_tokens = last_usage.get("cached_input_tokens", 0) + last_usage.get("non_cached_input_tokens", 0)
-            st.metric("Input Tokens", f"{total_tokens:,} (${total_input_cost:.4f})")
+            total_tokens = (
+                last_usage.get("cached_input_tokens", 0) + 
+                last_usage.get("non_cached_input_tokens", 0) + 
+                last_usage.get("output_tokens", 0)
+            )
+            st.metric("Total Tokens", f"{total_tokens:,}")
         with col3:
             st.metric("Total Cost", f"${total_cost:.4f}")
         
@@ -2985,7 +2992,7 @@ def update_analytics():
             df_history['total_input_cost'] = df_history['cached_input_cost'].fillna(0) + df_history['non_cached_input_cost'].fillna(0)
             df_history['total_cost'] = df_history['total_input_cost'] + df_history['output_cost'].fillna(0)
             
-            # Token usage over time
+            # Token usage over time with unique key
             fig_tokens = px.line(df_history, 
                                x='timestamp', 
                                y=['cached_input_tokens', 'non_cached_input_tokens', 'output_tokens'],
@@ -2995,9 +3002,9 @@ def update_analytics():
                                    'non_cached_input_tokens': 'Non-cached Input',
                                    'output_tokens': 'Output'
                                })
-            st.plotly_chart(fig_tokens)
+            st.plotly_chart(fig_tokens, use_container_width=True, key=f"tokens_{section}")
             
-            # Costs over time
+            # Costs over time with unique key
             fig_costs = px.line(df_history, 
                               x='timestamp', 
                               y=['total_input_cost', 'output_cost', 'total_cost'],
@@ -3007,7 +3014,7 @@ def update_analytics():
                                   'output_cost': 'Output Cost',
                                   'total_cost': 'Total Cost'
                               })
-            st.plotly_chart(fig_costs)
+            st.plotly_chart(fig_costs, use_container_width=True, key=f"costs_{section}")
             
             # Summary statistics
             st.markdown("#### Summary Statistics")
@@ -3024,37 +3031,17 @@ def update_analytics():
     else:
         st.info("No analytics data available yet. Generate some responses to see usage statistics.")
 
-# Display analytics in the main section
+# Update all calls to update_analytics to include a section identifier
 if st.session_state.get("token_usage", {}).get("generations"):
-    with st.expander("📊 Analytics", expanded=True):
-        update_analytics()  # Use our new analytics function
+    update_analytics("main")  # Main section analytics
+
+# In response generation section
+if st.button("Generate Response"):
+    with st.spinner("Generating response..."):
+        response_text = generate_response_suggestion(scenario_dict, classification_dict)
+        st.markdown("### Generated Response")
+        st.markdown(response_text)
         
-        # Show historical data
-        if len(st.session_state["token_usage"]["generations"]) > 1:
-            st.write("\n### Historical Usage")
-            
-            # Prepare data for plotting
-            df_history = pd.DataFrame(st.session_state["token_usage"]["generations"])
-            df_history['timestamp'] = pd.to_datetime(df_history['timestamp'])
-            
-            # Calculate total costs correctly
-            df_history['total_input_cost'] = df_history['cached_input_cost'] + df_history['non_cached_input_cost']
-            df_history['total_cost'] = df_history['total_input_cost'] + df_history['output_cost']
-            
-            # Create line chart for token usage over time
-            fig_tokens = px.line(df_history, 
-                               x='timestamp', 
-                               y=['cached_input_tokens', 'non_cached_input_tokens', 'output_tokens'],
-                               title='Token Usage Over Time')
-            st.plotly_chart(fig_tokens)
-            
-            # Create line chart for costs over time
-            fig_costs = px.line(df_history, 
-                              x='timestamp', 
-                              y=['cached_input_cost', 'non_cached_input_cost', 'output_cost', 'total_cost'],
-                              title='Costs Over Time')
-            st.plotly_chart(fig_costs)
-            
-            # Show average response time
-            avg_response_time = df_history['response_time'].mean()
-            st.metric("Average Response Time", f"{avg_response_time:.2f}s")
+        # Display analytics with unique section identifier
+        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+            update_analytics("response")
