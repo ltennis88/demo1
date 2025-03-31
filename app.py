@@ -1895,12 +1895,15 @@ if st.session_state["generated_scenario"]:
                     try:
                         response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
                             st.session_state["generated_scenario"], 
-                            st.session_state["classification_result"]
+                            classification_result
                         )
-                        st.markdown(f"<div class='classification-card'>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='classification-header'>Suggested {inbound_route.capitalize()} Response</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='field-value' style='white-space: pre-wrap;'>{response_text}</div>", unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
+                        response_card = f"""
+                        <div class='classification-card'>
+                            <div class='classification-header'>Suggested {inbound_route.capitalize()} Response</div>
+                            <div class='field-value' style='white-space: pre-wrap;'>{str(response_text)}</div>
+                        </div>
+                        """
+                        st.markdown(response_card, unsafe_allow_html=True)
                     except Exception as e:
                         st.error(f"Could not generate response suggestion: {str(e)}")
 
@@ -2047,45 +2050,7 @@ if len(df) > 0:
                 st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['membership_id']}</div>", unsafe_allow_html=True)
         
-        # Account details section - only show if there's actual account info
-        has_account_info = (recent_row['account_name'] or recent_row['account_location'] or 
-                           recent_row['account_reviews'] or recent_row['account_jobs'] or
-                           recent_row['membership_id'])
-        
-        if has_account_info:
-            st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
-            
-            if recent_row['account_name']:
-                st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['account_name']}</div>", unsafe_allow_html=True)
-            
-            if recent_row['membership_id']:
-                st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['membership_id']}</div>", unsafe_allow_html=True)
-            
-            if recent_row['account_location']:
-                st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['account_location']}</div>", unsafe_allow_html=True)
-            
-            if recent_row['account_reviews']:
-                st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['account_reviews']}</div>", unsafe_allow_html=True)
-            
-            if recent_row['account_jobs']:
-                st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['account_jobs']}</div>", unsafe_allow_html=True)
-            
-            # Show project cost and payment status side by side if available
-            if recent_row['project_cost'] or recent_row['payment_status']:
-                st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>Project Cost: {recent_row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {recent_row['payment_status']}</div>", unsafe_allow_html=True)
-        
-        # Scenario text section
-        if recent_row['scenario_text']:
-            st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='inquiry-detail'>{recent_row['scenario_text']}</div>", unsafe_allow_html=True)
-        
-        # Classification summary section
+        # Classification summary section only
         st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
         
         if recent_row['classification']:
@@ -2197,45 +2162,7 @@ if len(df) > 0:
                         st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
                 
-                # Account details section - only show if there's actual account info
-                has_account_info = (row['account_name'] or row['account_location'] or 
-                                   row['account_reviews'] or row['account_jobs'] or
-                                   row['membership_id'])
-                
-                if has_account_info:
-                    st.markdown("<div class='inquiry-section'>Account Details</div>", unsafe_allow_html=True)
-                    
-                    if row['account_name']:
-                        st.markdown("<div class='inquiry-label'>Name:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['account_name']}</div>", unsafe_allow_html=True)
-                    
-                    if row['membership_id']:
-                        st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
-                    
-                    if row['account_location']:
-                        st.markdown("<div class='inquiry-label'>Location:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['account_location']}</div>", unsafe_allow_html=True)
-                    
-                    if row['account_reviews']:
-                        st.markdown("<div class='inquiry-label'>Latest Reviews:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['account_reviews']}</div>", unsafe_allow_html=True)
-                    
-                    if row['account_jobs']:
-                        st.markdown("<div class='inquiry-label'>Latest Jobs:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['account_jobs']}</div>", unsafe_allow_html=True)
-                    
-                    # Show project cost and payment status side by side if available
-                    if row['project_cost'] or row['payment_status']:
-                        st.markdown("<div class='inquiry-label'>Project Details:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>Project Cost: {row['project_cost']} &nbsp;&nbsp;&nbsp; Status: {row['payment_status']}</div>", unsafe_allow_html=True)
-                
-                # Scenario text section
-                if row['scenario_text']:
-                    st.markdown("<div class='inquiry-section'>Scenario Text</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
-                
-                # Classification summary section
+                # Classification summary section only
                 st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
                 
                 if row['classification']:
