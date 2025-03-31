@@ -228,109 +228,93 @@ STRICT USER TYPE RULES – THESE MUST BE FOLLOWED EXACTLY:
 
 Prospective Homeowner:
 
-Allowed Actions: Inquire about finding reliable tradespeople, ask questions about the vetting process, and request information about account creation.
-
-Forbidden Actions: Leaving reviews, complaining about work quality, or referencing any past/completed jobs.
-
-Forbidden Phrases: "my account", "my review", "poor quality", "not satisfied", "completed job", "past work".
-
-Valid Example: "I'm planning to buy a home soon and would like to know how you verify your tradespeople before I create an account."
+    Allowed Actions: Inquire about finding reliable tradespeople, ask questions about the vetting process, and request information about account creation.
+    Forbidden Actions: Leaving reviews, complaining about work quality, or referencing any past/completed jobs.
+    Forbidden Phrases: "my account", "my review", "poor quality", "not satisfied", "completed job", "past work".
+    Valid Example: "I'm planning to buy a home soon and would like to know how you verify your tradespeople before I create an account."
 
 Existing Homeowner:
 
-Allowed Actions: Complain about work quality, leave reviews, and discuss jobs that were completed for them.
-
-Forbidden Actions: Asking about membership fees, discussing business profiles, or offering trade services.
-
-Forbidden Phrases: "my business", "insurance details", "trade license", "my customers".
-
-Valid Example: "I recently had my kitchen renovated by a plumber and want to leave a review about the work."
+    Allowed Actions: Complain about work quality, leave reviews, and discuss jobs that were completed for them.
+    Forbidden Actions: Asking about membership fees, discussing business profiles, or offering trade services.
+    Forbidden Phrases: "my business", "insurance details", "trade license", "my customers".
+    Valid Example: "I recently had my kitchen renovated by a plumber and want to leave a review about the work."
 
 Prospective Tradesperson:
 
-Allowed Actions: Inquire about the joining process, ask about membership costs, and request details on application requirements and the vetting process.
-
-Forbidden Actions: Discussing customer reviews, complaining about work quality, or referencing work performed in a home.
-
-Forbidden Phrases: "my review", "poor quality", "not satisfied", "in my home", "I hired".
-
-Valid Example: "What documents do I need to submit for my membership application and what are the associated costs?"
+    Allowed Actions: Inquire about the joining process, ask about membership costs, and request details on application requirements and the vetting process.
+    Forbidden Actions: Discussing customer reviews, complaining about work quality, or referencing work performed in a home.
+    Forbidden Phrases: "my review", "poor quality", "not satisfied", "in my home", "I hired".
+    Valid Example: "What documents do I need to submit for my membership application and what are the associated costs?"
 
 Existing Tradesperson:
 
-Allowed Actions: Ask about membership renewal, update business details, or respond to customer reviews.
-
-Forbidden Actions: Complaining about work done for them, leaving reviews for others, or requesting services as if they were a homeowner.
-
-Forbidden Phrases: "I hired", "done for me", "my home", "my property", "not satisfied with", "poor quality".
-
-Valid Example: "I need to update my public liability insurance details and respond to a recent customer review."
+    Allowed Actions: Ask about membership renewal, update business details, or respond to customer reviews.
+    Forbidden Actions: Complaining about work done for them, leaving reviews for others, or requesting services as if they were a homeowner.
+    Forbidden Phrases: "I hired", "done for me", "my home", "my property", "not satisfied with", "poor quality".
+    Valid Example: "I need to update my public liability insurance details and respond to a recent customer review."
 
 CRITICAL VALIDATION RULES: 
 
-A. For Tradespeople (both existing and prospective):
-Must never complain about work done for them, leave reviews about other tradespeople, request home services, or reference any work done in their own home.
-Do not use phrases like "I hired", "done for me", or "in my house". 
+    A. For Tradespeople (both existing and prospective):
+    Must never complain about work done for them, leave reviews about other tradespeople, request home services, or reference any work done in their own home.
+    Do not use phrases like "I hired", "done for me", or "in my house". 
 
-B. For Homeowners (both existing and prospective):
-Must never offer trade services, discuss membership fees, reference business profiles or customer details, or mention insurance or trade qualifications.
-Do not use phrases like "my business", "my customers", or "trade license".
+    B. For Homeowners (both existing and prospective):
+    Must never offer trade services, discuss membership fees, reference business profiles or customer details, or mention insurance or trade qualifications.
+    Do not use phrases like "my business", "my customers", or "trade license".
 
 ACCOUNT DETAILS FORMAT:
 
-Homeowners' reviews must begin with "Gave", "Left", or "Posted" and refer to work done for them (e.g., "Gave 4.5 stars to a roofer who fixed leaking gutters last week").
-
-Tradespeople's reviews must begin with "Received", "Customer gave", or "Client rated" and refer to work they completed for others (e.g., "Received a 5-star review for rewiring a period property").
-
-Homeowners' job descriptions must be passive (e.g., "Had kitchen renovation completed by a plumber").
-
-Tradespeople's job descriptions must be active (e.g., "Completed bathroom renovation with custom tiling").
-
-Do not mix review/job formats between user types.
+    Homeowners' reviews must begin with "Gave", "Left", or "Posted" and refer to work done for them (e.g., "Gave 4.5 stars to a roofer who fixed leaking gutters last week").
+    Tradespeople's reviews must begin with "Received", "Customer gave", or "Client rated" and refer to work they completed for others (e.g., "Received a 5-star review for rewiring a period property").
+    Homeowners' job descriptions must be passive (e.g., "Had kitchen renovation completed by a plumber").
+    Tradespeople's job descriptions must be active (e.g., "Completed bathroom renovation with custom tiling").
+    Do not mix review/job formats between user types.
 
 Membership IDs:
-Only an existing tradesperson may have a membership ID in the format "T-xxxxx".
-All other user types must have an empty membership_id field.
+    Only an existing tradesperson may have a membership ID in the format "T-xxxxx".
+    All other user types must have an empty membership_id field.
 
 Review and Job Data Rules:
-For Existing Homeowners: "latest_reviews" must contain reviews they have given for work completed for them, and "latest_jobs" must describe work done for them.
-For Existing Tradespeople: "latest_reviews" must contain reviews they received from customers, and "latest_jobs" must describe work they completed for others.
-Prospective users (both homeowner and tradesperson) must have empty "latest_reviews" and "latest_jobs", as well as empty "project_cost" and "payment_status".
+    For Existing Homeowners: "latest_reviews" must contain reviews they have given for work completed for them, and "latest_jobs" must describe work done for them.
+    For Existing Tradespeople: "latest_reviews" must contain reviews they received from customers, and "latest_jobs" must describe work they completed for others.
+    Prospective users (both homeowner and tradesperson) must have empty "latest_reviews" and "latest_jobs", as well as empty "project_cost" and "payment_status".
 
 SCENARIO GENERATION REQUIREMENTS: Generate a single inbound scenario in STRICT JSON FORMAT ONLY. The JSON object must include exactly these keys:
 
-"inbound_route": one of ["phone", "whatsapp", "email", "web_form"].
-"ivr_flow": a string (if inbound_route is "phone", otherwise an empty string).
-"ivr_selections": an array of numbers representing IVR selections (if inbound_route is "phone", otherwise an empty array).
-"user_type": one of ["existing_tradesperson", "existing_homeowner", "prospective_tradesperson", "prospective_homeowner"].
-"phone_email": a random phone number if the inbound_route is "phone" or "whatsapp", a random email if the inbound_route is "email", or empty if "web_form".
-"membership_id": For an existing tradesperson only (e.g., "T-12345"); empty for all other user types.
+    "inbound_route": one of ["phone", "whatsapp", "email", "web_form"].
+    "ivr_flow": a string (if inbound_route is "phone", otherwise an empty string).
+    "ivr_selections": an array of numbers representing IVR selections (if inbound_route is "phone", otherwise an empty array).
+    "user_type": one of ["existing_tradesperson", "existing_homeowner", "prospective_tradesperson", "prospective_homeowner"].
+    "phone_email": a random phone number if the inbound_route is "phone" or "whatsapp", a random email if the inbound_route is "email", or empty if "web_form".
+    "membership_id": For an existing tradesperson only (e.g., "T-12345"); empty for all other user types.
 
-"account_details": an object containing:
-"name": For existing users, provide a random first name; empty for prospective users.
-"surname": For existing users, provide a random surname; empty for prospective users.
-"location": For existing users, provide a random UK location; empty for prospective users.
-"latest_reviews": For Existing Homeowners: Reviews they have given about work done for them. For Existing Tradespeople: Reviews they have received from customers. Empty for Prospective users.
-"latest_jobs": For Existing Homeowners: Descriptions of jobs completed for them. For Existing Tradespeople: Descriptions of jobs they completed for others. Empty for Prospective users.
-"project_cost": For existing users with a recent job, provide a random cost (e.g., "£2,500"); empty otherwise.
-"payment_status": For existing users with a recent job, one of "Paid", "Pending", or "Partial Payment"; empty otherwise.
+    "account_details": an object containing:
+    "name": For existing users, provide a random first name; empty for prospective users.
+    "surname": For existing users, provide a random surname; empty for prospective users.
+    "location": For existing users, provide a random UK location; empty for prospective users.
+    "latest_reviews": For Existing Homeowners: Reviews they have given about work done for them. For Existing Tradespeople: Reviews they have received from customers. Empty for Prospective users.
+    "latest_jobs": For Existing Homeowners: Descriptions of jobs completed for them. For Existing Tradespeople: Descriptions of jobs they completed for others. Empty for Prospective users.
+    "project_cost": For existing users with a recent job, provide a random cost (e.g., "£2,500"); empty otherwise.
+    "payment_status": For existing users with a recent job, one of "Paid", "Pending", or "Partial Payment"; empty otherwise.
 
-"scenario_text": A concise, realistic reason for contacting Checkatrade that strictly matches the user type and adheres to the above rules.
+    "scenario_text": A concise, realistic reason for contacting Checkatrade that strictly matches the user type and adheres to the above rules.
 
 ADDITIONAL RULES:
-Return ONLY valid JSON with no extra commentary.
-If inbound_route is "phone", include a realistic IVR flow description and a corresponding array of IVR selections.
-For existing users, ensure account_details contains plausible data.
+    Return ONLY valid JSON with no extra commentary.
+    If inbound_route is "phone", include a realistic IVR flow description and a corresponding array of IVR selections.
+    For existing users, ensure account_details contains plausible data.
 
-The "scenario_text" must be specific to Checkatrade and logically match the user type:
-Prospective Homeowners: Questions about finding tradespeople or the vetting process (do not reference any completed job).
-Existing Homeowners: Comments about or reviews of completed jobs.
-Prospective Tradespeople: Inquiries about joining, membership costs, or the application process (do not reference providing home services).
-Existing Tradespeople: Requests to update membership details, respond to customer reviews, or membership renewals.
+    The "scenario_text" must be specific to Checkatrade and logically match the user type:
+    Prospective Homeowners: Questions about finding tradespeople or the vetting process (do not reference any completed job).
+    Existing Homeowners: Comments about or reviews of completed jobs.
+    Prospective Tradespeople: Inquiries about joining, membership costs, or the application process (do not reference providing home services).
+    Existing Tradespeople: Requests to update membership details, respond to customer reviews, or membership renewals.
 
 Ensure consistency:
-Homeowners receive work and give reviews.
-Tradespeople perform work and receive reviews.
+    Homeowners receive work and give reviews.
+    Tradespeople perform work and receive reviews.
 
 Use a variety of trade types in your examples (e.g., plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway/patio specialist, fencing contractor, tree surgeon).
 
@@ -384,44 +368,30 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     
     # Add strict validation rules for scenario generation
     validation_rules = """
-    STRICT SCENARIO VALIDATION:
+    STRICT JSON FORMAT REQUIREMENTS:
     
-    1. For EXISTING TRADESPERSON scenarios:
-       - Scenario MUST be about: membership management, profile updates, customer reviews, or business operations
-       - Account details MUST show reviews RECEIVED from customers
-       - Latest jobs MUST be work THEY did for others
-       - NEVER generate scenarios about them seeking services or hiring other tradespeople
-       Example scenarios:
-       * "Need to update my insurance certificate for my membership renewal"
-       * "How do I respond to the customer review I received yesterday?"
-       * "Having trouble uploading new photos to my business profile"
-    
-    2. For PROSPECTIVE TRADESPERSON scenarios:
-       - Scenario MUST be about: joining process, membership benefits, or application requirements
-       - NO account details or membership ID should be included
-       - NEVER generate scenarios about them seeking services
-       Example scenarios:
-       * "What documents do I need to submit for my membership application?"
-       * "Can you explain the vetting process for new tradespeople?"
-       * "What are the membership fees and payment options?"
-    
-    3. For EXISTING HOMEOWNER scenarios:
-       - Scenario MUST be about: finding services, leaving reviews, or discussing work done FOR them
-       - Account details MUST show reviews THEY gave about work done FOR them
-       - Latest jobs MUST be work done FOR them by tradespeople
-       Example scenarios:
-       * "Want to leave a review for the plumber who fixed my bathroom"
-       * "The electrician hasn't completed the rewiring job they started"
-       * "Need to find a reliable roofer in my area"
-    
-    4. For PROSPECTIVE HOMEOWNER scenarios:
-       - Scenario MUST be about: finding tradespeople or understanding Checkatrade's service
-       - NO account details should be included
-       - NEVER reference past jobs or reviews
-       Example scenarios:
-       * "How do I find a reliable plumber through Checkatrade?"
-       * "What checks do you do on your tradespeople?"
-       * "Do you cover my area for building work?"
+    You MUST return a single JSON object with EXACTLY this structure:
+    {
+        "inbound_route": "phone" | "whatsapp" | "email" | "web_form",
+        "ivr_flow": "string if phone, empty string otherwise",
+        "ivr_selections": [numbers if phone, empty array otherwise],
+        "user_type": "existing_tradesperson" | "existing_homeowner" | "prospective_tradesperson" | "prospective_homeowner",
+        "phone_email": "string based on route type",
+        "membership_id": "T-xxxxx for existing tradesperson only, empty string otherwise",
+        "account_details": {
+            "name": "string for existing users, empty string for prospective",
+            "surname": "string for existing users, empty string for prospective",
+            "location": "string for existing users, empty string for prospective",
+            "latest_reviews": "string for existing users, empty string for prospective",
+            "latest_jobs": "string for existing users, empty string for prospective",
+            "project_cost": "string for existing users with jobs, empty string otherwise",
+            "payment_status": "string for existing users with jobs, empty string otherwise"
+        },
+        "scenario_text": "string describing the contact reason"
+    }
+
+    DO NOT include any additional fields or commentary.
+    ALL fields must be present exactly as shown above.
     """
     
     # Start with base prompt
@@ -437,29 +407,72 @@ def generate_scenario(selected_route=None, selected_user_type=None):
     else:
         user_content += "\n\nYou may pick any inbound_route and user_type."
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  # Updated to use gpt-4o-mini
-        messages=[
-            {"role": "system", "content": "You generate diverse and random inbound scenarios for Checkatrade using FAQ topics as inspiration."},
-            {"role": "user", "content": user_content}
-        ],
-        temperature=1.0,  # Increased temperature for more diversity
-        max_tokens=500
-    )
-    raw_reply = response["choices"][0]["message"]["content"].strip()
     try:
-        scenario_data = json.loads(raw_reply)
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=1.0,
+            max_tokens=500
+        )
+        raw_reply = response["choices"][0]["message"]["content"].strip()
         
-        # If we're supposed to randomize the user type, do it manually to ensure proper randomness
-        if should_randomize_user_type:
-            # Randomly choose one of the four user types with equal probability
-            user_types = ["existing_homeowner", "existing_tradesperson", "prospective_homeowner", "prospective_tradesperson"]
-            random_user_type = random.choice(user_types)
-            scenario_data["user_type"] = random_user_type
+        try:
+            scenario_data = json.loads(raw_reply)
             
-            # If switching to a prospective user, clear account details
-            if "prospective" in random_user_type and scenario_data.get("account_details"):
-                scenario_data["account_details"] = {
+            # Validate required fields
+            required_fields = ["inbound_route", "ivr_flow", "ivr_selections", "user_type", 
+                             "phone_email", "membership_id", "account_details", "scenario_text"]
+            required_account_fields = ["name", "surname", "location", "latest_reviews", 
+                                     "latest_jobs", "project_cost", "payment_status"]
+            
+            # Check all required fields exist
+            for field in required_fields:
+                if field not in scenario_data:
+                    raise ValueError(f"Missing required field: {field}")
+            
+            # Check account_details structure
+            if not isinstance(scenario_data["account_details"], dict):
+                raise ValueError("account_details must be an object")
+            
+            for field in required_account_fields:
+                if field not in scenario_data["account_details"]:
+                    raise ValueError(f"Missing required account field: {field}")
+            
+            # If we're supposed to randomize the user type, do it manually
+            if should_randomize_user_type:
+                user_types = ["existing_homeowner", "existing_tradesperson", 
+                            "prospective_homeowner", "prospective_tradesperson"]
+                random_user_type = random.choice(user_types)
+                scenario_data["user_type"] = random_user_type
+                
+                # Update account details based on user type
+                if "prospective" in random_user_type:
+                    scenario_data["account_details"] = {
+                        "name": "",
+                        "surname": "",
+                        "location": "",
+                        "latest_reviews": "",
+                        "latest_jobs": "",
+                        "project_cost": "",
+                        "payment_status": ""
+                    }
+                    scenario_data["membership_id"] = ""
+                
+            return scenario_data
+            
+        except Exception as e:
+            # Return a properly structured error scenario
+            return {
+                "inbound_route": "error",
+                "ivr_flow": "",
+                "ivr_selections": [],
+                "user_type": selected_user_type if selected_user_type else "error",
+                "phone_email": "",
+                "membership_id": "",
+                "account_details": {
                     "name": "",
                     "surname": "",
                     "location": "",
@@ -467,43 +480,17 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                     "latest_jobs": "",
                     "project_cost": "",
                     "payment_status": ""
-                }
-                scenario_data["membership_id"] = ""
+                },
+                "scenario_text": f"Error parsing scenario JSON: {str(e)}"
+            }
             
-            # If switching to an existing user and missing account details, create dummy ones
-            elif "existing" in random_user_type and (not scenario_data.get("account_details") or not scenario_data.get("account_details").get("name")):
-                if random_user_type == "existing_homeowner":
-                    scenario_data["account_details"] = {
-                        "name": random.choice(["John", "Emma", "Michael", "Sarah", "David", "Lisa"]),
-                        "surname": random.choice(["Smith", "Jones", "Williams", "Brown", "Taylor", "Davies"]),
-                        "location": random.choice(["London", "Manchester", "Birmingham", "Liverpool", "Glasgow", "Bristol"]),
-                        "latest_reviews": "Recent 4-star review for a bathroom renovation with minor issues on finishing touches",
-                        "latest_jobs": "Kitchen remodeling by a carpenter and electrician, completed last month",
-                        "project_cost": f"£{random.randint(1500, 8000)}",
-                        "payment_status": random.choice(["Paid", "Pending", "Partial Payment"])
-                    }
-                elif random_user_type == "existing_tradesperson":
-                    scenario_data["membership_id"] = f"T-{random.randint(10000, 99999)}"
-                    scenario_data["account_details"] = {
-                        "name": random.choice(["Robert", "James", "Thomas", "Patricia", "Jennifer", "William"]),
-                        "surname": random.choice(["Wilson", "Evans", "Harris", "Lewis", "Walker", "Clark"]),
-                        "location": random.choice(["Leeds", "Sheffield", "Edinburgh", "Cardiff", "Belfast", "Newcastle"]),
-                        "latest_reviews": "Consistently receiving 4.8-star ratings for electrical work with comments on punctuality",
-                        "latest_jobs": "Complete rewiring of a Victorian property and installation of smart home systems",
-                        "project_cost": f"£{random.randint(1000, 5000)}",
-                        "payment_status": "Paid"
-                    }
-        # If user type was specified, ensure it's properly applied
-        elif selected_user_type:
-            scenario_data["user_type"] = selected_user_type
-        
-        return scenario_data
     except Exception as e:
+        # Return a properly structured error scenario for API errors
         return {
             "inbound_route": "error",
             "ivr_flow": "",
             "ivr_selections": [],
-            "user_type": selected_user_type if selected_user_type else random.choice(["existing_homeowner", "existing_tradesperson", "prospective_homeowner", "prospective_tradesperson"]),
+            "user_type": selected_user_type if selected_user_type else "error",
             "phone_email": "",
             "membership_id": "",
             "account_details": {
@@ -511,9 +498,11 @@ def generate_scenario(selected_route=None, selected_user_type=None):
                 "surname": "",
                 "location": "",
                 "latest_reviews": "",
-                "latest_jobs": ""
+                "latest_jobs": "",
+                "project_cost": "",
+                "payment_status": ""
             },
-            "scenario_text": "Error parsing scenario JSON."
+            "scenario_text": f"API Error: {str(e)}"
         }
 
 ###############################################################################
