@@ -153,9 +153,11 @@ def show_inquiries():
             elif recent_row['priority'] == "Low":
                 priority_class = "priority-low"
             
-            # Create the classification card
+            # Create the classification card with proper header
             classification_html = f"""
             <div class="classification-card">
+                <div style="font-weight: bold; font-size: 16px; margin-bottom: 15px;">Classification Results</div>
+                
                 <div class="classification-field">
                     <div class="field-label">Classification:</div>
                     <div class="field-value">{recent_row['classification']}</div>
