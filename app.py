@@ -1192,118 +1192,61 @@ Required JSON Structure:
 """
 
 def classify_scenario(text):
-    """Classify the scenario and return structured classification data."""
+    """Classify the scenario using GPT-4."""
     try:
-        # Start timing
         start_time = time.time()
         
-        # Get cached components
-        base_context = build_base_context()
+        # Get the classification template
         classification_template = get_classification_template()
         
-        # Build minimal dynamic prompt
-        classification_prompt = f"""Based on this scenario and context, classify the inquiry and return ONLY a valid JSON object (no other text).
-
-Context:
-{base_context}
-
-Scenario:
-{text}
-
-Classification Guidelines:
-{classification_template}"""
+        # Build the messages for the API call
+        messages = [{"role": "system", "content": classification_template},
+                   {"role": "user", "content": text}]
         
+        # Make the API call
         response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a classification system that only returns valid JSON objects."},
-                {"role": "user", "content": classification_prompt}
-            ],
-            temperature=0.5,
-            max_tokens=400
+            model="gpt-4",
+            messages=messages,
+            temperature=0,
+            response_format={ "type": "json_object" }
         )
-        
-        # Calculate token usage and costs
-        input_tokens = response["usage"]["prompt_tokens"]
-        output_tokens = response["usage"]["completion_tokens"]
-        total_tokens = response["usage"]["total_tokens"]
-        
-        # Split input tokens into cached and non-cached portions
-        cached_tokens = len(base_context.split()) + len(classification_template.split())
-        non_cached_tokens = input_tokens - cached_tokens
-        
-        # Calculate costs using appropriate rates
-        cached_input_cost = calculate_token_cost(cached_tokens, "cached_input")
-        non_cached_input_cost = calculate_token_cost(non_cached_tokens, "input")
-        output_cost = calculate_token_cost(output_tokens, "output")
-        total_cost = cached_input_cost + non_cached_input_cost + output_cost
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Store usage data
-        usage_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "input_tokens": input_tokens,
-            "cached_input_tokens": cached_tokens,
-            "non_cached_input_tokens": non_cached_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "cached_input_cost": cached_input_cost,
-            "non_cached_input_cost": non_cached_input_cost,
-            "output_cost": output_cost,
-            "total_cost": total_cost,
-            "response_time": response_time,
-            "operation": "classification"
-        }
+        # Get completion tokens
+        completion_tokens = response.usage.completion_tokens
+        prompt_tokens = response.usage.prompt_tokens
         
-        st.session_state["token_usage"]["generations"].append(usage_data)
-        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-        st.session_state["token_usage"]["total_cost"] += total_cost
-        st.session_state["token_usage"]["response_times"].append(response_time)
+        # Track token usage
+        track_token_usage(
+            operation="classification",
+            non_cached_input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
+            response_time=response_time
+        )
         
-        # Parse the classification response
+        # Display token usage
+        st.markdown("#### Classification Metrics")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Response Time", f"{response_time:.2f}s")
+        with col2:
+            st.metric("Input Tokens", f"{prompt_tokens:,}", f"£{calculate_token_cost(prompt_tokens, 'input'):.4f}")
+        with col3:
+            st.metric("Output Tokens", f"{completion_tokens:,}", f"£{calculate_token_cost(completion_tokens, 'output'):.4f}")
+        
         try:
-            response_text = response["choices"][0]["message"]["content"].strip()
-            if not response_text:
-                raise json.JSONDecodeError("Empty response", "", 0)
-                
-            classification_data = json.loads(response_text)
-            
-            # Validate required fields
-            required_fields = ["classification", "department", "subdepartment", "priority", 
-                             "summary", "related_faq_category", "estimated_response_time"]
-            missing_fields = [field for field in required_fields if field not in classification_data]
-            
-            if missing_fields:
-                raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
-                
-            return classification_data
-            
+            # Parse the response
+            result = json.loads(response.choices[0].message.content)
+            return result
         except json.JSONDecodeError as e:
-            st.error(f"Error parsing classification JSON: {str(e)}")
-            return {
-                "classification": "General",
-                "department": "Consumer Support",
-                "subdepartment": "General Inquiries",
-                "priority": "Medium",
-                "summary": "Could not parse classification response.",
-                "related_faq_category": "",
-                "estimated_response_time": "48 hours"
-            }
+            st.error(f"Error parsing classification response: {str(e)}")
+            return None
             
     except Exception as e:
-        st.error(f"Error in classification: {str(e)}")
-        return {
-            "classification": "General",
-            "department": "Consumer Support",
-            "subdepartment": "General Inquiries",
-            "priority": "Medium",
-            "summary": f"Error during classification: {str(e)}",
-            "related_faq_category": "",
-            "estimated_response_time": "48 hours"
-        }
+        st.error(f"Error during classification: {str(e)}")
+        return None
 
 ###############################################################################
 # 9) HELPER: GENERATE SCENARIO VIA OPENAI
@@ -1376,141 +1319,54 @@ def track_token_usage(operation, cached_input_tokens=0, non_cached_input_tokens=
     return usage_data
 
 def generate_scenario(selected_route=None, selected_user_type=None):
-    """
-    Generates a scenario using OpenAI's ChatCompletion.
-    If selected_route is provided (phone, whatsapp, email, web_form), force that route.
-    If selected_user_type is provided, force that user type.
-    """
-    # Start timing
-    start_time = time.time()
-    
-    # For random user type, we'll randomize it ourselves to ensure true randomness
-    should_randomize_user_type = selected_user_type is None
-    
-    # If we're randomizing, do it now so we can get the correct prompt
-    if should_randomize_user_type:
-        user_types = ["existing_homeowner", "existing_tradesperson", 
-                    "prospective_homeowner", "prospective_tradesperson"]
-        selected_user_type = random.choice(user_types)
-    
-    # Get the appropriate user type prompt - this is now guaranteed to have a user type
-    user_type_prompt = get_user_type_prompt(selected_user_type)
-    
-    # Start with base prompt
-    user_content = base_prompt + "\n\n" + user_type_prompt
-    
-    # Add route and user type instructions
-    if selected_route:
-        user_content += f"\n\nForce inbound_route to '{selected_route}'."
-    
-    # Always specify the user type now, since we either have it from input or randomly selected it
-    user_content += f"\n\nForce user_type to '{selected_user_type}'."
-
+    """Generate a scenario based on the selected route and user type."""
     try:
-        response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a JSON generator that creates strictly formatted scenario data for Checkatrade's contact system."},
-                    {"role": "user", "content": user_content}
-                ],
-                temperature=1.0,
-                max_tokens=500
-            )
-            
-            # Calculate token usage and costs
-        input_tokens = response["usage"]["prompt_tokens"]
-        output_tokens = response["usage"]["completion_tokens"]
-        total_tokens = response["usage"]["total_tokens"]
+        start_time = time.time()
         
-        # Calculate costs - since we're using cached prompts, use the cached_input rate
-        input_cost = calculate_token_cost(input_tokens, "cached_input")
-        output_cost = calculate_token_cost(output_tokens, "output")
-        total_cost = input_cost + output_cost
+        # Get the appropriate prompt based on user type
+        user_type_prompt = get_user_type_prompt(selected_user_type)
+        
+        messages = [
+            {"role": "system", "content": user_type_prompt},
+            {"role": "user", "content": f"Generate a scenario for route: {selected_route}"}
+        ]
+        
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=messages,
+            temperature=0.7
+        )
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Store usage data
-        usage_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "input_cost": input_cost,
-            "output_cost": output_cost,
-            "total_cost": total_cost,
-            "response_time": response_time,
-        "operation": "generation"
-        }
+        # Get completion tokens
+        completion_tokens = response.usage.completion_tokens
+        prompt_tokens = response.usage.prompt_tokens
         
-        st.session_state["token_usage"]["generations"].append(usage_data)
-        st.session_state["token_usage"]["total_input_tokens"] += input_tokens
-        st.session_state["token_usage"]["total_output_tokens"] += output_tokens
-        st.session_state["token_usage"]["total_cost"] += total_cost
-        st.session_state["token_usage"]["response_times"].append(response_time)
+        # Track token usage
+        track_token_usage(
+            operation="scenario_generation",
+            non_cached_input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
+            response_time=response_time
+        )
         
-        raw_reply = response["choices"][0]["message"]["content"].strip()
+        # Display token usage
+        st.markdown("#### Scenario Generation Metrics")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Response Time", f"{response_time:.2f}s")
+        with col2:
+            st.metric("Input Tokens", f"{prompt_tokens:,}", f"£{calculate_token_cost(prompt_tokens, 'input'):.4f}")
+        with col3:
+            st.metric("Output Tokens", f"{completion_tokens:,}", f"£{calculate_token_cost(completion_tokens, 'output'):.4f}")
         
-        try:
-            scenario_data = json.loads(raw_reply)
-            
-            # Ensure account details match the user type
-            if "prospective" in selected_user_type:
-                scenario_data["account_details"] = {
-                    "name": "",
-                    "surname": "",
-                    "location": "",
-                    "latest_reviews": "",
-                    "latest_jobs": "",
-                    "project_cost": "",
-                    "payment_status": ""
-                }
-                scenario_data["membership_id"] = ""
-            
-            # Force the user type to match what was selected/randomized
-            scenario_data["user_type"] = selected_user_type
-            
-            return scenario_data
-                
-        except Exception as e:
-            return {
-                "inbound_route": "error",
-                        "ivr_flow": "",
-                        "ivr_selections": [],
-                        "user_type": selected_user_type,
-                        "phone_email": "",
-                        "membership_id": "",
-                        "account_details": {
-                            "name": "",
-                            "surname": "",
-                            "location": "",
-                            "latest_reviews": "",
-                            "latest_jobs": "",
-                            "project_cost": "",
-                            "payment_status": ""
-                        },
-                        "scenario_text": f"Error parsing scenario JSON: {str(e)}"
-                    }
-            
+        return response.choices[0].message.content
+        
     except Exception as e:
-        return {
-            "inbound_route": "error",
-                    "ivr_flow": "",
-                    "ivr_selections": [],
-            "user_type": selected_user_type,
-                    "phone_email": "",
-                    "membership_id": "",
-                    "account_details": {
-                        "name": "",
-                        "surname": "",
-                        "location": "",
-                        "latest_reviews": "",
-                        "latest_jobs": "",
-                        "project_cost": "",
-                        "payment_status": ""
-                    },
-                    "scenario_text": f"API Error: {str(e)}"
-    }
+        st.error(f"Error generating scenario: {str(e)}")
+        return None
 
 ###############################################################################
 # 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
@@ -3062,3 +2918,69 @@ if st.button("Generate Response"):
         # Display analytics with unique section identifier
         if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
             update_analytics("response")
+
+# Update the metrics display section
+def display_operation_metrics(operation_data):
+    """Display metrics for a specific operation."""
+    # Calculate total input tokens correctly
+    input_tokens = operation_data.get("cached_input_tokens", 0) + operation_data.get("non_cached_input_tokens", 0)
+    output_tokens = operation_data.get("output_tokens", 0)
+    
+    # Calculate costs
+    input_cost = operation_data.get("cached_input_cost", 0) + operation_data.get("non_cached_input_cost", 0)
+    output_cost = operation_data.get("output_cost", 0)
+    total_cost = input_cost + output_cost
+    
+    # Display metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Response Time", f"{operation_data.get('response_time', 0):.2f}s")
+    with col2:
+        st.metric("Input Tokens", f"{input_tokens:,}", f"£{input_cost:.4f}")
+    with col3:
+        st.metric("Output Tokens", f"{output_tokens:,}", f"£{output_cost:.4f}")
+    with col4:
+        st.metric("Total Cost", f"£{total_cost:.4f}")
+    
+    # Show detailed breakdown
+    with st.expander("View Detailed Token Breakdown"):
+        st.markdown("**Input Token Details:**")
+        st.markdown(f"- Cached: {operation_data.get('cached_input_tokens', 0):,} tokens (£{operation_data.get('cached_input_cost', 0):.4f})")
+        st.markdown(f"- Non-cached: {operation_data.get('non_cached_input_tokens', 0):,} tokens (£{operation_data.get('non_cached_input_cost', 0):.4f})")
+        st.markdown(f"- Total Input: {input_tokens:,} tokens (£{input_cost:.4f})")
+        st.markdown("\n**Output Token Details:**")
+        st.markdown(f"- Total: {output_tokens:,} tokens (£{output_cost:.4f})")
+        st.markdown(f"\n**Total Cost: £{total_cost:.4f}**")
+
+# In the classification section
+if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+    last_classification = next(
+        (usage for usage in reversed(st.session_state["token_usage"]["generations"])
+         if usage.get("operation") == "classification"),
+        None
+    )
+    if last_classification:
+        st.markdown("#### Classification Metrics")
+        display_operation_metrics(last_classification)
+
+# In the scenario generation section
+if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+    last_generation = next(
+        (usage for usage in reversed(st.session_state["token_usage"]["generations"])
+         if usage.get("operation") == "scenario_generation"),
+        None
+    )
+    if last_generation:
+        st.markdown("#### Scenario Generation Metrics")
+        display_operation_metrics(last_generation)
+
+# In the response generation section
+if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+    last_response = next(
+        (usage for usage in reversed(st.session_state["token_usage"]["generations"])
+         if usage.get("operation") == "response_generation"),
+        None
+    )
+    if last_response:
+        st.markdown("#### Response Generation Metrics")
+        display_operation_metrics(last_response)
