@@ -224,6 +224,55 @@ You are a scenario generator for Checkatrade's inbound contact system.
 Below is FAQ/taxonomy data for reference:
 {faq_context}
 
+User Type Definitions:
+1. Prospective Homeowner:
+   - Individual planning home improvements or repairs
+   - No existing account or history with Checkatrade
+   - Common inquiries:
+     * Asking how to find reliable tradespeople
+     * Questions about vetting process and tradesperson reviews
+     * How to use the platform for upcoming renovation projects
+     * Understanding Checkatrade's protection and guarantees
+     * Creating an account for future projects
+
+2. Existing Homeowner:
+   - Current property owner using Checkatrade's services
+   - Has an account with completed jobs/reviews
+   - RECEIVES services from tradespeople
+   - Can leave reviews about work done FOR them
+   - Common inquiries:
+     * Complaints about work quality or delays
+     * Finding tradespeople for new projects
+     * Leaving reviews for completed work
+     * Questions about ongoing projects
+     * Payment disputes or project costs
+     * Warranty or guarantee claims
+
+3. Prospective Tradesperson:
+   - Skilled professional interested in joining Checkatrade
+   - No membership ID yet
+   - Common inquiries:
+     * Questions about membership costs and benefits
+     * Application process and requirements
+     * Vetting procedures and timelines
+     * Marketing support and lead generation details
+     * Tools and material discounts information
+     * Profile setup assistance
+
+4. Existing Tradesperson:
+   - Verified trade professional registered with Checkatrade
+   - Has active membership ID (format: T-xxxxx)
+   - PROVIDES services to homeowners
+   - RECEIVES reviews from customers
+   - Common inquiries:
+     * Membership renewal and payments
+     * Updating credentials or insurance details
+     * Managing customer reviews and feedback
+     * Technical support with profile/dashboard
+     * Accessing member benefits and discounts
+     * Lead generation and visibility questions
+     * Dispute resolution with customers
+
 Produce a single inbound scenario in STRICT JSON FORMAT ONLY (no extra text).
 The JSON object must have exactly these keys:
 - "inbound_route": one of "phone", "whatsapp", "email", "web_form".
@@ -237,24 +286,28 @@ The JSON object must have exactly these keys:
     - "surname": if existing, a random surname; otherwise empty.
     - "location": if existing, a UK location; otherwise empty.
     - "latest_reviews": 
-        * For homeowners: Reviews with SPECIFIC DETAILS about jobs completed by various tradespeople. Mention the type of job, the quality, and the tradesperson type. Be creative - examples: "Gave 4.5 stars to a roofer who fixed leaking gutters last week", "Recently gave mixed reviews (3-star) to a plumber who was late but fixed bathroom taps efficiently", "Left detailed positive feedback for a landscaper who transformed the garden with new paving and planting". 
-        * For tradespeople: SPECIFIC reviews they've received, e.g. "Recent 5-star review for rewiring a period property with minimal disruption", "Mixed feedback on a bathroom installation with some comments about delays", "Consistent 4-star ratings for fence installations with comments on tidiness".
+        * For existing homeowners: Reviews they've GIVEN about work done FOR them. Examples: "Gave 4.5 stars to a roofer who fixed leaking gutters last week", "Recently gave mixed reviews (3-star) to a plumber who was late but fixed bathroom taps efficiently"
+        * For existing tradespeople: Reviews they've RECEIVED from customers. Examples: "Recent 5-star review for rewiring a period property with minimal disruption", "Mixed feedback on a bathroom installation with some comments about delays"
         * Otherwise empty.
     - "latest_jobs": 
-        * For homeowners: DETAILED jobs completed for them by SPECIFIC TRADE TYPES (choose from: plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway specialist, fencing contractor, or tree surgeon). Examples: "Complete rewiring of a period property by an electrician with additional security lights", "New composite decking and landscaping completed last month", "Bathroom renovation with custom tiling and new fixtures", "Emergency roof repair after storm damage", "Kitchen extension with bifold doors and new appliances".
-        * For tradespeople: DETAILED jobs they've completed with SPECIFIC aspects. Choose from trades above and include details like: "Installed a new consumer unit and rewired a Victorian property", "Completed a large garden landscaping project with water feature and lighting", "Fitted a new kitchen with custom cabinetry and island", "Repaired storm damage to roof and replaced broken tiles", "Built a two-story extension with bi-fold doors".
+        * For existing homeowners: Jobs completed FOR them. Examples: "Complete rewiring by an electrician", "New bathroom installation by a plumber", "Garden landscaping by a landscaper"
+        * For existing tradespeople: Jobs they've completed FOR others. Examples: "Installed new consumer unit for a Victorian property", "Completed bathroom renovation with custom tiling", "Built garden deck with integrated lighting"
         * Otherwise empty.
     - "project_cost": if existing user with recent jobs, a random cost (e.g. "£2,500"); otherwise empty.
     - "payment_status": if existing user with recent jobs, one of "Paid", "Pending", "Partial Payment"; otherwise empty.
-- "scenario_text": a short, realistic reason for contacting Checkatrade (for example, a billing issue, a complaint, membership renewal, or looking for a tradesperson).
+- "scenario_text": a short, realistic reason for contacting Checkatrade that MUST match their user type.
 
 Rules:
 1. Return ONLY valid JSON with no extra commentary or code fences.
 2. If inbound_route is "phone", include realistic ivr_flow and ivr_selections.
 3. For "existing" user types, fill out account_details with plausible data.
-4. The scenario_text must be specific to Checkatrade.
-5. Remember: homeowners GIVE reviews and have jobs completed FOR them; tradespeople RECEIVE reviews and complete jobs FOR homeowners.
-6. For jobs and reviews, be SPECIFIC about what work was done, who did it, and include realistic details.
+4. The scenario_text must be specific to Checkatrade and LOGICALLY MATCH the user type:
+   - Homeowners CAN complain about work quality, tradespeople CANNOT
+   - Tradespeople CAN ask about membership fees, homeowners CANNOT
+   - Only existing users can reference their account history
+   - Only tradespeople can have membership IDs
+5. Remember the relationship: homeowners RECEIVE work and GIVE reviews; tradespeople DO work and RECEIVE reviews.
+6. For jobs and reviews, be SPECIFIC about what work was done and include realistic details.
 7. Vary the trade types used in the examples (plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway/patio specialist, fencing contractor, tree surgeon).
 """
 
