@@ -23,11 +23,13 @@ html, body, [class*="css"] {
     background-color: #121212 !important;
 }
 
-/* Reduce sidebar width to half */
+/* Reduce sidebar width */
 [data-testid="stSidebar"] {
     width: 12rem !important;
     min-width: 12rem !important;
     max-width: 12rem !important;
+    background-color: #1E1E1E !important;
+    border-right: 1px solid #424242 !important;
 }
 
 [data-testid="stSidebar"] > div:first-child {
@@ -41,29 +43,12 @@ html, body, [class*="css"] {
     max-width: 95% !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
-    margin-left: 0 !important;
 }
 
-/* Push content leftwards and increase width */
-section[data-testid="stSidebar"] ~ .css-1d391kg {
+/* Push content leftwards */
+.css-1d391kg {
     width: 100% !important;
-    margin-left: 0 !important;
     padding-left: 1rem !important;
-}
-
-/* Container styling for better use of space */
-.stApp > div:not([data-testid="stSidebar"]) {
-    margin-left: 0 !important;
-}
-
-/* Sidebar content styling */
-[data-testid="stSidebar"] {
-    background-color: #1E1E1E !important;
-    border-right: 1px solid #424242 !important;
-}
-
-[data-testid="stSidebar"] .element-container {
-    padding-right: 1rem;
 }
 
 /* More compact sidebar content */
@@ -323,7 +308,7 @@ div.stApp {
 section[data-testid="stSidebar"] ~ .css-1d391kg {
     width: 100% !important;
     margin-left: 0 !important;
-    padding-left: 0 !important;
+    padding-left: 1rem !important;
 }
 
 /* Container styling for better use of space */
