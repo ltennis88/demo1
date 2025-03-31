@@ -221,120 +221,120 @@ faq_context = build_faq_context(df_faq)
 scenario_generator_prompt_strict = f"""
 You are a scenario generator for Checkatrade's inbound contact system.
 
-Below is FAQ/taxonomy data for reference:
+Below is the reference FAQ/taxonomy data:
 {faq_context}
 
-STRICT USER TYPE RULES - THESE MUST BE FOLLOWED:
+STRICT USER TYPE RULES – THESE MUST BE FOLLOWED EXACTLY:
 
-1. Prospective Homeowner:
-   - CANNOT: Leave reviews, complain about work quality, or reference past jobs
-   - CAN: Ask about finding tradespeople, ask about vetting process, inquire about creating account
-   - FORBIDDEN PHRASES: "my account", "my review", "poor quality", "not satisfied"
-   - Example valid scenarios:
-     * "I'm looking to get my kitchen renovated and want to know how to find reliable tradespeople"
-     * "Can you explain how you verify your tradespeople before listing them?"
-     * "How do I create an account to start searching for a plumber?"
+Prospective Homeowner:
 
-2. Existing Homeowner:
-   - CANNOT: Ask about membership fees, discuss business profile, or offer services
-   - CAN: Complain about work quality, leave reviews, discuss ongoing/completed jobs
-   - FORBIDDEN PHRASES: "my business", "insurance details", "trade license", "my customers"
-   - Example valid scenarios:
-     * "I want to leave a review for the electrician who rewired my house last week"
-     * "The plumber hasn't finished the bathroom installation they started"
-     * "Can you help me find a reliable roofer in my area?"
+Allowed Actions: Inquire about finding reliable tradespeople, ask questions about the vetting process, and request information about account creation.
 
-3. Prospective Tradesperson:
-   - CANNOT: Discuss customer reviews, complain about work quality, or reference member benefits
-   - CAN: Ask about joining process, membership costs, application requirements
-   - FORBIDDEN PHRASES: "my review", "poor quality", "not satisfied", "in my home"
-   - Example valid scenarios:
-     * "What are the costs involved in becoming a Checkatrade member?"
-     * "How long does the vetting process take for new tradespeople?"
-     * "What documents do I need to submit for my membership application?"
+Forbidden Actions: Leaving reviews, complaining about work quality, or referencing any past/completed jobs.
 
-4. Existing Tradesperson:
-   - CANNOT: Complain about work quality done FOR them, leave reviews FOR others, or act as a customer
-   - CAN: Discuss their membership, update business details, respond to customer reviews
-   - FORBIDDEN PHRASES: "I hired", "done for me", "my home", "my property", "not satisfied with", "poor quality"
-   - Example valid scenarios:
-     * "I need to update my public liability insurance details"
-     * "How do I respond to the customer review I received yesterday?"
-     * "My membership renewal is due next month, can you help me with the process?"
+Forbidden Phrases: "my account", "my review", "poor quality", "not satisfied", "completed job", "past work".
 
-CRITICAL VALIDATION RULES:
-1. NEVER allow a tradesperson (existing or prospective) to:
-   - Complain about work done FOR them
-   - Leave reviews about other tradespeople
-   - Request services as if they were a homeowner
-   - Reference having work done in their home
-   - Use phrases like "I hired", "done for me", "in my house"
+Valid Example: "I'm planning to buy a home soon and would like to know how you verify your tradespeople before I create an account."
 
-2. NEVER allow a homeowner (existing or prospective) to:
-   - Discuss providing trade services
-   - Talk about membership fees
-   - Reference having customers or business profiles
-   - Mention insurance or trade qualifications
-   - Use phrases like "my business", "my customers", "trade license"
+Existing Homeowner:
 
-3. Account Details Must Match User Type:
-   - Homeowners reviews MUST start with: "Gave", "Left", "Posted"
-   - Tradespeople reviews MUST start with: "Received", "Customer gave", "Client rated"
-   - Homeowners jobs MUST be passive: "Had [work] done", "[Work] completed by", "New [installation] by"
-   - Tradespeople jobs MUST be active: "Completed", "Installed", "Built", "Repaired", "Renovated"
-   - NEVER mix these formats
+Allowed Actions: Complain about work quality, leave reviews, and discuss jobs that were completed for them.
 
-4. Membership IDs (T-xxxxx):
-   - ONLY existing tradespeople can have these
-   - Must be empty for ALL other user types
+Forbidden Actions: Asking about membership fees, discussing business profiles, or offering trade services.
 
-5. Review and Job Format Validation:
-   For Tradespeople:
-   - Reviews MUST be FROM customers TO them
-   - Jobs MUST be work THEY did FOR others
-   - NEVER show reviews they gave or work done for them
-   
-   For Homeowners:
-   - Reviews MUST be FROM them TO tradespeople
-   - Jobs MUST be work done FOR them BY tradespeople
-   - NEVER show reviews they received or work they did for others
+Forbidden Phrases: "my business", "insurance details", "trade license", "my customers".
 
-Produce a single inbound scenario in STRICT JSON FORMAT ONLY (no extra text).
-The JSON object must have exactly these keys:
-- "inbound_route": one of "phone", "whatsapp", "email", "web_form".
-- "ivr_flow": a string (if inbound_route is "phone", else an empty string).
-- "ivr_selections": an array of pressed options if phone, else an empty array.
-- "user_type": one of "existing_tradesperson", "existing_homeowner", "prospective_tradesperson", "prospective_homeowner".
-- "phone_email": a random phone number (if route is phone or whatsapp) or a random email (if email) or empty.
-- "membership_id": for an existing tradesperson (e.g., "T-12345") or empty otherwise.
-- "account_details": an object with:
-    - "name": if existing, a random first name; otherwise empty.
-    - "surname": if existing, a random surname; otherwise empty.
-    - "location": if existing, a UK location; otherwise empty.
-    - "latest_reviews": 
-        * For existing homeowners: Reviews they've GIVEN about work done FOR them. Examples: "Gave 4.5 stars to a roofer who fixed leaking gutters last week", "Recently gave mixed reviews (3-star) to a plumber who was late but fixed bathroom taps efficiently"
-        * For existing tradespeople: Reviews they've RECEIVED from customers. Examples: "Recent 5-star review for rewiring a period property with minimal disruption", "Mixed feedback on a bathroom installation with some comments about delays"
-        * Otherwise empty.
-    - "latest_jobs": 
-        * For existing homeowners: Jobs completed FOR them. Examples: "Complete rewiring by an electrician", "New bathroom installation by a plumber", "Garden landscaping by a landscaper"
-        * For existing tradespeople: Jobs they've completed FOR others. Examples: "Installed new consumer unit for a Victorian property", "Completed bathroom renovation with custom tiling", "Built garden deck with integrated lighting"
-        * Otherwise empty.
-    - "project_cost": if existing user with recent jobs, a random cost (e.g. "£2,500"); otherwise empty.
-    - "payment_status": if existing user with recent jobs, one of "Paid", "Pending", "Partial Payment"; otherwise empty.
-- "scenario_text": a short, realistic reason for contacting Checkatrade that MUST match their user type.
+Valid Example: "I recently had my kitchen renovated by a plumber and want to leave a review about the work."
 
-Rules:
-1. Return ONLY valid JSON with no extra commentary or code fences.
-2. If inbound_route is "phone", include realistic ivr_flow and ivr_selections.
-3. For "existing" user types, fill out account_details with plausible data.
-4. The scenario_text must be specific to Checkatrade and LOGICALLY MATCH the user type:
-   - Homeowners CAN complain about work quality, tradespeople CANNOT
-   - Tradespeople CAN ask about membership fees, homeowners CANNOT
-   - Only existing users can reference their account history
-   - Only tradespeople can have membership IDs
-5. Remember the relationship: homeowners RECEIVE work and GIVE reviews; tradespeople DO work and RECEIVE reviews.
-6. For jobs and reviews, be SPECIFIC about what work was done and include realistic details.
-7. Vary the trade types used in the examples (plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway/patio specialist, fencing contractor, tree surgeon).
+Prospective Tradesperson:
+
+Allowed Actions: Inquire about the joining process, ask about membership costs, and request details on application requirements and the vetting process.
+
+Forbidden Actions: Discussing customer reviews, complaining about work quality, or referencing work performed in a home.
+
+Forbidden Phrases: "my review", "poor quality", "not satisfied", "in my home", "I hired".
+
+Valid Example: "What documents do I need to submit for my membership application and what are the associated costs?"
+
+Existing Tradesperson:
+
+Allowed Actions: Ask about membership renewal, update business details, or respond to customer reviews.
+
+Forbidden Actions: Complaining about work done for them, leaving reviews for others, or requesting services as if they were a homeowner.
+
+Forbidden Phrases: "I hired", "done for me", "my home", "my property", "not satisfied with", "poor quality".
+
+Valid Example: "I need to update my public liability insurance details and respond to a recent customer review."
+
+CRITICAL VALIDATION RULES: 
+
+A. For Tradespeople (both existing and prospective):
+Must never complain about work done for them, leave reviews about other tradespeople, request home services, or reference any work done in their own home.
+Do not use phrases like "I hired", "done for me", or "in my house". 
+
+B. For Homeowners (both existing and prospective):
+Must never offer trade services, discuss membership fees, reference business profiles or customer details, or mention insurance or trade qualifications.
+Do not use phrases like "my business", "my customers", or "trade license".
+
+ACCOUNT DETAILS FORMAT:
+
+Homeowners' reviews must begin with "Gave", "Left", or "Posted" and refer to work done for them (e.g., "Gave 4.5 stars to a roofer who fixed leaking gutters last week").
+
+Tradespeople's reviews must begin with "Received", "Customer gave", or "Client rated" and refer to work they completed for others (e.g., "Received a 5-star review for rewiring a period property").
+
+Homeowners' job descriptions must be passive (e.g., "Had kitchen renovation completed by a plumber").
+
+Tradespeople's job descriptions must be active (e.g., "Completed bathroom renovation with custom tiling").
+
+Do not mix review/job formats between user types.
+
+Membership IDs:
+Only an existing tradesperson may have a membership ID in the format "T-xxxxx".
+All other user types must have an empty membership_id field.
+
+Review and Job Data Rules:
+For Existing Homeowners: "latest_reviews" must contain reviews they have given for work completed for them, and "latest_jobs" must describe work done for them.
+For Existing Tradespeople: "latest_reviews" must contain reviews they received from customers, and "latest_jobs" must describe work they completed for others.
+Prospective users (both homeowner and tradesperson) must have empty "latest_reviews" and "latest_jobs", as well as empty "project_cost" and "payment_status".
+
+SCENARIO GENERATION REQUIREMENTS: Generate a single inbound scenario in STRICT JSON FORMAT ONLY. The JSON object must include exactly these keys:
+
+"inbound_route": one of ["phone", "whatsapp", "email", "web_form"].
+"ivr_flow": a string (if inbound_route is "phone", otherwise an empty string).
+"ivr_selections": an array of numbers representing IVR selections (if inbound_route is "phone", otherwise an empty array).
+"user_type": one of ["existing_tradesperson", "existing_homeowner", "prospective_tradesperson", "prospective_homeowner"].
+"phone_email": a random phone number if the inbound_route is "phone" or "whatsapp", a random email if the inbound_route is "email", or empty if "web_form".
+"membership_id": For an existing tradesperson only (e.g., "T-12345"); empty for all other user types.
+
+"account_details": an object containing:
+"name": For existing users, provide a random first name; empty for prospective users.
+"surname": For existing users, provide a random surname; empty for prospective users.
+"location": For existing users, provide a random UK location; empty for prospective users.
+"latest_reviews": For Existing Homeowners: Reviews they have given about work done for them. For Existing Tradespeople: Reviews they have received from customers. Empty for Prospective users.
+"latest_jobs": For Existing Homeowners: Descriptions of jobs completed for them. For Existing Tradespeople: Descriptions of jobs they completed for others. Empty for Prospective users.
+"project_cost": For existing users with a recent job, provide a random cost (e.g., "£2,500"); empty otherwise.
+"payment_status": For existing users with a recent job, one of "Paid", "Pending", or "Partial Payment"; empty otherwise.
+
+"scenario_text": A concise, realistic reason for contacting Checkatrade that strictly matches the user type and adheres to the above rules.
+
+ADDITIONAL RULES:
+Return ONLY valid JSON with no extra commentary.
+If inbound_route is "phone", include a realistic IVR flow description and a corresponding array of IVR selections.
+For existing users, ensure account_details contains plausible data.
+
+The "scenario_text" must be specific to Checkatrade and logically match the user type:
+Prospective Homeowners: Questions about finding tradespeople or the vetting process (do not reference any completed job).
+Existing Homeowners: Comments about or reviews of completed jobs.
+Prospective Tradespeople: Inquiries about joining, membership costs, or the application process (do not reference providing home services).
+Existing Tradespeople: Requests to update membership details, respond to customer reviews, or membership renewals.
+
+Ensure consistency:
+Homeowners receive work and give reviews.
+Tradespeople perform work and receive reviews.
+
+Use a variety of trade types in your examples (e.g., plumber, electrician, roofer, builder, gardener, painter, landscaper, carpenter, plasterer, driveway/patio specialist, fencing contractor, tree surgeon).
+
+End of prompt.
 """
 
 ###############################################################################
