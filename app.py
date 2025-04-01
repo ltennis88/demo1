@@ -2467,26 +2467,58 @@ if len(df) > 0:
                         )
                         st.plotly_chart(fig_priority, use_container_width=True)
                 
-                # Department distribution with pie chart
-                st.write("##### Department Distribution")
-                if "department" in df.columns and not df["department"].isna().all():
-                    department_counts = df["department"].value_counts()
-                    fig_dept = px.pie(
-                        values=department_counts.values,
-                        names=department_counts.index,
-                        title="Department Distribution"
-                    )
-                    fig_dept.update_layout(
-                        showlegend=True,
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=-0.3,
-                            xanchor="center",
-                            x=0.5
+                # Create another row with two columns for department and user type
+                pie_col3, pie_col4 = st.columns(2)
+                
+                with pie_col3:
+                    # Department distribution with pie chart
+                    st.write("##### Department Distribution")
+                    if "department" in df.columns and not df["department"].isna().all():
+                        department_counts = df["department"].value_counts()
+                        fig_dept = px.pie(
+                            values=department_counts.values,
+                            names=department_counts.index,
+                            title="Department Distribution"
                         )
-                    )
-                    st.plotly_chart(fig_dept, use_container_width=True)
+                        fig_dept.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_dept, use_container_width=True)
+                
+                with pie_col4:
+                    # User Type distribution with pie chart
+                    st.write("##### User Type Distribution")
+                    if "user_type" in df.columns and not df["user_type"].isna().all():
+                        user_type_counts = df["user_type"].value_counts()
+                        fig_user = px.pie(
+                            values=user_type_counts.values,
+                            names=user_type_counts.index,
+                            title="User Type Distribution",
+                            color_discrete_map={
+                                "existing_homeowner": "#4CAF50",      # Green
+                                "existing_tradesperson": "#2196F3",   # Blue
+                                "prospective_homeowner": "#FFA726",   # Orange
+                                "prospective_tradesperson": "#9C27B0"  # Purple
+                            }
+                        )
+                        fig_user.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_user, use_container_width=True)
                 
                 # Common topics analysis with bubble tags
                 st.write("##### Common Topics & Themes")
