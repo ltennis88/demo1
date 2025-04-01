@@ -260,14 +260,19 @@ if "current_case_id" not in st.session_state:
 
 # Initialize inquiries early to avoid issues
 if "inquiries" not in st.session_state:
-    # Create a placeholder until we can properly load in the full initialization section
-    st.session_state["inquiries"] = pd.DataFrame(columns=[
-        "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
-        "phone_email", "membership_id", "scenario_text", "classification",
-        "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
-        "account_location", "account_reviews", "account_jobs", "project_cost", 
-        "payment_status", "estimated_response_time", "agent_notes", "case_status"
-    ])
+    # Load dummy inquiries if they exist
+    dummy_inquiries = load_dummy_inquiries()
+    if not dummy_inquiries.empty:
+        st.session_state["inquiries"] = dummy_inquiries
+    else:
+        # Create a placeholder if no dummy inquiries exist
+        st.session_state["inquiries"] = pd.DataFrame(columns=[
+            "timestamp", "inbound_route", "ivr_flow", "ivr_selections", "user_type",
+            "phone_email", "membership_id", "scenario_text", "classification",
+            "department", "subdepartment", "priority", "summary", "related_faq_category", "account_name", 
+            "account_location", "account_reviews", "account_jobs", "project_cost", 
+            "payment_status", "estimated_response_time", "agent_notes", "case_status"
+        ])
 
 # Initialize generated_scenario variable to avoid SessionInfo errors
 if "generated_scenario" not in st.session_state:
