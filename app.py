@@ -2630,7 +2630,7 @@ if len(df) > 0:
 
     json_data = df.to_json(orient="records")
     st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-    else:
+else:
     st.write("No data to export yet.")
 
 # -----------------------------------------------------------------------------
