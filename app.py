@@ -2419,6 +2419,7 @@ if len(df) > 0:
             if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
                 df = st.session_state["inquiries"]
                 
+                st.subheader("Classification Metrics")
                 # Create two columns for the pie charts
                 pie_col1, pie_col2 = st.columns(2)
                 
