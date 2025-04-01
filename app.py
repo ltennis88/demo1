@@ -700,45 +700,93 @@ elif st.session_state["section"] == "analytics":
             for word, count in themes:
                 st.markdown(f"{word.title()} ({count})")
         
-        # Token Usage Analytics
-        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-            st.subheader("Token Usage Analytics")
+        # Common topics analysis with bubble tags
+        st.write("##### Common Topics & Themes")
+        if "summary" in df.columns and not df["summary"].isna().all():
+            summaries = " ".join(df["summary"].fillna("")).lower()
+            words = re.findall(r'\b\w+\b', summaries)
+            word_counts = Counter(words)
             
-            # Create DataFrame from token usage data
-            df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
+            # Filter out common stop words and short words
+            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+            themes = [(word, count) for word, count in word_counts.most_common(10) 
+                     if word not in stop_words and len(word) > 3]
             
-            # Classification Metrics
-            st.markdown("#### Classification Metrics")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                avg_response_time = df_tokens['response_time'].mean()
-                total_response_time = df_tokens['response_time'].sum()
-                st.metric("Average Response Time", f"{avg_response_time:.2f}s", f"Total: {total_response_time:.2f}s")
-            
-            with col2:
-                avg_cached_tokens = df_tokens['cached_input_tokens'].mean()
-                cached_cost = df_tokens['cached_input_cost'].sum()
-                st.metric("Avg Cached Input Tokens", f"{avg_cached_tokens:,.0f}", f"${cached_cost:.4f}")
-            
-            with col3:
-                avg_non_cached_tokens = df_tokens['non_cached_input_tokens'].mean()
-                non_cached_cost = df_tokens['non_cached_input_cost'].sum()
-                st.metric("Avg Non-Cached Input Tokens", f"{avg_non_cached_tokens:,.0f}", f"${non_cached_cost:.4f}")
-            
-            with col4:
-                avg_output_tokens = df_tokens['output_tokens'].mean()
-                output_cost = df_tokens['output_cost'].sum()
-                st.metric("Average Output Tokens", f"{avg_output_tokens:,.0f}", f"${output_cost:.4f}")
-            
-            # Cost Breakdown
-            st.markdown("#### Cost Breakdown")
-            total_input_cost = cached_cost + non_cached_cost
-            total_cost = total_input_cost + output_cost
-            
-            st.markdown(f"Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}")
-            st.markdown(f"Total Output Cost: ${output_cost:.4f}")
-            st.markdown(f"Total Cost: ${total_cost:.4f}")
+            if themes:
+                # Create bubble tags HTML with updated styling
+                st.markdown("""
+                <style>
+                .bubble-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-top: 10px;
+                }
+                .bubble-tag {
+                    background-color: #2979FF;
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 14px;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: fit-content;
+                }
+                .bubble-count {
+                    background-color: rgba(255, 255, 255, 0.2);
+                    padding: 2px 8px;
+                    border-radius: 10px;
+                    font-size: 12px;
+                    white-space: nowrap;
+                }
+                </style>
+                <div class="bubble-container">
+                """, unsafe_allow_html=True)
+                
+                # Generate bubble tags
+                bubble_tags = []
+                for word, count in themes:
+                    bubble_tags.append(f"""
+                    <div class="bubble-tag">
+                        {word.title()}
+                        <span class="bubble-count">{count}</span>
+                    </div>
+                    """)
+                
+                st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
+            else:
+                st.text("No common themes found yet")
+
+        # LLM API Metrics Section
+        st.write("##### LLM API Metrics")
+        # Display totals
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Cost", f"${total_cost:.4f}")
+        with col2:
+            st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+        with col3:
+            st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+        
+        # Display averages
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.metric("Avg Cost", f"${avg_cost:.4f}")
+        with col5:
+            st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
+        with col6:
+            st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
+        
+        # Display response time metrics if available
+        if response_times:
+            col7, col8, col9 = st.columns(3)
+            with col7:
+                st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
+            with col8:
+                st.metric("Max Response Time", f"{max_response_time:.2f}s")
+            with col9:
+                st.metric("Min Response Time", f"{min_response_time:.2f}s")
     else:
         st.info("No data available for analytics. Generate scenarios and classifications to see analytics.")
 else:
@@ -2573,6 +2621,36 @@ if len(df) > 0:
                         st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
                     else:
                         st.text("No common themes found yet")
+
+                # LLM API Metrics Section
+                st.write("##### LLM API Metrics")
+                # Display totals
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Cost", f"${total_cost:.4f}")
+                with col2:
+                    st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+                with col3:
+                    st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+                
+                # Display averages
+                col4, col5, col6 = st.columns(3)
+                with col4:
+                    st.metric("Avg Cost", f"${avg_cost:.4f}")
+                with col5:
+                    st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
+                with col6:
+                    st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
+                
+                # Display response time metrics if available
+                if response_times:
+                    col7, col8, col9 = st.columns(3)
+                    with col7:
+                        st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
+                    with col8:
+                        st.metric("Max Response Time", f"{max_response_time:.2f}s")
+                    with col9:
+                        st.metric("Min Response Time", f"{min_response_time:.2f}s")
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
