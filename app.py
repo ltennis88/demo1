@@ -2666,9 +2666,9 @@ if len(df) > 0:
             with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
                 st.markdown("<div class='info-container'>", unsafe_allow_html=True)
                 
-            col1, col2 = st.columns(2)
+                col1, col2 = st.columns(2)
                 
-            with col1:
+                with col1:
                     st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
                     
@@ -2683,8 +2683,8 @@ if len(df) > 0:
                     if 'ivr_selections' in row and row['ivr_selections']:
                         st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
-                    
-            with col2:
+                
+                with col2:
                     if 'user_type' in row and row['user_type']:
                         st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
@@ -2696,29 +2696,29 @@ if len(df) > 0:
                     if 'membership_id' in row and row['membership_id']:
                         st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
-            
-            # Classification summary section only
-            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
-            
-            if 'classification' in row and row['classification']:
-                st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
-            
-            if 'priority' in row and row['priority']:
-                st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
-            
-            if 'summary' in row and row['summary']:
-                st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
-            
-            # Show scenario text
-            if 'scenario_text' in row and row['scenario_text']:
-                st.markdown("<div class='inquiry-section'>Scenario Details</div>", unsafe_allow_html=True)
-                st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+                
+                # Classification summary section only
+                st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+                
+                if 'classification' in row and row['classification']:
+                    st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+                
+                if 'priority' in row and row['priority']:
+                    st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+                
+                if 'summary' in row and row['summary']:
+                    st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+                
+                # Show scenario text
+                if 'scenario_text' in row and row['scenario_text']:
+                    st.markdown("<div class='inquiry-section'>Scenario Details</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
         st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
 
