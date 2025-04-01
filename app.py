@@ -2780,13 +2780,23 @@ if len(df) > 0:
 # -----------------------------------------------------------------------------
 
 def extract_key_topics(scenario_text):
-    """Extract key topics from the scenario using OpenAI."""
+    """Extract key topics and concepts from a scenario using OpenAI."""
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a customer service assistant. Extract the key topics from this scenario."},
-                {"role": "user", "content": scenario_text}
+                {"role": "system", "content": "Extract key topics, concepts, and intent from this customer scenario. Focus on actionable items and main themes."},
+                {"role": "user", "content": f"""
+                Analyze this customer scenario and extract:
+                1. Main topics
+                2. Customer intent
+                3. Key issues or concerns
+                4. Relevant business areas
+                5. Type of request/complaint
+
+                Scenario:
+                {scenario_text}
+                """}
             ],
             temperature=0,
             max_tokens=150
@@ -2803,7 +2813,7 @@ def extract_key_topics(scenario_text):
         return key_topics
     except Exception as e:
         st.error(f"Error extracting key topics: {str(e)}")
-        return None
+        return str(scenario_text)  # Fallback to original text if extraction fails
 
 def process_relevant_faq(scenario_text, faq_dataframe, context):
     """Process and find relevant FAQ entries."""
