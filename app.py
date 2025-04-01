@@ -1630,22 +1630,22 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 
                 # If not cached, extract key topics
                 if not key_topics:
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Extract key topics from this customer scenario."},
+                    response = openai.ChatCompletion.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "Extract key topics from this customer scenario."},
                             {"role": "user", "content": str(scenario_text)}
-                ],
-                temperature=0,
-                max_tokens=150
-            )
+                        ],
+                        temperature=0,
+                        max_tokens=150
+                    )
                     key_topics = response['choices'][0]['message']['content']
-            
+                    
                     # Cache the key topics
-            if 'faq_key_topics' not in st.session_state:
-                st.session_state['faq_key_topics'] = {}
-            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
-            
+                    if 'faq_key_topics' not in st.session_state:
+                        st.session_state['faq_key_topics'] = {}
+                    st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+                
                 # Score each FAQ
                 for faq_entry in faq_dict['all_faqs']:
                     score = score_faq_relevance(key_topics, faq_entry)
@@ -1653,9 +1653,12 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                         best_score = score
                         best_match = faq_entry['question']
                         best_answer = faq_entry['answer']
-                
-        except Exception as e:
-            st.error(f"Error in semantic search: {str(e)}")
+            except Exception as e:
+                st.error(f"Error in semantic search: {str(e)}")
+            
+            # Return results if we found a good match
+            if best_match and best_score >= 3:
+                return best_match, best_answer, best_score
             
         # Return results if we found a good match
         if best_match and best_score >= 3:
@@ -2379,9 +2382,9 @@ if len(df) > 0:
             # Display totals
             st.write("##### Total Metrics")
             col1, col2, col3 = st.columns(3)
-        with col1:
+            with col1:
                 st.metric("Total Cost", f"${total_cost:.4f}")
-        with col2:
+            with col2:
                 st.metric("Total Input Tokens", f"{total_input_tokens:,}")
             with col3:
                 st.metric("Total Output Tokens", f"{total_output_tokens:,}")
@@ -2395,7 +2398,7 @@ if len(df) > 0:
                 st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
             with col6:
                 st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
-            
+
             # Display response time metrics if available
             response_times = [gen.get("response_time", 0) for gen in generations]
             if response_times:
@@ -2410,7 +2413,7 @@ if len(df) > 0:
                     st.metric("Max Response Time", f"{max_response_time:.2f}s")
                 with col9:
                     st.metric("Min Response Time", f"{min_response_time:.2f}s")
-            
+
             # Display classification and priority distributions
             if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
                 df = st.session_state["inquiries"]
@@ -2438,141 +2441,19 @@ if len(df) > 0:
                             )
                         )
                         st.plotly_chart(fig_class, use_container_width=True)
+
+                # Display user type and contact info in columns
+                col1, col2 = st.columns(2)
+                with col1:
+                    if recent_row['inbound_route']:
+                        st.markdown("<div class='inquiry-label'>Contact Method:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route'].title()}</div>", unsafe_allow_html=True)
                 
-                with pie_col2:
-                    # Priority distribution with pie chart
-                    st.write("##### Priority Distribution")
-                    if "priority" in df.columns and not df["priority"].isna().all():
-                        priority_counts = df["priority"].value_counts()
-                        fig_priority = px.pie(
-                            values=priority_counts.values,
-                            names=priority_counts.index,
-                            color_discrete_map={
-                                "High": "#FF4B4B",
-                                "Medium": "#FFA726",
-                                "Low": "#4CAF50"
-                            }
-                        )
-                        fig_priority.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_priority, use_container_width=True)
-                
-                # Create another row with two columns for department and user type
-                pie_col3, pie_col4 = st.columns(2)
-                
-                with pie_col3:
-                    # Department distribution with pie chart
-                    st.write("##### Department Distribution")
-                    if "department" in df.columns and not df["department"].isna().all():
-                        department_counts = df["department"].value_counts()
-                        fig_dept = px.pie(
-                            values=department_counts.values,
-                            names=department_counts.index
-                        )
-                        fig_dept.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_dept, use_container_width=True)
-                
-                with pie_col4:
-                    # User Type distribution with pie chart
-                    st.write("##### User Type Distribution")
-                    if "user_type" in df.columns and not df["user_type"].isna().all():
-                        user_type_counts = df["user_type"].value_counts()
-                        fig_user = px.pie(
-                            values=user_type_counts.values,
-                            names=user_type_counts.index,
-                            color_discrete_map={
-                                "existing_homeowner": "#4CAF50",      # Green
-                                "existing_tradesperson": "#2196F3",   # Blue
-                                "prospective_homeowner": "#FFA726",   # Orange
-                                "prospective_tradesperson": "#9C27B0"  # Purple
-                            }
-                        )
-                        fig_user.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_user, use_container_width=True)
-                
-                # Common topics analysis with bubble tags
-                st.write("##### Common Topics & Themes")
-                if "summary" in df.columns and not df["summary"].isna().all():
-                    summaries = " ".join(df["summary"].fillna("")).lower()
-                    words = re.findall(r'\b\w+\b', summaries)
-                    word_counts = Counter(words)
-                    
-                    # Filter out common stop words and short words
-                    stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
-                    themes = [(word, count) for word, count in word_counts.most_common(10) 
-                             if word not in stop_words and len(word) > 3]
-                    
-                    if themes:
-                        # Create bubble tags HTML with updated styling
-            st.markdown("""
-                        <style>
-                        .bubble-container {
-                            display: flex;
-                            flex-wrap: wrap;
-                            gap: 10px;
-                            margin-top: 10px;
-                        }
-                        .bubble-tag {
-                            background-color: #2979FF;
-                            color: white;
-                            padding: 8px 16px;
-                            border-radius: 20px;
-                            font-size: 14px;
-                            display: inline-flex;
-                            align-items: center;
-                            gap: 8px;
-                            width: fit-content;
-                        }
-                        .bubble-count {
-                            background-color: rgba(255, 255, 255, 0.2);
-                            padding: 2px 8px;
-                            border-radius: 10px;
-                            font-size: 12px;
-                            white-space: nowrap;
-                        }
-                        </style>
-                        <div class="bubble-container">
-            """, unsafe_allow_html=True)
-            
-                        # Generate bubble tags
-                        bubble_tags = []
-                        for word, count in themes:
-                            bubble_tags.append(f"""
-                            <div class="bubble-tag">
-                                {word.title()}
-                                <span class="bubble-count">{count}</span>
-                        </div>
-                            """)
-                        
-                        st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
-        else:
-                        st.text("No common themes found yet")
+                with col2:
+                    if recent_row['user_type']:
+                        st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
+
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
@@ -2590,15 +2471,15 @@ if len(df) > 0:
         
         # Display user type and contact info in columns
         col1, col2 = st.columns(2)
-            with col1:
+        with col1:
             if recent_row['inbound_route']:
                 st.markdown("<div class='inquiry-label'>Contact Method:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route'].title()}</div>", unsafe_allow_html=True)
             
             with col2:
-            if recent_row['user_type']:
-                st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
+                if recent_row['user_type']:
+                    st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
         
         # Rest of the recent inquiry display code...
 
@@ -2606,9 +2487,19 @@ if len(df) > 0:
     if len(df) > 1:
         st.subheader("Historical Inquiries")
         # Rest of the historical inquiries display code...
-
     else:
-    st.info("No inquiries logged yet. Generate some scenarios to see the dashboard.")
+        st.info("No inquiries logged yet. Generate some scenarios to see the dashboard.")
+
+    # Data Exports section
+    st.subheader("Data Exports")
+    if len(df) > 0:
+        csv_data = df.to_csv(index=False)
+        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="main_csv_download")
+
+        json_data = df.to_json(orient="records")
+        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
+    else:
+        st.write("No data to export yet.")
 
 # Remove any other calls to update_analytics outside the expander
 # ... rest of the code ...
@@ -2623,7 +2514,7 @@ if len(df) > 0:
 
     json_data = df.to_json(orient="records")
     st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-    else:
+else:
     st.write("No data to export yet.")
 
 # -----------------------------------------------------------------------------
