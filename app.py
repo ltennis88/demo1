@@ -676,7 +676,7 @@ elif st.session_state["section"] == "analytics":
             for classification, count in classification_counts.items():
                 percentage = (count / len(df)) * 100
                 st.markdown(f"{classification}: {count} ({percentage:.1f}%)")
-        
+            
         with colB:
             priority_counts = df["priority"].value_counts()
             st.markdown("#### Priority Distribution")
@@ -762,9 +762,9 @@ elif st.session_state["section"] == "analytics":
         st.write("##### LLM API Metrics")
         # Display totals
         col1, col2, col3 = st.columns(3)
-        with col1:
+            with col1:
             st.metric("Total Cost", f"${total_cost:.4f}")
-        with col2:
+            with col2:
             st.metric("Total Input Tokens", f"{total_input_tokens:,}")
         with col3:
             st.metric("Total Output Tokens", f"{total_output_tokens:,}")
@@ -1678,22 +1678,22 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 
                 # If not cached, extract key topics
                 if not key_topics:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "Extract key topics from this customer scenario."},
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Extract key topics from this customer scenario."},
                             {"role": "user", "content": str(scenario_text)}
-                        ],
-                        temperature=0,
-                        max_tokens=150
-                    )
+                ],
+                temperature=0,
+                max_tokens=150
+            )
                     key_topics = response['choices'][0]['message']['content']
-                    
+            
                     # Cache the key topics
-                    if 'faq_key_topics' not in st.session_state:
-                        st.session_state['faq_key_topics'] = {}
-                    st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
-                
+            if 'faq_key_topics' not in st.session_state:
+                st.session_state['faq_key_topics'] = {}
+            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+            
                 # Score each FAQ
                 for faq_entry in faq_dict['all_faqs']:
                     score = score_faq_relevance(key_topics, faq_entry)
@@ -1702,9 +1702,9 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                         best_match = faq_entry['question']
                         best_answer = faq_entry['answer']
                 
-            except Exception as e:
-                st.error(f"Error in semantic search: {str(e)}")
-        
+        except Exception as e:
+            st.error(f"Error in semantic search: {str(e)}")
+            
         # Return results if we found a good match
         if best_match and best_score >= 3:
             return best_match, best_answer, best_score
@@ -2408,24 +2408,168 @@ if len(df) > 0:
     # Analytics in expander
     with st.expander("View Analytics Dashboard", expanded=False):
         if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-            st.subheader("Analytics Overview")
-            # Get token data
-            token_data = st.session_state["token_usage"]
-            generations = token_data["generations"]
-            num_generations = len(generations)
+            # Create two columns for the pie charts
+            pie_col1, pie_col2 = st.columns(2)
             
-            # Calculate totals
-            total_cost = sum(gen.get("total_cost", 0) for gen in generations)
-            total_input_tokens = sum(gen.get("input_tokens", 0) for gen in generations)
-            total_output_tokens = sum(gen.get("output_tokens", 0) for gen in generations)
+            with pie_col1:
+                # Classification distribution with pie chart
+                st.write("##### Classification Distribution")
+                if "classification" in df.columns and not df["classification"].isna().all():
+                    classification_counts = df["classification"].value_counts()
+                    fig_class = px.pie(
+                        values=classification_counts.values,
+                        names=classification_counts.index
+                    )
+                    fig_class.update_layout(
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_class, use_container_width=True)
             
-            # Calculate averages
-            avg_cost = total_cost / num_generations if num_generations > 0 else 0
-            avg_input_tokens = total_input_tokens / num_generations if num_generations > 0 else 0
-            avg_output_tokens = total_output_tokens / num_generations if num_generations > 0 else 0
+            with pie_col2:
+                # Priority distribution with pie chart
+                st.write("##### Priority Distribution")
+                if "priority" in df.columns and not df["priority"].isna().all():
+                    priority_counts = df["priority"].value_counts()
+                    fig_priority = px.pie(
+                        values=priority_counts.values,
+                        names=priority_counts.index,
+                        color_discrete_map={
+                            "High": "#FF4B4B",
+                            "Medium": "#FFA726",
+                            "Low": "#4CAF50"
+                        }
+                    )
+                    fig_priority.update_layout(
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_priority, use_container_width=True)
             
+            # Create another row with two columns for department and user type
+            pie_col3, pie_col4 = st.columns(2)
+            
+            with pie_col3:
+                # Department distribution with pie chart
+                st.write("##### Department Distribution")
+                if "department" in df.columns and not df["department"].isna().all():
+                    department_counts = df["department"].value_counts()
+                    fig_dept = px.pie(
+                        values=department_counts.values,
+                        names=department_counts.index
+                    )
+                    fig_dept.update_layout(
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_dept, use_container_width=True)
+            
+            with pie_col4:
+                # User Type distribution with pie chart
+                st.write("##### User Type Distribution")
+                if "user_type" in df.columns and not df["user_type"].isna().all():
+                    user_type_counts = df["user_type"].value_counts()
+                    fig_user = px.pie(
+                        values=user_type_counts.values,
+                        names=user_type_counts.index,
+                        color_discrete_map={
+                            "existing_homeowner": "#4CAF50",      # Green
+                            "existing_tradesperson": "#2196F3",   # Blue
+                            "prospective_homeowner": "#FFA726",   # Orange
+                            "prospective_tradesperson": "#9C27B0"  # Purple
+                        }
+                    )
+                    fig_user.update_layout(
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_user, use_container_width=True)
+
+            # Common topics analysis with bubble tags
+            st.write("##### Common Topics & Themes")
+            if "summary" in df.columns and not df["summary"].isna().all():
+                summaries = " ".join(df["summary"].fillna("")).lower()
+                words = re.findall(r'\b\w+\b', summaries)
+                word_counts = Counter(words)
+                
+                # Filter out common stop words and short words
+                stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+                themes = [(word, count) for word, count in word_counts.most_common(10) 
+                         if word not in stop_words and len(word) > 3]
+                
+                if themes:
+                    # Create bubble tags HTML with updated styling
+                    st.markdown("""
+                    <style>
+                    .bubble-container {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 10px;
+                        margin-top: 10px;
+                    }
+                    .bubble-tag {
+                        background-color: #2979FF;
+                        color: white;
+                        padding: 8px 16px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        width: fit-content;
+                    }
+                    .bubble-count {
+                        background-color: rgba(255, 255, 255, 0.2);
+                        padding: 2px 8px;
+                        border-radius: 10px;
+                        font-size: 12px;
+                        white-space: nowrap;
+                    }
+                    </style>
+                    <div class="bubble-container">
+                    """, unsafe_allow_html=True)
+                    
+                    # Generate bubble tags
+                    bubble_tags = []
+                    for word, count in themes:
+                        bubble_tags.append(f"""
+                        <div class="bubble-tag">
+                            {word.title()}
+                            <span class="bubble-count">{count}</span>
+                    </div>
+                        """)
+                    
+                    st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
+                else:
+                    st.text("No common themes found yet")
+
+            # LLM API Metrics Section
+            st.write("##### LLM API Metrics")
             # Display totals
-            st.write("##### Total Metrics")
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Total Cost", f"${total_cost:.4f}")
@@ -2435,7 +2579,6 @@ if len(df) > 0:
                 st.metric("Total Output Tokens", f"{total_output_tokens:,}")
             
             # Display averages
-            st.write("##### Average Metrics (per response)")
             col4, col5, col6 = st.columns(3)
             with col4:
                 st.metric("Avg Cost", f"${avg_cost:.4f}")
@@ -2445,12 +2588,7 @@ if len(df) > 0:
                 st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
             
             # Display response time metrics if available
-            response_times = [gen.get("response_time", 0) for gen in generations]
             if response_times:
-                avg_response_time = sum(response_times) / len(response_times)
-                max_response_time = max(response_times)
-                min_response_time = min(response_times)
-                st.write("##### Response Time Metrics")
                 col7, col8, col9 = st.columns(3)
                 with col7:
                     st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
@@ -2458,200 +2596,7 @@ if len(df) > 0:
                     st.metric("Max Response Time", f"{max_response_time:.2f}s")
                 with col9:
                     st.metric("Min Response Time", f"{min_response_time:.2f}s")
-            
-            # Display classification and priority distributions
-            if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
-                df = st.session_state["inquiries"]
-                
-                # Create two columns for the pie charts
-                pie_col1, pie_col2 = st.columns(2)
-                
-                with pie_col1:
-                    # Classification distribution with pie chart
-                    st.write("##### Classification Distribution")
-                    if "classification" in df.columns and not df["classification"].isna().all():
-                        classification_counts = df["classification"].value_counts()
-                        fig_class = px.pie(
-                            values=classification_counts.values,
-                            names=classification_counts.index
-                        )
-                        fig_class.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_class, use_container_width=True)
-                
-                with pie_col2:
-                    # Priority distribution with pie chart
-                    st.write("##### Priority Distribution")
-                    if "priority" in df.columns and not df["priority"].isna().all():
-                        priority_counts = df["priority"].value_counts()
-                        fig_priority = px.pie(
-                            values=priority_counts.values,
-                            names=priority_counts.index,
-                            color_discrete_map={
-                                "High": "#FF4B4B",
-                                "Medium": "#FFA726",
-                                "Low": "#4CAF50"
-                            }
-                        )
-                        fig_priority.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_priority, use_container_width=True)
-                
-                # Create another row with two columns for department and user type
-                pie_col3, pie_col4 = st.columns(2)
-                
-                with pie_col3:
-                    # Department distribution with pie chart
-                    st.write("##### Department Distribution")
-                    if "department" in df.columns and not df["department"].isna().all():
-                        department_counts = df["department"].value_counts()
-                        fig_dept = px.pie(
-                            values=department_counts.values,
-                            names=department_counts.index
-                        )
-                        fig_dept.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_dept, use_container_width=True)
-                
-                with pie_col4:
-                    # User Type distribution with pie chart
-                    st.write("##### User Type Distribution")
-                    if "user_type" in df.columns and not df["user_type"].isna().all():
-                        user_type_counts = df["user_type"].value_counts()
-                        fig_user = px.pie(
-                            values=user_type_counts.values,
-                            names=user_type_counts.index,
-                            color_discrete_map={
-                                "existing_homeowner": "#4CAF50",      # Green
-                                "existing_tradesperson": "#2196F3",   # Blue
-                                "prospective_homeowner": "#FFA726",   # Orange
-                                "prospective_tradesperson": "#9C27B0"  # Purple
-                            }
-                        )
-                        fig_user.update_layout(
-                            showlegend=True,
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=-0.3,
-                                xanchor="center",
-                                x=0.5
-                            )
-                        )
-                        st.plotly_chart(fig_user, use_container_width=True)
-
-                # Common topics analysis with bubble tags
-                st.write("##### Common Topics & Themes")
-                if "summary" in df.columns and not df["summary"].isna().all():
-                    summaries = " ".join(df["summary"].fillna("")).lower()
-                    words = re.findall(r'\b\w+\b', summaries)
-                    word_counts = Counter(words)
-                    
-                    # Filter out common stop words and short words
-                    stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
-                    themes = [(word, count) for word, count in word_counts.most_common(10) 
-                             if word not in stop_words and len(word) > 3]
-                    
-                    if themes:
-                        # Create bubble tags HTML with updated styling
-                        st.markdown("""
-                        <style>
-                        .bubble-container {
-                            display: flex;
-                            flex-wrap: wrap;
-                            gap: 10px;
-                            margin-top: 10px;
-                        }
-                        .bubble-tag {
-                            background-color: #2979FF;
-                            color: white;
-                            padding: 8px 16px;
-                            border-radius: 20px;
-                            font-size: 14px;
-                            display: inline-flex;
-                            align-items: center;
-                            gap: 8px;
-                            width: fit-content;
-                        }
-                        .bubble-count {
-                            background-color: rgba(255, 255, 255, 0.2);
-                            padding: 2px 8px;
-                            border-radius: 10px;
-                            font-size: 12px;
-                            white-space: nowrap;
-                        }
-                        </style>
-                        <div class="bubble-container">
-                        """, unsafe_allow_html=True)
-                        
-                        # Generate bubble tags
-                        bubble_tags = []
-                        for word, count in themes:
-                            bubble_tags.append(f"""
-                            <div class="bubble-tag">
-                                {word.title()}
-                                <span class="bubble-count">{count}</span>
-                            </div>
-                            """)
-                        
-                        st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
-                    else:
-                        st.text("No common themes found yet")
-
-                # LLM API Metrics Section
-                st.write("##### LLM API Metrics")
-                # Display totals
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Cost", f"${total_cost:.4f}")
-                with col2:
-                    st.metric("Total Input Tokens", f"{total_input_tokens:,}")
-                with col3:
-                    st.metric("Total Output Tokens", f"{total_output_tokens:,}")
-                
-                # Display averages
-                col4, col5, col6 = st.columns(3)
-                with col4:
-                    st.metric("Avg Cost", f"${avg_cost:.4f}")
-                with col5:
-                    st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
-                with col6:
-                    st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
-                
-                # Display response time metrics if available
-                if response_times:
-                    col7, col8, col9 = st.columns(3)
-                    with col7:
-                        st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
-                    with col8:
-                        st.metric("Max Response Time", f"{max_response_time:.2f}s")
-                    with col9:
-                        st.metric("Min Response Time", f"{min_response_time:.2f}s")
-        else:
+    else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
     # Recent Inquiries Section
@@ -2701,7 +2646,7 @@ if len(df) > 0:
 
     json_data = df.to_json(orient="records")
     st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-else:
+    else:
     st.write("No data to export yet.")
 
 # -----------------------------------------------------------------------------
