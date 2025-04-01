@@ -2522,6 +2522,66 @@ if len(df) > 0:
                         )
                         st.plotly_chart(fig_dept, use_container_width=True)
 
+                # Common topics analysis with bubble tags
+                st.write("##### Common Topics & Themes")
+                if "summary" in df.columns and not df["summary"].isna().all():
+                    summaries = " ".join(df["summary"].fillna("")).lower()
+                    words = re.findall(r'\b\w+\b', summaries)
+                    word_counts = Counter(words)
+                    
+                    # Filter out common stop words and short words
+                    stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+                    themes = [(word, count) for word, count in word_counts.most_common(10) 
+                             if word not in stop_words and len(word) > 3]
+                    
+                    if themes:
+                        # Create bubble tags HTML with updated styling
+                        st.markdown("""
+                        <style>
+                        .bubble-container {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 10px;
+                            margin-top: 10px;
+                        }
+                        .bubble-tag {
+                            background-color: #2979FF;
+                            color: white;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            font-size: 14px;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            width: fit-content;
+                        }
+                        .bubble-count {
+                            background-color: rgba(255, 255, 255, 0.2);
+                            padding: 2px 8px;
+                            border-radius: 10px;
+                            font-size: 12px;
+                            white-space: nowrap;
+                        }
+                        </style>
+                        <div class="bubble-container">
+                        """, unsafe_allow_html=True)
+                        
+                        # Generate bubble tags
+                        bubble_tags = []
+                        for word, count in themes:
+                            bubble_tags.append(f"""
+                            <div class="bubble-tag">
+                                {word.title()}
+                                <span class="bubble-count">{count}</span>
+                            </div>
+                            """)
+                        
+                        st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
+                    else:
+                        st.text("No common themes found yet")
+                else:
+                    st.text("No summary data available for theme analysis")
+
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
