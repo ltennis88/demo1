@@ -1606,6 +1606,24 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 ###############################################################################
 # 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
 ###############################################################################
+def extract_key_topics(scenario_text):
+    """Extract key topics and concepts from a scenario using OpenAI."""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": "Extract key topics from this scenario."}, {"role": "user", "content": scenario_text}],
+            temperature=0,
+            max_tokens=150
+        )
+        key_topics = response.choices[0].message.content
+        if 'faq_key_topics' not in st.session_state:
+            st.session_state['faq_key_topics'] = {}
+        st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+        return key_topics
+    except Exception as e:
+        st.error(f"Error extracting key topics: {str(e)}")
+        return str(scenario_text)
+
 def score_faq_relevance(key_topics, faq_entry):
     """Score a single FAQ's relevance using multiple factors."""
     try:
