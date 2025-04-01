@@ -15,85 +15,44 @@ from collections import Counter
 ###############################################################################
 # Helper Functions
 ###############################################################################
-def update_analytics(section="main"):
-    """Update analytics display."""
+def render_analytics_dashboard():
+    """Render the analytics dashboard with all metrics and visualizations."""
     if "token_usage" not in st.session_state or not st.session_state["token_usage"]["generations"]:
         st.info("No analytics data available yet. Generate some responses to see analytics.")
         return
 
     st.header("Analytics Dashboard")
     
-    # Get the token usage data
-    token_data = st.session_state["token_usage"]
+    # Summary Analytics section
+    st.subheader("Summary Analytics")
     
-    # Calculate total costs and tokens with backward compatibility
-    total_input_tokens = sum(
-        (gen.get("cached_input_tokens", 0) + gen.get("non_cached_input_tokens", 0)) 
-        if ("cached_input_tokens" in gen or "non_cached_input_tokens" in gen)
-        else gen.get("input_tokens", 0)
-        for gen in token_data["generations"]
-    )
-    
-    total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
-    
-    total_input_cost = sum(
-        (gen.get("cached_input_cost", 0) + gen.get("non_cached_input_cost", 0))
-        if ("cached_input_cost" in gen or "non_cached_input_cost" in gen)
-        else gen.get("input_cost", 0)
-        for gen in token_data["generations"]
-    )
-    
-    total_output_cost = sum(gen.get("output_cost", 0) for gen in token_data["generations"])
-    total_cost = total_input_cost + total_output_cost
-    
-    # Display summary metrics
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Cost", f"${total_cost:.4f}")
-    with col2:
-        st.metric("Total Input Tokens", f"{total_input_tokens:,}")
-    with col3:
-        st.metric("Total Output Tokens", f"{total_output_tokens:,}")
-    
-    # Display cost breakdown
-    st.subheader("Cost Breakdown")
-    col4, col5 = st.columns(2)
-    with col4:
-        st.metric("Input Cost", f"${total_input_cost:.4f}")
-    with col5:
-        st.metric("Output Cost", f"${total_output_cost:.4f}")
-    
-    # Display average response time
-    response_times = [gen.get("response_time", 0) for gen in token_data["generations"]]
-    if response_times:
-        avg_response_time = sum(response_times) / len(response_times)
-        st.metric("Average Response Time", f"{avg_response_time:.2f}s")
-    
-    # Display inquiries data if available
+    # Get all inquiries that have classifications
     if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
         df = st.session_state["inquiries"]
+        total_inquiries = len(df)
         
-        # Classification distribution
-        st.subheader("Classification Distribution")
-        if "classification" in df.columns and not df["classification"].isna().all():
-            classification_counts = df["classification"].value_counts()
-            for classification, count in classification_counts.items():
-                if pd.notna(classification):  # Skip NaN values
-                    percentage = (count / len(df)) * 100
-                    st.text(f"{classification}: {count} ({percentage:.1f}%)")
-        
-        # Priority distribution
-        st.subheader("Priority Distribution")
-        if "priority" in df.columns and not df["priority"].isna().all():
-            priority_counts = df["priority"].value_counts()
-            for priority, count in priority_counts.items():
-                if pd.notna(priority):  # Skip NaN values
-                    percentage = (count / len(df)) * 100
-                    st.text(f"{priority}: {count} ({percentage:.1f}%)")
-        
-        # Common topics analysis
-        st.subheader("Common Topics & Themes")
-        if "summary" in df.columns and not df["summary"].isna().all():
+        # Count inquiries by type
+        inquiry_types = df["classification"].value_counts()
+        for inquiry_type, count in inquiry_types.items():
+            if pd.notna(inquiry_type):
+                percentage = (count / total_inquiries) * 100
+                st.text(f"{inquiry_type}: {count} ({percentage:.1f}%)")
+
+    # Priority Distribution section
+    st.subheader("Priority Distribution")
+    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+        df = st.session_state["inquiries"]
+        priority_counts = df["priority"].value_counts()
+        for priority, count in priority_counts.items():
+            if pd.notna(priority):
+                percentage = (count / len(df)) * 100
+                st.text(f"{priority}: {count} ({percentage:.1f}%)")
+
+    # Common Topics & Themes section
+    st.subheader("Common Topics & Themes")
+    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+        df = st.session_state["inquiries"]
+        if "summary" in df.columns:
             summaries = " ".join(df["summary"].fillna("")).lower()
             words = re.findall(r'\b\w+\b', summaries)
             word_counts = Counter(words)
@@ -103,11 +62,45 @@ def update_analytics(section="main"):
             themes = [(word, count) for word, count in word_counts.most_common(10) 
                      if word not in stop_words and len(word) > 3]
             
-            if themes:  # Only display if we have themes
-                for word, count in themes:
-                    st.text(f"{word.title()}: {count}")
-            else:
-                st.text("No common themes found yet")
+            for word, count in themes:
+                st.text(f"{word.title()} ({count})")
+
+    # Token Usage Analytics section
+    st.subheader("Token Usage Analytics")
+    
+    # Classification Metrics
+    st.subheader("Classification Metrics")
+    
+    # Calculate averages from token usage data
+    generations = st.session_state["token_usage"]["generations"]
+    if generations:
+        avg_response_time = sum(gen.get("response_time", 0) for gen in generations) / len(generations)
+        avg_cached_tokens = sum(gen.get("cached_input_tokens", 0) for gen in generations) / len(generations)
+        avg_non_cached_tokens = sum(gen.get("non_cached_input_tokens", 0) for gen in generations) / len(generations)
+        avg_output_tokens = sum(gen.get("output_tokens", 0) for gen in generations) / len(generations)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Average Response Time", f"{avg_response_time:.2f}s", f"Total: {sum(gen.get('response_time', 0) for gen in generations):.2f}s")
+        with col2:
+            st.metric("Avg Cached Input Tokens", f"{int(avg_cached_tokens):,}", f"${sum(gen.get('cached_input_cost', 0) for gen in generations):.4f}")
+        with col3:
+            st.metric("Avg Non-Cached Input Tokens", f"{int(avg_non_cached_tokens):,}", f"${sum(gen.get('non_cached_input_cost', 0) for gen in generations):.4f}")
+        with col4:
+            st.metric("Average Output Tokens", f"{int(avg_output_tokens):,}", f"${sum(gen.get('output_cost', 0) for gen in generations):.4f}")
+
+    # Cost Breakdown section
+    st.subheader("Cost Breakdown")
+    if generations:
+        total_input_cost = sum((gen.get("cached_input_cost", 0) + gen.get("non_cached_input_cost", 0)) for gen in generations)
+        total_output_cost = sum(gen.get("output_cost", 0) for gen in generations)
+        
+        st.text(f"Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}")
+        st.text(f"Total Output Cost: ${total_output_cost:.4f}")
+
+def update_analytics(section="main"):
+    """Update analytics display."""
+    render_analytics_dashboard()
 
 ###############################################################################
 # 1) EARLY INITIALIZATION - To prevent SessionInfo errors
@@ -585,10 +578,20 @@ if inquiries_btn:
 if analytics_btn:
     st.session_state["section"] = "analytics"
 
-# Display appropriate section based on selection
-if st.session_state["section"] == "main":
+# Setup API key
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+# Navigation buttons
+if st.button("View Analytics Dashboard"):
+    st.session_state["page"] = "analytics"
+
+# Main page content based on current page
+if st.session_state["page"] == "analytics":
+    render_analytics_dashboard()
+elif st.session_state["page"] == "main":
+    # Main page content here
     st.header("Generate New Inquiry")
-elif st.session_state["section"] == "inquiries":
+elif st.session_state["page"] == "inquiries":
     st.header("View Inquiries")
     # Display inquiries directly in main app
     df = st.session_state["inquiries"]
@@ -662,85 +665,6 @@ elif st.session_state["section"] == "inquiries":
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
         st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
-elif st.session_state["section"] == "analytics":
-    st.header("Analytics Dashboard")
-    # Display analytics directly in main app
-    df = st.session_state["inquiries"]
-    if len(df) > 0:
-        st.subheader("Summary Analytics")
-        
-        # Row 1: Classification and Priority distribution
-        colA, colB = st.columns(2)
-        with colA:
-            classification_counts = df["classification"].value_counts()
-            for classification, count in classification_counts.items():
-                percentage = (count / len(df)) * 100
-                st.markdown(f"{classification}: {count} ({percentage:.1f}%)")
-            
-        with colB:
-            priority_counts = df["priority"].value_counts()
-            st.markdown("#### Priority Distribution")
-            for priority, count in priority_counts.items():
-                percentage = (count / len(df)) * 100
-                st.markdown(f"{priority}: {count} ({percentage:.1f}%)")
-        
-        # Common topics/themes from summaries
-        st.subheader("Common Topics & Themes")
-        if "summary" in df.columns:
-            # Extract and count common words/phrases
-            summaries = " ".join(df["summary"].fillna("")).lower()
-            words = re.findall(r'\b\w+\b', summaries)
-            word_counts = Counter(words)
-            
-            # Filter out common stop words and show top themes
-            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with'])
-            themes = [(word, count) for word, count in word_counts.most_common(10) 
-                     if word not in stop_words and len(word) > 3]
-            
-            for word, count in themes:
-                st.markdown(f"{word.title()} ({count})")
-        
-        # Token Usage Analytics
-        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
-            st.subheader("Token Usage Analytics")
-            
-            # Create DataFrame from token usage data
-            df_tokens = pd.DataFrame(st.session_state["token_usage"]["generations"])
-            
-            # Classification Metrics
-            st.markdown("#### Classification Metrics")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                avg_response_time = df_tokens['response_time'].mean()
-                total_response_time = df_tokens['response_time'].sum()
-                st.metric("Average Response Time", f"{avg_response_time:.2f}s", f"Total: {total_response_time:.2f}s")
-            
-            with col2:
-                avg_cached_tokens = df_tokens['cached_input_tokens'].mean()
-                cached_cost = df_tokens['cached_input_cost'].sum()
-                st.metric("Avg Cached Input Tokens", f"{avg_cached_tokens:,.0f}", f"${cached_cost:.4f}")
-            
-            with col3:
-                avg_non_cached_tokens = df_tokens['non_cached_input_tokens'].mean()
-                non_cached_cost = df_tokens['non_cached_input_cost'].sum()
-                st.metric("Avg Non-Cached Input Tokens", f"{avg_non_cached_tokens:,.0f}", f"${non_cached_cost:.4f}")
-            
-            with col4:
-                avg_output_tokens = df_tokens['output_tokens'].mean()
-                output_cost = df_tokens['output_cost'].sum()
-                st.metric("Average Output Tokens", f"{avg_output_tokens:,.0f}", f"${output_cost:.4f}")
-            
-            # Cost Breakdown
-            st.markdown("#### Cost Breakdown")
-            total_input_cost = cached_cost + non_cached_cost
-            total_cost = total_input_cost + output_cost
-            
-            st.markdown(f"Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}")
-            st.markdown(f"Total Output Cost: ${output_cost:.4f}")
-            st.markdown(f"Total Cost: ${total_cost:.4f}")
-    else:
-        st.info("No data available for analytics. Generate scenarios and classifications to see analytics.")
 else:
     st.info("Generate a scenario above before classification.")
 
