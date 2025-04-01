@@ -734,6 +734,15 @@ if st.session_state["section"] == "main":
     st.header("Generate New Inquiry")
 elif st.session_state["section"] == "inquiries":
     st.header("View Inquiries")
+    # Add reload button
+    if st.button("🔄 Reload Inquiries"):
+        dummy_inquiries = load_dummy_inquiries()
+        if not dummy_inquiries.empty:
+            st.session_state["inquiries"] = dummy_inquiries
+            st.success("Inquiries reloaded successfully!")
+        else:
+            st.warning("No inquiries found in inquiries.json")
+    
     # Display inquiries directly in main app
     df = st.session_state["inquiries"]
     if len(df) > 0:
@@ -1004,7 +1013,6 @@ guarantee_terms = load_guarantee_terms()
 ###############################################################################
 # 4) SET UP SESSION STATE
 ###############################################################################
-@st.cache_data
 def load_dummy_inquiries():
     """
     Loads dummy inquiry data from inquiries.json file if it exists.
