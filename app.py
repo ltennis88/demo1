@@ -2617,17 +2617,6 @@ if len(df) > 0:
     else:
         st.info("No inquiries logged yet. Generate some scenarios to see the dashboard.")
 
-    # Data Exports section
-    st.subheader("Data Exports")
-    if len(df) > 0:
-        csv_data = df.to_csv(index=False)
-        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="main_csv_download")
-
-        json_data = df.to_json(orient="records")
-        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-    else:
-        st.write("No data to export yet.")
-
     # Data Exports section within the expander
     st.subheader("Data Exports")
     if len(df) > 0:
