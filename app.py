@@ -2467,6 +2467,27 @@ if len(df) > 0:
                         )
                         st.plotly_chart(fig_priority, use_container_width=True)
                 
+                # Department distribution with pie chart
+                st.write("##### Department Distribution")
+                if "department" in df.columns and not df["department"].isna().all():
+                    department_counts = df["department"].value_counts()
+                    fig_dept = px.pie(
+                        values=department_counts.values,
+                        names=department_counts.index,
+                        title="Department Distribution"
+                    )
+                    fig_dept.update_layout(
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.3,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_dept, use_container_width=True)
+                
                 # Common topics analysis with bubble tags
                 st.write("##### Common Topics & Themes")
                 if "summary" in df.columns and not df["summary"].isna().all():
@@ -2480,7 +2501,7 @@ if len(df) > 0:
                              if word not in stop_words and len(word) > 3]
                     
                     if themes:
-                        # Create bubble tags HTML
+                        # Create bubble tags HTML with updated styling
                         st.markdown("""
                         <style>
                         .bubble-container {
@@ -2495,15 +2516,17 @@ if len(df) > 0:
                             padding: 8px 16px;
                             border-radius: 20px;
                             font-size: 14px;
-                            display: flex;
+                            display: inline-flex;
                             align-items: center;
                             gap: 8px;
+                            width: fit-content;
                         }
                         .bubble-count {
                             background-color: rgba(255, 255, 255, 0.2);
                             padding: 2px 8px;
                             border-radius: 10px;
                             font-size: 12px;
+                            white-space: nowrap;
                         }
                         </style>
                         <div class="bubble-container">
