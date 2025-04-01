@@ -2503,21 +2503,24 @@ if len(df) > 0:
     else:
         st.write("No data to export yet.")
 
+    # Data Exports section within the expander
+    st.subheader("Data Exports")
+    if len(df) > 0:
+        csv_data = df.to_csv(index=False)
+        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="analytics_csv_download")
+
+        json_data = df.to_json(orient="records")
+        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="analytics_json_download")
+    else:
+        st.write("No data to export yet.")
+
 # Remove any other calls to update_analytics outside the expander
 # ... rest of the code ...
 
 # -----------------------------------------------------------------------------
 # EXPORT LOGGED DATA
 # -----------------------------------------------------------------------------
-st.subheader("Data Exports")
-if len(df) > 0:
-    csv_data = df.to_csv(index=False)
-    st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="main_csv_download")
-
-    json_data = df.to_json(orient="records")
-    st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-else:
-    st.write("No data to export yet.")
+# This section is removed as it's now part of the analytics expander
 
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
