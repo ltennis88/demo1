@@ -1630,22 +1630,22 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                 
                 # If not cached, extract key topics
                 if not key_topics:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "Extract key topics from this customer scenario."},
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Extract key topics from this customer scenario."},
                             {"role": "user", "content": str(scenario_text)}
-                        ],
-                        temperature=0,
-                        max_tokens=150
-                    )
+                ],
+                temperature=0,
+                max_tokens=150
+            )
                     key_topics = response['choices'][0]['message']['content']
-                    
+            
                     # Cache the key topics
-                    if 'faq_key_topics' not in st.session_state:
-                        st.session_state['faq_key_topics'] = {}
-                    st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
-                
+            if 'faq_key_topics' not in st.session_state:
+                st.session_state['faq_key_topics'] = {}
+            st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+            
                 # Score each FAQ
                 for faq_entry in faq_dict['all_faqs']:
                     score = score_faq_relevance(key_topics, faq_entry)
@@ -1653,8 +1653,9 @@ def find_relevant_faq(scenario_text, faq_dataframe):
                         best_score = score
                         best_match = faq_entry['question']
                         best_answer = faq_entry['answer']
-            except Exception as e:
-                st.error(f"Error in semantic search: {str(e)}")
+                
+        except Exception as e:
+            st.error(f"Error in semantic search: {str(e)}")
             
         # Return results if we found a good match
         if best_match and best_score >= 3:
@@ -2376,11 +2377,11 @@ if len(df) > 0:
             avg_output_tokens = total_output_tokens / num_generations if num_generations > 0 else 0
             
             # Display totals
-            st.write("##### LLM API Metrics")
+            st.write("##### Total Metrics")
             col1, col2, col3 = st.columns(3)
-            with col1:
+        with col1:
                 st.metric("Total Cost", f"${total_cost:.4f}")
-            with col2:
+        with col2:
                 st.metric("Total Input Tokens", f"{total_input_tokens:,}")
             with col3:
                 st.metric("Total Output Tokens", f"{total_output_tokens:,}")
@@ -2529,7 +2530,7 @@ if len(df) > 0:
                     
                     if themes:
                         # Create bubble tags HTML with updated styling
-                        st.markdown("""
+            st.markdown("""
                         <style>
                         .bubble-container {
                             display: flex;
@@ -2558,7 +2559,7 @@ if len(df) > 0:
                         </style>
                         <div class="bubble-container">
             """, unsafe_allow_html=True)
-                        
+            
                         # Generate bubble tags
                         bubble_tags = []
                         for word, count in themes:
@@ -2570,12 +2571,10 @@ if len(df) > 0:
                             """)
                         
                         st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
-                    else:
-                        st.text("No common themes found yet")
-                else:
-                    st.info("No analytics data available yet. Generate some responses to see analytics.")
         else:
-            st.info("No data available for analytics. Generate scenarios and classifications to see analytics.")
+                        st.text("No common themes found yet")
+        else:
+            st.info("No analytics data available yet. Generate some responses to see analytics.")
     
     # Recent Inquiries Section
     st.subheader("Recent Inquiries")
@@ -2591,12 +2590,12 @@ if len(df) > 0:
         
         # Display user type and contact info in columns
         col1, col2 = st.columns(2)
-        with col1:
+            with col1:
             if recent_row['inbound_route']:
                 st.markdown("<div class='inquiry-label'>Contact Method:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route'].title()}</div>", unsafe_allow_html=True)
-        
-        with col2:
+            
+            with col2:
             if recent_row['user_type']:
                 st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
@@ -2609,16 +2608,10 @@ if len(df) > 0:
         # Rest of the historical inquiries display code...
 
     else:
-        st.info("No inquiries logged yet. Generate some scenarios to see the dashboard.")
+    st.info("No inquiries logged yet. Generate some scenarios to see the dashboard.")
 
-    if len(df) > 0:
-        csv_data = df.to_csv(index=False)
-        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="main_csv_download")
-
-        json_data = df.to_json(orient="records")
-        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-    else:
-        st.write("No data to export yet.")
+# Remove any other calls to update_analytics outside the expander
+# ... rest of the code ...
 
 # -----------------------------------------------------------------------------
 # EXPORT LOGGED DATA
@@ -2630,7 +2623,7 @@ if len(df) > 0:
 
     json_data = df.to_json(orient="records")
     st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="main_json_download")
-else:
+    else:
     st.write("No data to export yet.")
 
 # -----------------------------------------------------------------------------
