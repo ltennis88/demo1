@@ -2829,3 +2829,33 @@ Answer: {faq_answer}
     except Exception as e:
         st.error(f"Error finding relevant FAQ: {str(e)}")
         return context
+
+###############################################################################
+# Download Data Button
+###############################################################################
+# Add download button at the bottom of the page
+st.markdown("<hr style='margin: 30px 0px; border-color: #424242;'/>", unsafe_allow_html=True)
+st.subheader("Download Data")
+
+if st.button("Download Inquiries Data as JSON"):
+    # Convert DataFrame to JSON
+    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+        # Create a copy of the DataFrame
+        df_download = st.session_state["inquiries"].copy()
+        
+        # Convert timestamp to string if it exists
+        if 'timestamp' in df_download.columns:
+            df_download['timestamp'] = df_download['timestamp'].astype(str)
+        
+        # Convert to JSON string
+        json_str = df_download.to_json(orient="records", indent=2)
+        
+        # Create download button
+        st.download_button(
+            label="Click to Download JSON",
+            data=json_str,
+            file_name="checkatrade_inquiries.json",
+            mime="application/json"
+        )
+    else:
+        st.warning("No inquiry data available to download.")
