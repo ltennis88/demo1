@@ -87,21 +87,21 @@ def render_analytics_dashboard():
             st.write("##### Classification Distribution")
         if "classification" in df.columns and not df["classification"].isna().all():
             classification_counts = df["classification"].value_counts()
-                fig_class = px.pie(
-                    values=classification_counts.values,
-                    names=classification_counts.index
+            fig_class = px.pie(
+                values=classification_counts.values,
+                names=classification_counts.index
+            )
+            fig_class.update_layout(
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.3,
+                    xanchor="center",
+                    x=0.5
                 )
-                fig_class.update_layout(
-                    showlegend=True,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=-0.3,
-                        xanchor="center",
-                        x=0.5
-                    )
-                )
-                st.plotly_chart(fig_class, use_container_width=True)
+            )
+            st.plotly_chart(fig_class, use_container_width=True)
 
         with pie_col2:
             # User Type distribution with pie chart
@@ -2683,10 +2683,10 @@ if len(df) > 0:
                     if 'ivr_selections' in row and row['ivr_selections']:
                         st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
-                    
+                
             with col2:
                     if 'user_type' in row and row['user_type']:
-                    st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                        st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
                     
                     if 'phone_email' in row and row['phone_email']:
