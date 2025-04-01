@@ -2380,6 +2380,7 @@ if len(df) > 0:
             avg_output_tokens = total_output_tokens / num_generations if num_generations > 0 else 0
             
             # Display totals
+            st.subheader("LLM Metrics")
             st.write("##### Total Metrics")
             col1, col2, col3 = st.columns(3)
             with col1:
