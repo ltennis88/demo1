@@ -2504,38 +2504,6 @@ if len(df) > 0:
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
-    # Recent Inquiries Section
-    st.subheader("Recent Inquiries")
-    if len(df) > 0:
-        recent_row = df.iloc[-1]
-        with st.container():
-            st.markdown("<div class='inquiry-card'>", unsafe_allow_html=True)
-            st.markdown("<div class='inquiry-section'>Latest Inquiry Details</div>", unsafe_allow_html=True)
-            
-            # Display scenario text
-            if recent_row.get('scenario_text'):
-                st.markdown("<div class='inquiry-label'>Scenario:</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='inquiry-detail'>{recent_row['scenario_text']}</div>", unsafe_allow_html=True)
-            
-            # Display user type and contact info in columns
-            col1, col2 = st.columns(2)
-            with col1:
-                if recent_row.get('inbound_route'):
-                    st.markdown("<div class='inquiry-label'>Contact Method:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route'].title()}</div>", unsafe_allow_html=True)
-                    
-            with col2:
-                if recent_row.get('user_type'):
-                    st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
-
-    # Historical Inquiries
-    if len(df) > 1:
-        st.subheader("Historical Inquiries")
-        # Rest of the historical inquiries display code...
-    else:
-        st.info("No inquiries logged yet. Generate some scenarios to see the dashboard.")
-
     # Data Exports section within the expander
     st.subheader("Data Exports")
     if len(df) > 0:
