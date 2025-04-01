@@ -58,7 +58,7 @@ def render_analytics_dashboard():
         st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
     with col6:
         st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
-
+    
     # Display response time metrics if available
     response_times = [gen.get("response_time", 0) for gen in generations]
     if response_times:
@@ -85,8 +85,8 @@ def render_analytics_dashboard():
         with pie_col1:
             # Classification distribution with pie chart
             st.write("##### Classification Distribution")
-            if "classification" in df.columns and not df["classification"].isna().all():
-                classification_counts = df["classification"].value_counts()
+        if "classification" in df.columns and not df["classification"].isna().all():
+            classification_counts = df["classification"].value_counts()
                 fig_class = px.pie(
                     values=classification_counts.values,
                     names=classification_counts.index
@@ -801,6 +801,16 @@ elif st.session_state["section"] == "inquiries":
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
         st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
+
+    # Data Export section
+    st.header("Data Export")
+    if "inquiries" in st.session_state and len(st.session_state["inquiries"]) > 0:
+        df = st.session_state["inquiries"]
+        json_data = df.to_json(orient="records")
+        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json")
+    else:
+        st.info("No data to export yet.")
+
 elif st.session_state["section"] == "analytics":
     render_analytics_dashboard()
 else:
@@ -2721,6 +2731,15 @@ if len(df) > 0:
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
         st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
+
+    # Data Export section
+    st.header("Data Export")
+    if "inquiries" in st.session_state and len(st.session_state["inquiries"]) > 0:
+        df = st.session_state["inquiries"]
+        json_data = df.to_json(orient="records")
+        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json")
+    else:
+        st.info("No data to export yet.")
 
 # -----------------------------------------------------------------------------
 # EXPORT LOGGED DATA
