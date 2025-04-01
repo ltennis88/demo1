@@ -2463,6 +2463,107 @@ if len(df) > 0:
             if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
                 df = st.session_state["inquiries"]
                 
+                # Create two columns for the pie charts
+                pie_col1, pie_col2 = st.columns(2)
+                
+                with pie_col1:
+                    # Classification distribution with pie chart
+                    st.write("##### Classification Distribution")
+                    if "classification" in df.columns and not df["classification"].isna().all():
+                        classification_counts = df["classification"].value_counts()
+                        fig_class = px.pie(
+                            values=classification_counts.values,
+                            names=classification_counts.index
+                        )
+                        fig_class.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_class, use_container_width=True)
+                
+                with pie_col2:
+                    # Priority distribution with pie chart
+                    st.write("##### Priority Distribution")
+                    if "priority" in df.columns and not df["priority"].isna().all():
+                        priority_counts = df["priority"].value_counts()
+                        fig_priority = px.pie(
+                            values=priority_counts.values,
+                            names=priority_counts.index,
+                            color_discrete_map={
+                                "High": "#FF4B4B",
+                                "Medium": "#FFA726",
+                                "Low": "#4CAF50"
+                            }
+                        )
+                        fig_priority.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_priority, use_container_width=True)
+                
+                # Create another row with two columns for department and user type
+                pie_col3, pie_col4 = st.columns(2)
+                
+                with pie_col3:
+                    # Department distribution with pie chart
+                    st.write("##### Department Distribution")
+                    if "department" in df.columns and not df["department"].isna().all():
+                        department_counts = df["department"].value_counts()
+                        fig_dept = px.pie(
+                            values=department_counts.values,
+                            names=department_counts.index
+                        )
+                        fig_dept.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_dept, use_container_width=True)
+                
+                with pie_col4:
+                    # User Type distribution with pie chart
+                    st.write("##### User Type Distribution")
+                    if "user_type" in df.columns and not df["user_type"].isna().all():
+                        user_type_counts = df["user_type"].value_counts()
+                        fig_user = px.pie(
+                            values=user_type_counts.values,
+                            names=user_type_counts.index,
+                            color_discrete_map={
+                                "existing_homeowner": "#4CAF50",      # Green
+                                "existing_tradesperson": "#2196F3",   # Blue
+                                "prospective_homeowner": "#FFA726",   # Orange
+                                "prospective_tradesperson": "#9C27B0"  # Purple
+                            }
+                        )
+                        fig_user.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_user, use_container_width=True)
+
                 # Common topics analysis with bubble tags
                 st.write("##### Common Topics & Themes")
                 if "summary" in df.columns and not df["summary"].isna().all():
@@ -2521,136 +2622,35 @@ if len(df) > 0:
                     else:
                         st.text("No common themes found yet")
 
-                    # Create two columns for the pie charts
-                    pie_col1, pie_col2 = st.columns(2)
-                    
-                    with pie_col1:
-                        # Classification distribution with pie chart
-                        st.write("##### Classification Distribution")
-                        if "classification" in df.columns and not df["classification"].isna().all():
-                            classification_counts = df["classification"].value_counts()
-                            fig_class = px.pie(
-                                values=classification_counts.values,
-                                names=classification_counts.index
-                            )
-                            fig_class.update_layout(
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="bottom",
-                                    y=-0.3,
-                                    xanchor="center",
-                                    x=0.5
-                                )
-                            )
-                            st.plotly_chart(fig_class, use_container_width=True)
-                        
-                    with pie_col2:
-                        # Priority distribution with pie chart
-                        st.write("##### Priority Distribution")
-                        if "priority" in df.columns and not df["priority"].isna().all():
-                            priority_counts = df["priority"].value_counts()
-                            fig_priority = px.pie(
-                                values=priority_counts.values,
-                                names=priority_counts.index,
-                                color_discrete_map={
-                                    "High": "#FF4B4B",
-                                    "Medium": "#FFA726",
-                                    "Low": "#4CAF50"
-                                }
-                            )
-                            fig_priority.update_layout(
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="bottom",
-                                    y=-0.3,
-                                    xanchor="center",
-                                    x=0.5
-                                )
-                            )
-                            st.plotly_chart(fig_priority, use_container_width=True)
-                        
-                    # Create another row with two columns for department and user type
-                    pie_col3, pie_col4 = st.columns(2)
-                    
-                    with pie_col3:
-                        # Department distribution with pie chart
-                        st.write("##### Department Distribution")
-                        if "department" in df.columns and not df["department"].isna().all():
-                            department_counts = df["department"].value_counts()
-                            fig_dept = px.pie(
-                                values=department_counts.values,
-                                names=department_counts.index
-                            )
-                            fig_dept.update_layout(
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="bottom",
-                                    y=-0.3,
-                                    xanchor="center",
-                                    x=0.5
-                                )
-                            )
-                            st.plotly_chart(fig_dept, use_container_width=True)
-                        
-                    with pie_col4:
-                        # User Type distribution with pie chart
-                        st.write("##### User Type Distribution")
-                        if "user_type" in df.columns and not df["user_type"].isna().all():
-                            user_type_counts = df["user_type"].value_counts()
-                            fig_user = px.pie(
-                                values=user_type_counts.values,
-                                names=user_type_counts.index,
-                                color_discrete_map={
-                                    "existing_homeowner": "#4CAF50",      # Green
-                                    "existing_tradesperson": "#2196F3",   # Blue
-                                    "prospective_homeowner": "#FFA726",   # Orange
-                                    "prospective_tradesperson": "#9C27B0"  # Purple
-                                }
-                            )
-                            fig_user.update_layout(
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="h",
-                                    yanchor="bottom",
-                                    y=-0.3,
-                                    xanchor="center",
-                                    x=0.5
-                                )
-                            )
-                            st.plotly_chart(fig_user, use_container_width=True)
-
-                    # LLM API Metrics Section
-                    st.write("##### LLM API Metrics")
-                    # Display totals
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Total Cost", f"${total_cost:.4f}")
-                    with col2:
-                        st.metric("Total Input Tokens", f"{total_input_tokens:,}")
-                    with col3:
-                        st.metric("Total Output Tokens", f"{total_output_tokens:,}")
-                    
-                    # Display averages
-                    col4, col5, col6 = st.columns(3)
-                    with col4:
-                        st.metric("Avg Cost", f"${avg_cost:.4f}")
-                    with col5:
-                        st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
-                    with col6:
-                        st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
-                    
-                    # Display response time metrics if available
-                    if response_times:
-                        col7, col8, col9 = st.columns(3)
-                        with col7:
-                            st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
-                        with col8:
-                            st.metric("Max Response Time", f"{max_response_time:.2f}s")
-                        with col9:
-                            st.metric("Min Response Time", f"{min_response_time:.2f}s")
+                # LLM API Metrics Section
+                st.write("##### LLM API Metrics")
+                # Display totals
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Cost", f"${total_cost:.4f}")
+                with col2:
+                    st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+                with col3:
+                    st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+                
+                # Display averages
+                col4, col5, col6 = st.columns(3)
+                with col4:
+                    st.metric("Avg Cost", f"${avg_cost:.4f}")
+                with col5:
+                    st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
+                with col6:
+                    st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
+                
+                # Display response time metrics if available
+                if response_times:
+                    col7, col8, col9 = st.columns(3)
+                    with col7:
+                        st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
+                    with col8:
+                        st.metric("Max Response Time", f"{max_response_time:.2f}s")
+                    with col9:
+                        st.metric("Min Response Time", f"{min_response_time:.2f}s")
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
