@@ -2089,3 +2089,685 @@ if st.session_state["generated_scenario"]:
             st.markdown(f"<div class='agent-detail'>Project Cost: {project_cost} &nbsp;&nbsp;&nbsp; Status: {payment_status}</div>", unsafe_allow_html=True)
         
         st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+
+# -----------------------------------------------------------------------------
+# CLASSIFY & STORE INQUIRY
+# -----------------------------------------------------------------------------
+st.header("Inquiry Classification")
+if st.session_state["generated_scenario"]:
+    scenario_text = st.session_state["generated_scenario"].get("scenario_text", "")
+    account_details = st.session_state["generated_scenario"].get("account_details", {})
+    if st.button("Classify Scenario", use_container_width=True):
+        if scenario_text.strip():
+            with st.spinner("Classifying scenario..."):
+                classification_result = classify_scenario(scenario_text)
+                now = time.strftime("%Y-%m-%d %H:%M:%S")
+
+                new_row = {
+                    "timestamp": now,
+                    "inbound_route": st.session_state["generated_scenario"].get("inbound_route", ""),
+                    "ivr_flow": st.session_state["generated_scenario"].get("ivr_flow", ""),
+                    "ivr_selections": self_process_ivr_selections(st.session_state["generated_scenario"].get("ivr_selections", [])),
+                    "user_type": st.session_state["generated_scenario"].get("user_type", ""),
+                    "phone_email": st.session_state["generated_scenario"].get("phone_email", ""),
+                    "membership_id": st.session_state["generated_scenario"].get("membership_id", ""),
+                    "scenario_text": scenario_text,
+                    "classification": classification_result.get("classification", "General"),
+                    "department": classification_result.get("department", "Consumer Support"),
+                    "subdepartment": classification_result.get("subdepartment", "General Inquiries"),
+                    "priority": classification_result.get("priority", "Medium"),
+                    "summary": classification_result.get("summary", ""),
+                    "related_faq_category": classification_result.get("related_faq_category", ""),
+                    "account_name": f"{account_details.get('name', '')} {account_details.get('surname', '')}".strip(),
+                    "account_location": account_details.get("location", ""),
+                    "account_reviews": account_details.get("latest_reviews", ""),
+                    "account_jobs": account_details.get("latest_jobs", ""),
+                    "project_cost": account_details.get("project_cost", ""),
+                    "payment_status": account_details.get("payment_status", ""),
+                    "estimated_response_time": classification_result.get("estimated_response_time", "48 hours"),
+                    "agent_notes": "",  # Initialize with empty agent notes
+                    "case_status": "New"  # Initial case status
+                }
+
+                st.session_state["inquiries"] = pd.concat(
+                    [st.session_state["inquiries"], pd.DataFrame([new_row])],
+                    ignore_index=True
+                )
+                
+                # Store the case index for reference
+                st.session_state["current_case_id"] = len(st.session_state["inquiries"]) - 1
+                
+                # Save to file
+                save_inquiries_to_file()
+                
+                # Get the most recent classification data
+                if st.session_state["token_usage"]["generations"]:
+                    # Find the most recent classification operation
+                    classification_data = None
+                    for data in reversed(st.session_state["token_usage"]["generations"]):
+                        if data.get("operation") == "classification":
+                            classification_data = data
+                            break
+                    
+                    if classification_data:
+                        # Calculate total input cost
+                        total_input_cost = classification_data['cached_input_cost'] + classification_data['non_cached_input_cost']
+                        
+                        # Display classification metrics
+                        st.markdown("### Classification Metrics")
+                        st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                        
+                        with metric_col1:
+                            st.metric(
+                                "Response Time",
+                                f"{classification_data['response_time']:.2f}s"
+                            )
+                        
+                        with metric_col2:
+                            st.metric(
+                                "Cached Input Tokens",
+                                f"{classification_data['cached_input_tokens']:,}",
+                                f"${classification_data['cached_input_cost']:.4f}"
+                            )
+                        
+                        with metric_col3:
+                            st.metric(
+                                "Non-Cached Input Tokens",
+                                f"{classification_data['non_cached_input_tokens']:,}",
+                                f"${classification_data['non_cached_input_cost']:.4f}"
+                            )
+                        
+                        with metric_col4:
+                            st.metric(
+                                "Output Tokens",
+                                f"{classification_data['output_tokens']:,}",
+                                f"${classification_data['output_cost']:.4f}"
+                            )
+                        
+                        # Add total cost summary
+                        st.markdown("<div class='inquiry-section'>Total Costs</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-label'>Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-label'>Total Output Cost: ${classification_data['output_cost']:.4f}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-label'>Total Cost: ${classification_data['total_cost']:.4f}</div>", unsafe_allow_html=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                
+                # Determine priority class
+                priority_class = "priority-medium"
+                if new_row["priority"] == "High":
+                    priority_class = "priority-high"
+                elif new_row["priority"] == "Low":
+                    priority_class = "priority-low"
+                
+                # Create classification section with Streamlit components instead of raw HTML
+                st.markdown("<h3>Classification Results</h3>", unsafe_allow_html=True)
+                
+                # Create a styled container for the classification results
+                st.markdown("""
+                <style>
+                .styled-container {
+                    background-color: #1E1E1E;
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                    border: 1px solid #424242;
+                }
+                .result-row {
+                    display: flex;
+                    margin-bottom: 12px;
+                }
+                .result-label {
+                    width: 220px;
+                    font-weight: bold;
+                    color: #64B5F6;
+                }
+                .result-value {
+                    flex-grow: 1;
+                    background-color: #2C2C2C;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Start the styled container
+                st.markdown("<div class='styled-container'>", unsafe_allow_html=True)
+                
+                # Create each classification field with proper formatting
+                st.markdown(f"""
+                <div class='result-row'>
+                    <div class='result-label'>Classification:</div>
+                    <div class='result-value'>{classification_result.get("classification", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Department:</div>
+                    <div class='result-value'>{classification_result.get("department", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Subdepartment:</div>
+                    <div class='result-value'>{classification_result.get("subdepartment", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Priority:</div>
+                    <div class='result-value'>
+                        <span class='priority-{classification_result.get("priority", "medium").lower()}'>
+                            {classification_result.get("priority", "Medium")}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Estimated Response Time:</div>
+                    <div class='result-value'>{classification_result.get("estimated_response_time", "Unknown")}</div>
+                </div>
+                
+                <div class='result-row'>
+                    <div class='result-label'>Summary:</div>
+                    <div class='result-value'>{classification_result.get("summary", "No summary available")}</div>
+                </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Get relevant FAQ based on the classification result and scenario text
+                faq_category = classification_result.get("related_faq_category", "")
+                relevant_faq = None
+                faq_relevance_score = 0
+
+                # First try to use the model's suggested FAQ category
+                if faq_category and faq_category.lower() not in ["", "none", "n/a"]:
+                    # First check if Category column exists
+                    if "Category" in df_faq.columns:
+                    # Filter FAQ dataframe by the suggested category
+                        category_matches = df_faq[df_faq["Category"].str.lower().str.contains(faq_category.lower(), na=False)]
+                    if not category_matches.empty:
+                        # Look for the best match within this category
+                        best_match = None
+                        best_score = 0
+                        
+                        for _, row in category_matches.iterrows():
+                            question = str(row.get("Question", "")).lower()
+                            scenario_lower = scenario_text.lower()
+                            # Count significant word matches
+                            score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                            if score > best_score:
+                                best_score = score
+                                best_match = row["Question"]
+                        
+                        if best_match and best_score >= 2:  # Require at least 2 significant matches
+                            relevant_faq = best_match
+                            faq_relevance_score = best_score + 2  # Bonus for model-suggested category
+                    else:
+                        # If Category column doesn't exist, try searching in Type column instead
+                        if "Type" in df_faq.columns:
+                            category_matches = df_faq[df_faq["Type"].str.lower().str.contains(faq_category.lower(), na=False)]
+                            if not category_matches.empty:
+                                # Same matching logic as above
+                                best_match = None
+                                best_score = 0
+                                
+                                for _, row in category_matches.iterrows():
+                                    question = str(row.get("Question", "")).lower()
+                                    scenario_lower = scenario_text.lower()
+                                    score = sum(1 for word in scenario_lower.split() if len(word) > 4 and word in question)
+                                    if score > best_score:
+                                        best_score = score
+                                        best_match = row["Question"]
+                                
+                                if best_match and best_score >= 2:
+                                    relevant_faq = best_match
+                                    faq_relevance_score = best_score + 2
+
+                # If no FAQ found via category or low relevance, use our keyword matching function
+                if not relevant_faq or faq_relevance_score < 3:
+                    keyword_faq, keyword_answer, keyword_score = find_relevant_faq(scenario_text, df_faq)
+                    if keyword_faq and keyword_score >= 3:  # Higher threshold for keyword matching
+                        # If we already have a FAQ but this one is more relevant, replace it
+                        if keyword_score > faq_relevance_score:
+                            relevant_faq = keyword_faq
+                            relevant_answer = keyword_answer
+                            faq_relevance_score = keyword_score
+
+                # Only display FAQ if we have a sufficiently relevant match
+                if relevant_faq and faq_relevance_score >= 3:
+                    faq_content = f"""
+                    <div class="classification-card">
+                        <div class="classification-header">Relevant FAQ</div>
+                        <div class="field-value"><strong>Question:</strong> {str(relevant_faq)}</div>
+                    """
+                    
+                    # If we have an answer, display it as well
+                    if 'relevant_answer' in locals() and relevant_answer:
+                        faq_content += f"""
+                        <div class="field-value"><strong>Answer:</strong> {str(relevant_answer)}</div>
+                        """
+                    
+                    faq_content += "</div>"
+                    st.markdown(faq_content, unsafe_allow_html=True)
+                
+                # Generate response suggestion for email or whatsapp
+                inbound_route = st.session_state["generated_scenario"].get("inbound_route", "")
+                if inbound_route in ["email", "whatsapp"]:
+                    try:
+                        response_text, input_tokens, output_tokens, input_cost, output_cost = generate_response_suggestion(
+                        st.session_state["generated_scenario"], 
+                        classification_result
+                    )
+                        response_card = f"""
+                        <div class='classification-card'>
+                            <div class='classification-header'>Suggested {inbound_route.capitalize()} Response</div>
+                            <div class='field-value' style='white-space: pre-wrap;'>{str(response_text)}</div>
+                        </div>
+                        """
+                        st.markdown(response_card, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Could not generate response suggestion: {str(e)}")
+                        
+                # Add metrics for the classification tokens and cost
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    last_usage = st.session_state["token_usage"]["generations"][-1]
+                    response_time = last_usage.get("response_time", 0)
+                    st.metric("Response Time", f"{response_time:.2f}s")
+                
+                with col2:
+                    # Handle both token usage data structures
+                    input_tokens = last_usage.get("input_tokens", last_usage.get("cached_input_tokens", 0) + last_usage.get("non_cached_input_tokens", 0))
+                    input_cost = last_usage.get("input_cost", last_usage.get("cached_input_cost", 0) + last_usage.get("non_cached_input_cost", 0))
+                    st.metric("Input Tokens", f"{input_tokens} (${input_cost:.4f})")
+                
+                with col3:
+                    output_tokens = last_usage.get("output_tokens", 0)
+                    output_cost = last_usage.get("output_cost", 0)
+                    st.metric("Output Tokens", f"{output_tokens} (${output_cost:.4f})")
+                    
+                with col4:
+                    total_cost = last_usage.get("total_cost", 0)
+                    st.metric("Total Cost", f"${total_cost:.4f}")
+                
+                # Store all classification fields in the inquiries DataFrame
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "classification"] = classification_result.get("classification", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "department"] = classification_result.get("department", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "subdepartment"] = classification_result.get("subdepartment", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "priority"] = classification_result.get("priority", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "estimated_response_time"] = classification_result.get("estimated_response_time", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "summary"] = classification_result.get("summary", "")
+                st.session_state["inquiries"].at[st.session_state["current_case_id"], "related_faq_category"] = classification_result.get("related_faq_category", "")
+                
+                # Also save the generated response suggestion if applicable
+                if inbound_route in ["email", "whatsapp", "webform"] and 'response_suggestion' in locals():
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "response_suggestion"] = response_suggestion
+                
+                # Save any relevant FAQ that was found
+                if relevant_faq and faq_relevance_score >= 3:
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq"] = relevant_faq
+                    st.session_state["inquiries"].at[st.session_state["current_case_id"], "faq_relevance_score"] = faq_relevance_score
+                    # Also save the FAQ answer if available
+                    if 'relevant_answer' in locals() and relevant_answer:
+                        st.session_state["inquiries"].at[st.session_state["current_case_id"], "relevant_faq_answer"] = relevant_answer
+                
+                # Save to file again to ensure all classification fields are stored
+                save_inquiries_to_file()
+        else:
+            st.warning("No scenario text found. Generate a scenario first.")
+else:
+    st.info("Generate a scenario above before classification.")
+
+# -----------------------------------------------------------------------------
+# DASHBOARD & LOGGED INQUIRIES (Enhanced View)
+# -----------------------------------------------------------------------------
+st.header("Dashboard")
+df = st.session_state["inquiries"]
+
+if len(df) > 0:
+    # Analytics in expander
+    with st.expander("View Analytics Dashboard", expanded=False):
+        if "token_usage" in st.session_state and st.session_state["token_usage"]["generations"]:
+            st.subheader("Analytics Overview")
+            # Get token data
+            token_data = st.session_state["token_usage"]
+            generations = token_data["generations"]
+            num_generations = len(generations)
+            
+            # Calculate totals
+            total_cost = sum(gen.get("total_cost", 0) for gen in generations)
+            total_input_tokens = sum(gen.get("input_tokens", 0) for gen in generations)
+            total_output_tokens = sum(gen.get("output_tokens", 0) for gen in generations)
+            
+            # Calculate averages
+            avg_cost = total_cost / num_generations if num_generations > 0 else 0
+            avg_input_tokens = total_input_tokens / num_generations if num_generations > 0 else 0
+            avg_output_tokens = total_output_tokens / num_generations if num_generations > 0 else 0
+            
+            # Display totals
+            st.subheader("LLM Metrics")
+            st.write("##### Total Metrics")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Cost", f"${total_cost:.4f}")
+            with col2:
+                st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+            with col3:
+                st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+            
+            # Display averages
+            st.write("##### Average Metrics (per response)")
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                st.metric("Avg Cost", f"${avg_cost:.4f}")
+            with col5:
+                st.metric("Avg Input Tokens", f"{int(avg_input_tokens):,}")
+            with col6:
+                st.metric("Avg Output Tokens", f"{int(avg_output_tokens):,}")
+
+            # Display response time metrics if available
+            response_times = [gen.get("response_time", 0) for gen in generations]
+            if response_times:
+                avg_response_time = sum(response_times) / len(response_times)
+                max_response_time = max(response_times)
+                min_response_time = min(response_times)
+                st.write("##### Response Time Metrics")
+                col7, col8, col9 = st.columns(3)
+                with col7:
+                    st.metric("Avg Response Time", f"{avg_response_time:.2f}s")
+                with col8:
+                    st.metric("Max Response Time", f"{max_response_time:.2f}s")
+                with col9:
+                    st.metric("Min Response Time", f"{min_response_time:.2f}s")
+
+            # Display classification and priority distributions
+            if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
+                df = st.session_state["inquiries"]
+                
+                st.subheader("Classification Metrics")
+                # Create two columns for the pie charts
+                pie_col1, pie_col2 = st.columns(2)
+                
+                with pie_col1:
+                    # Classification distribution with pie chart
+                    st.write("##### Classification Distribution")
+                    if "classification" in df.columns and not df["classification"].isna().all():
+                        classification_counts = df["classification"].value_counts()
+                        fig_class = px.pie(
+                            values=classification_counts.values,
+                            names=classification_counts.index
+                        )
+                        fig_class.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_class, use_container_width=True)
+
+                with pie_col2:
+                    # User Type distribution with pie chart
+                    st.write("##### User Type Distribution")
+                    if "user_type" in df.columns and not df["user_type"].isna().all():
+                        user_type_counts = df["user_type"].value_counts()
+                        fig_user = px.pie(
+                            values=user_type_counts.values,
+                            names=user_type_counts.index,
+                            color_discrete_map={
+                                "existing_homeowner": "#4CAF50",      # Green
+                                "existing_tradesperson": "#2196F3",   # Blue
+                                "prospective_homeowner": "#FFA726",   # Orange
+                                "prospective_tradesperson": "#9C27B0"  # Purple
+                            }
+                        )
+                        fig_user.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_user, use_container_width=True)
+
+                # Create another row with two columns for contact method and department
+                pie_col3, pie_col4 = st.columns(2)
+                
+                with pie_col3:
+                    # Contact Method (inbound_route) distribution with pie chart
+                    st.write("##### Contact Method Distribution")
+                    if "inbound_route" in df.columns and not df["inbound_route"].isna().all():
+                        route_counts = df["inbound_route"].value_counts()
+                        fig_route = px.pie(
+                            values=route_counts.values,
+                            names=route_counts.index,
+                            color_discrete_map={
+                                "phone": "#FF4B4B",     # Red
+                                "email": "#4CAF50",     # Green
+                                "whatsapp": "#2196F3",  # Blue
+                                "web_form": "#FFA726"   # Orange
+                            }
+                        )
+                        fig_route.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_route, use_container_width=True)
+
+                with pie_col4:
+                    # Department distribution with pie chart
+                    st.write("##### Department Distribution")
+                    if "department" in df.columns and not df["department"].isna().all():
+                        department_counts = df["department"].value_counts()
+                        fig_dept = px.pie(
+                            values=department_counts.values,
+                            names=department_counts.index
+                        )
+                        fig_dept.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_dept, use_container_width=True)
+
+                # Common topics analysis with bubble tags
+                st.write("##### Common Topics & Themes")
+                if "summary" in df.columns and not df["summary"].isna().all():
+                    summaries = " ".join(df["summary"].fillna("")).lower()
+                    words = re.findall(r'\b\w+\b', summaries)
+                    word_counts = Counter(words)
+                    
+                    # Filter out common stop words and short words
+                    stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
+                    themes = [(word, count) for word, count in word_counts.most_common(10) 
+                             if word not in stop_words and len(word) > 3]
+                    
+                    if themes:
+                        # Create bubble tags HTML with updated styling
+                        st.markdown("""
+                        <style>
+                        .bubble-container {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 10px;
+                            margin-top: 10px;
+                        }
+                        .bubble-tag {
+                            background-color: #2979FF;
+                            color: white;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            font-size: 14px;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            width: fit-content;
+                        }
+                        .bubble-count {
+                            background-color: rgba(255, 255, 255, 0.2);
+                            padding: 2px 8px;
+                            border-radius: 10px;
+                            font-size: 12px;
+                            white-space: nowrap;
+                        }
+                        </style>
+                        <div class="bubble-container">
+                        """, unsafe_allow_html=True)
+                        
+                        # Generate bubble tags
+                        bubble_tags = []
+                        for word, count in themes:
+                            bubble_tags.append(f"""
+                            <div class="bubble-tag">
+                                {word.title()}
+                                <span class="bubble-count">{count}</span>
+                            </div>
+                            """)
+                        
+                        st.markdown("".join(bubble_tags) + "</div>", unsafe_allow_html=True)
+                    else:
+                        st.text("No common themes found yet")
+                else:
+                    st.text("No summary data available for theme analysis")
+
+        else:
+            st.info("No analytics data available yet. Generate some responses to see analytics.")
+    
+    # View Inquiries section
+    st.header("View Inquiries")
+    # Display inquiries directly in main app
+    df = st.session_state["inquiries"]
+    if len(df) > 0:
+        # Sort inquiries by timestamp in descending order (most recent first)
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        except:
+            # If timestamp conversion fails, just use the existing order
+            pass
+        
+        # Display all inquiries in a collapsible container
+        for idx, row in df.iterrows():
+            # Use a header for each inquiry instead of a nested expander
+            with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
+                st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                
+            col1, col2 = st.columns(2)
+                
+            with col1:
+                    st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
+                    
+                    if 'inbound_route' in row and row['inbound_route']:
+                        st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                    
+                    if 'ivr_flow' in row and row['ivr_flow']:
+                        st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                    
+                    if 'ivr_selections' in row and row['ivr_selections']:
+                        st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
+                    
+            with col2:
+                    if 'user_type' in row and row['user_type']:
+                        st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
+                    
+                    if 'phone_email' in row and row['phone_email']:
+                        st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                    
+                    if 'membership_id' in row and row['membership_id']:
+                        st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+            
+            # Classification summary section only
+            st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+            
+            if 'classification' in row and row['classification']:
+                st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+            
+            if 'priority' in row and row['priority']:
+                st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+            
+            if 'summary' in row and row['summary']:
+                st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+            
+            # Show scenario text
+            if 'scenario_text' in row and row['scenario_text']:
+                st.markdown("<div class='inquiry-section'>Scenario Details</div>", unsafe_allow_html=True)
+                st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
+    else:
+        st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
+
+# -----------------------------------------------------------------------------
+# EXPORT LOGGED DATA
+# -----------------------------------------------------------------------------
+# This section is removed as it's now part of the analytics expander
+
+# -----------------------------------------------------------------------------
+# HELPER FUNCTIONS
+# -----------------------------------------------------------------------------
+
+def extract_key_topics(scenario_text):
+    """Extract key topics from the scenario using OpenAI."""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a customer service assistant. Extract the key topics from this scenario."},
+                {"role": "user", "content": scenario_text}
+            ],
+            temperature=0,
+            max_tokens=150
+        )
+        
+        # Extract key topics from the response
+        key_topics = response.choices[0].message.content
+        
+        # Cache the key topics for this scenario
+        if 'faq_key_topics' not in st.session_state:
+            st.session_state['faq_key_topics'] = {}
+        st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
+        
+        return key_topics
+    except Exception as e:
+        st.error(f"Error extracting key topics: {str(e)}")
+        return None
+
+def process_relevant_faq(scenario_text, faq_dataframe, context):
+    """Process and find relevant FAQ entries."""
+    try:
+        relevant_faq, faq_answer, faq_relevance = find_relevant_faq(scenario_text, faq_dataframe)
+        if relevant_faq and faq_answer and faq_relevance >= 7:
+            return context + f"""
+Relevant FAQ:
+Question: {relevant_faq}
+Answer: {faq_answer}
+"""
+        return context
+    except Exception as e:
+        st.error(f"Error finding relevant FAQ: {str(e)}")
+        return context
