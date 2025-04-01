@@ -806,30 +806,30 @@ elif st.session_state["section"] == "inquiries":
                     st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
                 
-                # Show matched FAQ and response if available
-                with st.expander("View Matched FAQ and Generated Response"):
-                    # Display matched FAQ if available
-                    if 'relevant_faq' in row and row['relevant_faq']:
-                        st.markdown("<div class='inquiry-section'>Matched FAQ</div>", unsafe_allow_html=True)
-                        st.markdown("<div class='inquiry-label'>Question:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq']}</div>", unsafe_allow_html=True)
-                        
-                        if 'relevant_faq_answer' in row and row['relevant_faq_answer']:
-                            st.markdown("<div class='inquiry-label'>Answer:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq_answer']}</div>", unsafe_allow_html=True)
-                        
-                        if 'faq_relevance_score' in row and row['faq_relevance_score']:
-                            st.markdown("<div class='inquiry-label'>Relevance Score:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['faq_relevance_score']:.2f}</div>", unsafe_allow_html=True)
-                    else:
-                        st.info("No matching FAQ found for this inquiry.")
+                # Show matched FAQ and response
+                st.markdown("<div class='inquiry-section'>Matched FAQ and Generated Response</div>", unsafe_allow_html=True)
+                
+                # Display matched FAQ if available
+                if 'relevant_faq' in row and row['relevant_faq']:
+                    st.markdown("<div class='inquiry-label'>Matched FAQ Question:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq']}</div>", unsafe_allow_html=True)
                     
-                    # Display generated response if available
-                    if 'response_suggestion' in row and row['response_suggestion']:
-                        st.markdown("<div class='inquiry-section'>Generated Response</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['response_suggestion']}</div>", unsafe_allow_html=True)
-                    elif row['inbound_route'] in ['email', 'whatsapp']:
-                        st.info("No response was generated for this inquiry.")
+                    if 'relevant_faq_answer' in row and row['relevant_faq_answer']:
+                        st.markdown("<div class='inquiry-label'>FAQ Answer:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq_answer']}</div>", unsafe_allow_html=True)
+                    
+                    if 'faq_relevance_score' in row and row['faq_relevance_score']:
+                        st.markdown("<div class='inquiry-label'>FAQ Relevance Score:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['faq_relevance_score']:.2f}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div class='inquiry-detail' style='font-style: italic;'>No matching FAQ found for this inquiry.</div>", unsafe_allow_html=True)
+                
+                # Display generated response if available
+                if 'response_suggestion' in row and row['response_suggestion']:
+                    st.markdown("<div class='inquiry-label'>Generated Response:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['response_suggestion']}</div>", unsafe_allow_html=True)
+                elif row['inbound_route'] in ['email', 'whatsapp']:
+                    st.markdown("<div class='inquiry-detail' style='font-style: italic;'>No response was generated for this inquiry.</div>", unsafe_allow_html=True)
                 
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
@@ -2825,30 +2825,30 @@ if len(df) > 0:
                     st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
                 
-                # Show matched FAQ and response if available
-                with st.expander("View Matched FAQ and Generated Response"):
-                    # Display matched FAQ if available
-                    if 'relevant_faq' in row and row['relevant_faq']:
-                        st.markdown("<div class='inquiry-section'>Matched FAQ</div>", unsafe_allow_html=True)
-                        st.markdown("<div class='inquiry-label'>Question:</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq']}</div>", unsafe_allow_html=True)
-                        
-                        if 'relevant_faq_answer' in row and row['relevant_faq_answer']:
-                            st.markdown("<div class='inquiry-label'>Answer:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq_answer']}</div>", unsafe_allow_html=True)
-                        
-                        if 'faq_relevance_score' in row and row['faq_relevance_score']:
-                            st.markdown("<div class='inquiry-label'>Relevance Score:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{row['faq_relevance_score']:.2f}</div>", unsafe_allow_html=True)
-                    else:
-                        st.info("No matching FAQ found for this inquiry.")
+                # Show matched FAQ and response
+                st.markdown("<div class='inquiry-section'>Matched FAQ and Generated Response</div>", unsafe_allow_html=True)
+                
+                # Display matched FAQ if available
+                if 'relevant_faq' in row and row['relevant_faq']:
+                    st.markdown("<div class='inquiry-label'>Matched FAQ Question:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq']}</div>", unsafe_allow_html=True)
                     
-                    # Display generated response if available
-                    if 'response_suggestion' in row and row['response_suggestion']:
-                        st.markdown("<div class='inquiry-section'>Generated Response</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='inquiry-detail'>{row['response_suggestion']}</div>", unsafe_allow_html=True)
-                    elif row['inbound_route'] in ['email', 'whatsapp']:
-                        st.info("No response was generated for this inquiry.")
+                    if 'relevant_faq_answer' in row and row['relevant_faq_answer']:
+                        st.markdown("<div class='inquiry-label'>FAQ Answer:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['relevant_faq_answer']}</div>", unsafe_allow_html=True)
+                    
+                    if 'faq_relevance_score' in row and row['faq_relevance_score']:
+                        st.markdown("<div class='inquiry-label'>FAQ Relevance Score:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['faq_relevance_score']:.2f}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div class='inquiry-detail' style='font-style: italic;'>No matching FAQ found for this inquiry.</div>", unsafe_allow_html=True)
+                
+                # Display generated response if available
+                if 'response_suggestion' in row and row['response_suggestion']:
+                    st.markdown("<div class='inquiry-label'>Generated Response:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['response_suggestion']}</div>", unsafe_allow_html=True)
+                elif row['inbound_route'] in ['email', 'whatsapp']:
+                    st.markdown("<div class='inquiry-detail' style='font-style: italic;'>No response was generated for this inquiry.</div>", unsafe_allow_html=True)
                 
                 st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
