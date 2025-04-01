@@ -2647,19 +2647,80 @@ if len(df) > 0:
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
     
-    # Data Exports section within the expander
-    st.subheader("Data Exports")
+    # View Inquiries section
+    st.header("View Inquiries")
+    # Display inquiries directly in main app
+    df = st.session_state["inquiries"]
     if len(df) > 0:
-        csv_data = df.to_csv(index=False)
-        st.download_button("Download CSV", data=csv_data, file_name="inquiries.csv", mime="text/csv", key="analytics_csv_download")
-
-        json_data = df.to_json(orient="records")
-        st.download_button("Download JSON", data=json_data, file_name="inquiries.json", mime="application/json", key="analytics_json_download")
+        # Sort inquiries by timestamp in descending order (most recent first)
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
+        except:
+            # If timestamp conversion fails, just use the existing order
+            pass
+        
+        # Display all inquiries in a collapsible container
+        for idx, row in df.iterrows():
+            # Use a header for each inquiry instead of a nested expander
+            with st.expander(f"Inquiry #{idx+1} - {row['classification']} (Priority: {row['priority']})"):
+                st.markdown("<div class='info-container'>", unsafe_allow_html=True)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("<div class='inquiry-label'>Timestamp:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['timestamp']}</div>", unsafe_allow_html=True)
+                    
+                    if 'inbound_route' in row and row['inbound_route']:
+                        st.markdown("<div class='inquiry-label'>Inbound Route:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['inbound_route']}</div>", unsafe_allow_html=True)
+                    
+                    if 'ivr_flow' in row and row['ivr_flow']:
+                        st.markdown("<div class='inquiry-label'>IVR Flow:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_flow']}</div>", unsafe_allow_html=True)
+                    
+                    if 'ivr_selections' in row and row['ivr_selections']:
+                        st.markdown("<div class='inquiry-label'>IVR Selections:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['ivr_selections']}</div>", unsafe_allow_html=True)
+                
+                with col2:
+                    if 'user_type' in row and row['user_type']:
+                        st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['user_type']}</div>", unsafe_allow_html=True)
+                    
+                    if 'phone_email' in row and row['phone_email']:
+                        st.markdown("<div class='inquiry-label'>Phone/Email:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['phone_email']}</div>", unsafe_allow_html=True)
+                    
+                    if 'membership_id' in row and row['membership_id']:
+                        st.markdown("<div class='inquiry-label'>Membership ID:</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='inquiry-detail'>{row['membership_id']}</div>", unsafe_allow_html=True)
+                
+                # Classification summary section only
+                st.markdown("<div class='inquiry-section'>Classification Summary</div>", unsafe_allow_html=True)
+                
+                if 'classification' in row and row['classification']:
+                    st.markdown("<div class='inquiry-label'>Classification:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['classification']}</div>", unsafe_allow_html=True)
+                
+                if 'priority' in row and row['priority']:
+                    st.markdown("<div class='inquiry-label'>Priority:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['priority']}</div>", unsafe_allow_html=True)
+                
+                if 'summary' in row and row['summary']:
+                    st.markdown("<div class='inquiry-label'>Summary:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['summary']}</div>", unsafe_allow_html=True)
+                
+                # Show scenario text
+                if 'scenario_text' in row and row['scenario_text']:
+                    st.markdown("<div class='inquiry-section'>Scenario Details</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='inquiry-label'>Scenario Text:</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='inquiry-detail'>{row['scenario_text']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)  # Close info-container div
     else:
-        st.write("No data to export yet.")
-
-# Remove any other calls to update_analytics outside the expander
-# ... rest of the code ...
+        st.info("No inquiries found. Generate a scenario and classify it to create inquiries.")
 
 # -----------------------------------------------------------------------------
 # EXPORT LOGGED DATA
