@@ -2442,20 +2442,83 @@ if len(df) > 0:
                         )
                         st.plotly_chart(fig_class, use_container_width=True)
 
-                # Only try to access recent data if we have inquiries
-                if len(df) > 0:
-                    recent_row = df.iloc[-1]
-                    # Display user type and contact info in columns
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if recent_row.get('inbound_route'):
-                            st.markdown("<div class='inquiry-label'>Contact Method:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route'].title()}</div>", unsafe_allow_html=True)
-                    
-                    with col2:
-                        if recent_row.get('user_type'):
-                            st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
-                            st.markdown(f"<div class='inquiry-detail'>{recent_row['user_type']}</div>", unsafe_allow_html=True)
+                with pie_col2:
+                    # User Type distribution with pie chart
+                    st.write("##### User Type Distribution")
+                    if "user_type" in df.columns and not df["user_type"].isna().all():
+                        user_type_counts = df["user_type"].value_counts()
+                        fig_user = px.pie(
+                            values=user_type_counts.values,
+                            names=user_type_counts.index,
+                            color_discrete_map={
+                                "existing_homeowner": "#4CAF50",      # Green
+                                "existing_tradesperson": "#2196F3",   # Blue
+                                "prospective_homeowner": "#FFA726",   # Orange
+                                "prospective_tradesperson": "#9C27B0"  # Purple
+                            }
+                        )
+                        fig_user.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_user, use_container_width=True)
+
+                # Create another row with two columns for contact method and department
+                pie_col3, pie_col4 = st.columns(2)
+                
+                with pie_col3:
+                    # Contact Method (inbound_route) distribution with pie chart
+                    st.write("##### Contact Method Distribution")
+                    if "inbound_route" in df.columns and not df["inbound_route"].isna().all():
+                        route_counts = df["inbound_route"].value_counts()
+                        fig_route = px.pie(
+                            values=route_counts.values,
+                            names=route_counts.index,
+                            color_discrete_map={
+                                "phone": "#FF4B4B",     # Red
+                                "email": "#4CAF50",     # Green
+                                "whatsapp": "#2196F3",  # Blue
+                                "web_form": "#FFA726"   # Orange
+                            }
+                        )
+                        fig_route.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_route, use_container_width=True)
+
+                with pie_col4:
+                    # Department distribution with pie chart
+                    st.write("##### Department Distribution")
+                    if "department" in df.columns and not df["department"].isna().all():
+                        department_counts = df["department"].value_counts()
+                        fig_dept = px.pie(
+                            values=department_counts.values,
+                            names=department_counts.index
+                        )
+                        fig_dept.update_layout(
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=-0.3,
+                                xanchor="center",
+                                x=0.5
+                            )
+                        )
+                        st.plotly_chart(fig_dept, use_container_width=True)
 
         else:
             st.info("No analytics data available yet. Generate some responses to see analytics.")
@@ -2479,7 +2542,7 @@ if len(df) > 0:
                 if recent_row.get('inbound_route'):
                     st.markdown("<div class='inquiry-label'>Contact Method:</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='inquiry-detail'>{recent_row['inbound_route'].title()}</div>", unsafe_allow_html=True)
-                
+                    
             with col2:
                 if recent_row.get('user_type'):
                     st.markdown("<div class='inquiry-label'>User Type:</div>", unsafe_allow_html=True)
