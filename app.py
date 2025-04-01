@@ -1607,29 +1607,42 @@ def generate_scenario(selected_route=None, selected_user_type=None):
 # 10) HELPER: CLASSIFY SCENARIO VIA OPENAI
 ###############################################################################
 def score_faq_relevance(key_topics, faq_entry):
-    """Score a single FAQ's relevance - runs in parallel"""
+    """Score a single FAQ's relevance using multiple factors."""
     try:
+        # Build a comprehensive prompt that considers multiple aspects
         faq_prompt = f"""
-        Compare these two texts and rate their relevance on a scale of 0-10:
-        
-        Customer Issue Summary:
+        Compare these texts and rate their relevance considering ALL the following factors:
+
+        CUSTOMER CONTEXT:
         {key_topics}
-        
-        FAQ Question:
-        {faq_entry['question']}
-        FAQ Category: {faq_entry['category']}
-        FAQ Type: {faq_entry['type']}
-        
-        Only respond with a number 0-10, where:
-        0 = Completely unrelated
-        5 = Somewhat related but not directly applicable
-        10 = Highly relevant and directly applicable
+
+        FAQ ENTRY:
+        Question: {faq_entry['question']}
+        Category: {faq_entry['category']}
+        Type: {faq_entry['type']}
+
+        SCORING FACTORS (consider all):
+        1. Direct keyword matches
+        2. Semantic similarity of concepts
+        3. Intent alignment
+        4. Context relevance
+        5. Category/Type match
+        6. Specificity match (general vs specific)
+
+        Score Guidelines:
+        0-2: No meaningful relation
+        3-4: Slightly related but different context
+        5-6: Similar topic but different specifics
+        7-8: Strong topical and contextual match
+        9-10: Perfect or near-perfect match
+
+        Return ONLY a number 0-10, no explanation.
         """
         
         score_response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a relevance scoring system. Only respond with a number 0-10."},
+                {"role": "system", "content": "You are a precision scoring system. Only output a single number 0-10."},
                 {"role": "user", "content": faq_prompt}
             ],
             temperature=0,
@@ -1646,21 +1659,30 @@ def score_faq_relevance(key_topics, faq_entry):
         return 0
 
 def find_relevant_faq(scenario_text, faq_dataframe):
-    """Find the most relevant FAQ for a given scenario using keyword matching first."""
+    """Find the most relevant FAQ using a sophisticated hybrid matching approach."""
     try:
         # Get the optimized FAQ dictionary from session state
         faq_dict = st.session_state.get('faq_dict', {})
         if not faq_dict:
             _, faq_dict = load_faq_csv()
             
-        # Quick keyword matching first
-        scenario_keywords = set(word.lower() for word in str(scenario_text).split() if len(word) > 3)
-        best_match = None
-        best_score = 0
-        best_answer = None
+        # Initialize variables for best matches
+        best_matches = []
         
-        # Try keyword matching first
+        # 1. Enhanced Keyword Matching
+        scenario_keywords = set(word.lower() for word in str(scenario_text).split() if len(word) > 3)
+        
+        # Extract key phrases (2-3 word combinations)
+        words = str(scenario_text).lower().split()
+        key_phrases = set()
+        for i in range(len(words)-1):
+            key_phrases.add(f"{words[i]} {words[i+1]}")
+            if i < len(words)-2:
+                key_phrases.add(f"{words[i]} {words[i+1]} {words[i+2]}")
+        
+        # Score each FAQ entry
         for faq_entry in faq_dict['all_faqs']:
+            score = 0
             question = str(faq_entry['question']).lower()
             answer = str(faq_entry['answer'])
             category = str(faq_entry['category']).lower()
@@ -1670,61 +1692,87 @@ def find_relevant_faq(scenario_text, faq_dataframe):
             faq_text = f"{question} {category} {faq_type}"
             faq_keywords = set(word.lower() for word in faq_text.split() if len(word) > 3)
             
-            # Calculate score based on keyword matches
+            # Score based on different factors
+            # 1. Keyword matches
             common_words = scenario_keywords & faq_keywords
-            score = len(common_words) * 2  # Give more weight to keyword matches
+            score += len(common_words) * 2
             
-            # Boost score for exact phrase matches
+            # 2. Phrase matches
+            for phrase in key_phrases:
+                if phrase in question:
+                    score += 4  # Higher weight for phrase matches
+                elif phrase in faq_text:
+                    score += 2
+            
+            # 3. Category/Type relevance
+            scenario_lower = scenario_text.lower()
+            if category in scenario_lower:
+                score += 3
+            if faq_type in scenario_lower:
+                score += 3
+            
+            # 4. Exact matches
             for phrase in scenario_text.lower().split('.'):
-                if phrase.strip() and phrase.strip() in question:
-                    score += 3
+                phrase = phrase.strip()
+                if phrase and phrase in question:
+                    score += 5
             
-            if score > best_score:
-                best_score = score
-                best_match = faq_entry['question']
-                best_answer = answer
+            # Store this match if it's good enough
+            if score >= 3:
+                best_matches.append({
+                    'question': faq_entry['question'],
+                    'answer': answer,
+                    'score': score,
+                    'entry': faq_entry
+                })
         
-        # Only use semantic search if keyword matching didn't find a good match
-        if best_score < 4:
-            try:
-                # Get cached key topics if available
-                key_topics = st.session_state.get('faq_key_topics', {}).get(str(scenario_text))
-                
-                # If not cached, extract key topics
-                if not key_topics:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "Extract key topics from this customer scenario."},
-                            {"role": "user", "content": str(scenario_text)}
-                        ],
-                        temperature=0,
-                        max_tokens=150
-                    )
-                    key_topics = response['choices'][0]['message']['content']
-                    
-                    # Cache the key topics
-                    if 'faq_key_topics' not in st.session_state:
-                        st.session_state['faq_key_topics'] = {}
-                    st.session_state['faq_key_topics'][str(scenario_text)] = key_topics
-                
-                # Score each FAQ
-                for faq_entry in faq_dict['all_faqs']:
-                    score = score_faq_relevance(key_topics, faq_entry)
-                    if score > best_score:
-                        best_score = score
-                        best_match = faq_entry['question']
-                        best_answer = faq_entry['answer']
-            except Exception as e:
-                st.error(f"Error in semantic search: {str(e)}")
+        # Sort matches by score
+        best_matches.sort(key=lambda x: x['score'], reverse=True)
+        
+        # If we have good keyword matches, verify with semantic search
+        if best_matches:
+            # Get key topics if not already cached
+            key_topics = st.session_state.get('faq_key_topics', {}).get(str(scenario_text))
+            if not key_topics:
+                key_topics = extract_key_topics(scenario_text)
             
-            # Return results if we found a good match
-            if best_match and best_score >= 3:
-                return best_match, best_answer, best_score
+            # Verify top matches with semantic scoring
+            verified_matches = []
+            for match in best_matches[:3]:  # Check top 3 keyword matches
+                semantic_score = score_faq_relevance(key_topics, match['entry'])
+                # Combine keyword and semantic scores with weights
+                combined_score = (match['score'] * 0.4) + (semantic_score * 0.6)
+                verified_matches.append({
+                    'question': match['question'],
+                    'answer': match['answer'],
+                    'score': combined_score
+                })
             
-        # Return results if we found a good match
-        if best_match and best_score >= 3:
-            return best_match, best_answer, best_score
+            # Sort by combined score
+            verified_matches.sort(key=lambda x: x['score'], reverse=True)
+            
+            if verified_matches:
+                best_match = verified_matches[0]
+                return best_match['question'], best_match['answer'], best_match['score']
+        
+        # If no good matches found through keywords, try pure semantic search
+        key_topics = st.session_state.get('faq_key_topics', {}).get(str(scenario_text))
+        if not key_topics:
+            key_topics = extract_key_topics(scenario_text)
+        
+        best_semantic_score = 0
+        best_semantic_match = None
+        best_semantic_answer = None
+        
+        for faq_entry in faq_dict['all_faqs']:
+            score = score_faq_relevance(key_topics, faq_entry)
+            if score > best_semantic_score:
+                best_semantic_score = score
+                best_semantic_match = faq_entry['question']
+                best_semantic_answer = faq_entry['answer']
+        
+        if best_semantic_match and best_semantic_score >= 7:
+            return best_semantic_match, best_semantic_answer, best_semantic_score
             
         return None, None, 0
         
