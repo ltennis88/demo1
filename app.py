@@ -1196,3 +1196,41 @@ The response should be in valid JSON format like this:
 def load_existing_tradesperson_prompt():
     return """
 Generate a realistic customer service scenario for Checkatrade's contact center involving an existing tradesperson member.
+
+For existing tradespeople, consider scenarios like:
+- Questions about membership renewal or fees
+- Issues with reviews or ratings
+- Profile updates or changes
+- Lead generation concerns
+- Payment or billing inquiries
+- Technical support with the platform
+- Questions about expanding service areas
+- Disputes with customers
+
+Include:
+1. A randomized inbound_route (phone, email, whatsapp, or web_form)
+2. Random phone number or email based on the route
+3. A valid tradesperson membership_id (T-xxxxx format)
+4. Realistic account details including business name, location, and recent reviews/jobs
+5. A detailed scenario_text from the tradesperson's perspective
+
+The response should be in valid JSON format like this:
+{
+    "inbound_route": "phone",
+    "ivr_flow": "tradesperson_support",
+    "ivr_selections": ["existing_member", "billing"],
+    "user_type": "existing_tradesperson",
+    "phone_email": "+44 7700 900123",
+    "membership_id": "T-54321",
+    "account_details": {
+        "name": "John",
+        "surname": "Smith",
+        "location": "Leeds",
+        "latest_reviews": "Received 5-star review for kitchen remodel on June 1st",
+        "latest_jobs": "Completed full kitchen renovation for Mrs. Thompson",
+        "project_cost": "£12,000",
+        "payment_status": "Paid"
+    },
+    "scenario_text": "I need to update my service area to include the new postcode district I'm now working in. Also, my latest customer review hasn't shown up on my profile yet - can you check why?"
+}
+"""
