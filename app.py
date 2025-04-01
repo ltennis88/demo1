@@ -21,86 +21,50 @@ def update_analytics(section="main"):
         st.info("No analytics data available yet. Generate some responses to see analytics.")
         return
 
-    # Add anchor div for scrolling
-    st.markdown('<div id="analytics-dashboard"></div>', unsafe_allow_html=True)
     st.header("Analytics Dashboard")
-
-    # Summary Analytics section
-    st.subheader("Summary Analytics")
     
-    # Get all inquiries that have classifications
-    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
-        df = st.session_state["inquiries"]
-        total_inquiries = len(df)
-        
-        # Count inquiries by type
-        inquiry_types = df["classification"].value_counts()
-        for inquiry_type, count in inquiry_types.items():
-            if pd.notna(inquiry_type):
-                percentage = (count / total_inquiries) * 100
-                st.text(f"{inquiry_type}: {count} ({percentage:.1f}%)")
-
-    # Priority Distribution section
-    st.subheader("Priority Distribution")
-    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
-        df = st.session_state["inquiries"]
-        priority_counts = df["priority"].value_counts()
-        for priority, count in priority_counts.items():
-            if pd.notna(priority):
-                percentage = (count / len(df)) * 100
-                st.text(f"{priority}: {count} ({percentage:.1f}%)")
-
-    # Common Topics & Themes section
-    st.subheader("Common Topics & Themes")
-    if "inquiries" in st.session_state and not st.session_state["inquiries"].empty:
-        df = st.session_state["inquiries"]
-        if "summary" in df.columns:
-            summaries = " ".join(df["summary"].fillna("")).lower()
-            words = re.findall(r'\b\w+\b', summaries)
-            word_counts = Counter(words)
-            
-            # Filter out common stop words and short words
-            stop_words = set(['and', 'the', 'to', 'of', 'in', 'for', 'a', 'with', 'is', 'are', 'was', 'were'])
-            themes = [(word, count) for word, count in word_counts.most_common(10) 
-                     if word not in stop_words and len(word) > 3]
-            
-            for word, count in themes:
-                st.text(f"{word.title()} ({count})")
-
-    # Token Usage Analytics section
-    st.subheader("Token Usage Analytics")
+    # Get the token usage data
+    token_data = st.session_state["token_usage"]
     
-    # Classification Metrics
-    st.subheader("Classification Metrics")
+    # Calculate total costs and tokens with backward compatibility
+    total_input_tokens = sum(
+        (gen.get("cached_input_tokens", 0) + gen.get("non_cached_input_tokens", 0)) 
+        if ("cached_input_tokens" in gen or "non_cached_input_tokens" in gen)
+        else gen.get("input_tokens", 0)
+        for gen in token_data["generations"]
+    )
     
-    # Calculate averages from token usage data
-    generations = st.session_state["token_usage"]["generations"]
-    if generations:
-        avg_response_time = sum(gen.get("response_time", 0) for gen in generations) / len(generations)
-        avg_cached_tokens = sum(gen.get("cached_input_tokens", 0) for gen in generations) / len(generations)
-        avg_non_cached_tokens = sum(gen.get("non_cached_input_tokens", 0) for gen in generations) / len(generations)
-        avg_output_tokens = sum(gen.get("output_tokens", 0) for gen in generations) / len(generations)
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Average Response Time", f"{avg_response_time:.2f}s", f"Total: {sum(gen.get('response_time', 0) for gen in generations):.2f}s")
-        with col2:
-            st.metric("Avg Cached Input Tokens", f"{int(avg_cached_tokens):,}", f"${sum(gen.get('cached_input_cost', 0) for gen in generations):.4f}")
-        with col3:
-            st.metric("Avg Non-Cached Input Tokens", f"{int(avg_non_cached_tokens):,}", f"${sum(gen.get('non_cached_input_cost', 0) for gen in generations):.4f}")
-        with col4:
-            st.metric("Average Output Tokens", f"{int(avg_output_tokens):,}", f"${sum(gen.get('output_cost', 0) for gen in generations):.4f}")
-
-    # Cost Breakdown section
+    total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
+    
+    total_input_cost = sum(
+        (gen.get("cached_input_cost", 0) + gen.get("non_cached_input_cost", 0))
+        if ("cached_input_cost" in gen or "non_cached_input_cost" in gen)
+        else gen.get("input_cost", 0)
+        for gen in token_data["generations"]
+    )
+    
+    total_output_cost = sum(gen.get("output_cost", 0) for gen in token_data["generations"])
+    total_cost = total_input_cost + total_output_cost
+    
+    # Display summary metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Cost", f"${total_cost:.4f}")
+    with col2:
+        st.metric("Total Input Tokens", f"{total_input_tokens:,}")
+    with col3:
+        st.metric("Total Output Tokens", f"{total_output_tokens:,}")
+    
+    # Display cost breakdown
     st.subheader("Cost Breakdown")
-    total_input_cost = sum((gen.get("cached_input_cost", 0) + gen.get("non_cached_input_cost", 0)) for gen in generations)
-    total_output_cost = sum(gen.get("output_cost", 0) for gen in generations)
-    
-    st.text(f"Total Input Cost (Cached + Non-Cached): ${total_input_cost:.4f}")
-    st.text(f"Total Output Cost: ${total_output_cost:.4f}")
+    col4, col5 = st.columns(2)
+    with col4:
+        st.metric("Input Cost", f"${total_input_cost:.4f}")
+    with col5:
+        st.metric("Output Cost", f"${total_output_cost:.4f}")
     
     # Display average response time
-    response_times = [gen.get("response_time", 0) for gen in generations]
+    response_times = [gen.get("response_time", 0) for gen in token_data["generations"]]
     if response_times:
         avg_response_time = sum(response_times) / len(response_times)
         st.metric("Average Response Time", f"{avg_response_time:.2f}s")
@@ -286,20 +250,313 @@ st.markdown("""
     margin-bottom: 12px;
 }
 
-/* Add smooth scrolling behavior */
-html {
-    scroll-behavior: smooth;
+/* Priority colors */
+.priority-high { color: #F44336; font-weight: bold; }
+.priority-medium { color: #FFA726; font-weight: bold; }
+.priority-low { color: #4CAF50; font-weight: bold; }
+
+/* Center the main app container */
+.main {
+    align-items: center !important;
+    display: flex !important;
+    justify-content: center !important;
+}
+
+/* Fix main content layout */
+.main .block-container {
+    max-width: 1200px !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Reduce sidebar width */
+[data-testid="stSidebar"] {
+    width: 12rem !important;
+    min-width: 12rem !important;
+    max-width: 12rem !important;
+    background-color: #1E1E1E !important;
+    border-right: 1px solid #424242 !important;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    width: 12rem !important;
+    min-width: 12rem !important;
+    max-width: 12rem !important;
+}
+
+/* More compact sidebar content */
+[data-testid="stSidebar"] .block-container {
+    padding-top: 2rem !important;
+}
+
+/* Improve sidebar headings */
+[data-testid="stSidebar"] h1, 
+[data-testid="stSidebar"] h2, 
+[data-testid="stSidebar"] h3 {
+    font-size: 1.2rem !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.75rem !important;
+    color: #64B5F6 !important;
+}
+
+/* Common styles for detail items */
+.agent-detail, .inquiry-detail {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    color: white;
+    background-color: #2C2C2C;
+    border-radius: 5px;
+}
+
+/* Common styles for labels */
+.agent-label, .inquiry-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: #e0e0e0;
+}
+
+/* Common styles for section headers */
+.agent-section, .inquiry-section {
+    margin-top: 20px;
+    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #757575;
+    color: #64B5F6;
+}
+
+/* Additional container styling */
+.info-container {
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid #424242;
+    background-color: #1E1E1E !important;
+}
+
+/* Topic tag styling */
+.tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.topic-tag {
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #2979FF;
+    color: white !important;
+    border-radius: 20px;
+    font-size: 14px;
+    margin: 5px;
+    font-weight: 500;
+}
+
+/* Override Streamlit's default text color */
+.element-container, .stMarkdown, .stText, .stSubheader {
+    color: white !important;
+}
+
+/* Override header colors */
+h1, h2, h3, h4, h5, h6 {
+    color: white !important;
+}
+
+/* Override text colors */
+p, div, span, li, label {
+    color: white !important;
+}
+
+/* Add styles for charts and expanders */
+.stExpander {
+    border: 1px solid #424242 !important;
+    background-color: #1E1E1E !important;
+}
+
+/* Dark theme for buttons */
+.stButton>button {
+    background-color: #333 !important;
+    color: white !important;
+    border: 1px solid #555 !important;
+}
+
+.stButton>button:hover {
+    background-color: #444 !important;
+    border: 1px solid #777 !important;
+}
+
+/* Set background color to dark */
+.main .block-container, .appview-container {
+    background-color: #121212 !important;
+}
+
+/* Override streamlit radio buttons and checkboxes */
+.stRadio > div, .stCheckbox > div {
+    color: white !important;
+}
+
+/* Make select boxes dark */
+.stSelectbox > div > div {
+    background-color: #333 !important;
+    color: white !important;
+}
+
+/* Dark header */
+header {
+    background-color: #121212 !important;
+}
+
+/* Force dark theme for all elements */
+div.stApp {
+    background-color: #121212 !important;
+}
+
+.nav-button {
+    background-color: #121212;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-right: 10px;
+    text-decoration: none;
+    display: inline-block;
+    border: 2px solid #555;
+    font-weight: 500;
+}
+.nav-button.active {
+    background-color: transparent;
+    border: 2px solid #0087CC;
+    color: #0087CC;
+}
+.nav-button:hover:not(.active) {
+    background-color: #1E1E1E;
+    border-color: #0087CC;
+    color: #0087CC;
+}
+.nav-container {
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* Utility classes for cards and containers */
+.info-container {
+    background-color: #2C2C2C;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #424242;
+}
+.inquiry-label {
+    font-weight: bold;
+    color: #64B5F6;
+    margin-bottom: 5px;
+}
+.inquiry-detail {
+    background-color: #1E1E1E;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin-bottom: 12px;
+}
+.inquiry-section {
+    font-weight: bold;
+    font-size: 16px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: #90CAF9;
+    border-bottom: 1px solid #424242;
+    padding-bottom: 5px;
+}
+.priority-high {
+    color: #F44336;
+    font-weight: bold;
+}
+.priority-medium {
+    color: #FFA726;
+    font-weight: bold;
+}
+.priority-low {
+    color: #4CAF50;
+    font-weight: bold;
+}
+/* Style for classification styling */
+.classification-card {
+    background-color: #2C2C2C;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #424242;
+}
+.classification-header {
+    font-weight: bold;
+    font-size: 14px;
+    color: #90CAF9;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #424242;
+    padding-bottom: 5px;
+}
+.field-label {
+    font-weight: bold;
+    color: #64B5F6;
+    margin-bottom: 5px;
+}
+.field-value {
+    background-color: #1E1E1E;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin-bottom: 12px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    font-size: 13px;
+}
+
+/* Override entire layout structure */
+.css-18e3th9 {
+    padding-top: 1rem;
+    padding-bottom: 10rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Force main content to take full width */
+.css-1d391kg {
+    width: 100% !important;
+    padding-left: 0 !important;
+}
+
+/* Reset flex layout from Streamlit */
+.css-1y4p8pa {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+}
+
+/* Fix main content layout */
+.main .block-container {
+    max-width: 95% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    margin-left: 0 !important;
+}
+
+/* Push content leftwards and increase width */
+section[data-testid="stSidebar"] ~ .css-1d391kg {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 1rem !important;
+}
+
+/* Container styling for better use of space */
+.stApp > div:not([data-testid="stSidebar"]) {
+    margin-left: 0 !important;
+}
+
+/* Override Streamlit's default column spacing */
+.row-widget.stRadio > div {
+    flex-direction: column;
 }
 </style>
-
-<script>
-function scrollToAnalytics() {
-    const element = document.getElementById('analytics-dashboard');
-    if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-    }
-}
-</script>
 """, unsafe_allow_html=True)
 
 # Add a clear title for the main page
@@ -2423,24 +2680,3 @@ Answer: {faq_answer}
     except Exception as e:
         st.error(f"Error finding relevant FAQ: {str(e)}")
         return context
-
-# Setup API key
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-# Add View Analytics Dashboard button that scrolls to the analytics section
-st.markdown("""
-    <button 
-        onclick="scrollToAnalytics()" 
-        style="
-            background-color: #1E1E1E;
-            color: white;
-            padding: 10px 20px;
-            border: 1px solid #424242;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        "
-    >
-        View Analytics Dashboard
-    </button>
-""", unsafe_allow_html=True)
