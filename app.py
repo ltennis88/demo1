@@ -2425,8 +2425,7 @@ if len(df) > 0:
                         classification_counts = df["classification"].value_counts()
                         fig_class = px.pie(
                             values=classification_counts.values,
-                            names=classification_counts.index,
-                            title="Classification Distribution"
+                            names=classification_counts.index
                         )
                         fig_class.update_layout(
                             showlegend=True,
@@ -2448,7 +2447,6 @@ if len(df) > 0:
                         fig_priority = px.pie(
                             values=priority_counts.values,
                             names=priority_counts.index,
-                            title="Priority Distribution",
                             color_discrete_map={
                                 "High": "#FF4B4B",
                                 "Medium": "#FFA726",
@@ -2477,8 +2475,7 @@ if len(df) > 0:
                         department_counts = df["department"].value_counts()
                         fig_dept = px.pie(
                             values=department_counts.values,
-                            names=department_counts.index,
-                            title="Department Distribution"
+                            names=department_counts.index
                         )
                         fig_dept.update_layout(
                             showlegend=True,
@@ -2500,7 +2497,6 @@ if len(df) > 0:
                         fig_user = px.pie(
                             values=user_type_counts.values,
                             names=user_type_counts.index,
-                            title="User Type Distribution",
                             color_discrete_map={
                                 "existing_homeowner": "#4CAF50",      # Green
                                 "existing_tradesperson": "#2196F3",   # Blue
