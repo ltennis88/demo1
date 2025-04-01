@@ -2631,27 +2631,8 @@ else:
     st.write("No data to export yet.")
 
 # -----------------------------------------------------------------------------
-# ANALYTICS FUNCTIONS
+# HELPER FUNCTIONS
 # -----------------------------------------------------------------------------
-# Function definition moved to top of file
-
-# Update all calls to update_analytics to include a section identifier
-if st.session_state.get("token_usage", {}).get("generations"):
-    # Display basic metrics
-    token_data = st.session_state["token_usage"]
-    total_cost = sum(gen.get("total_cost", 0) for gen in token_data["generations"])
-    total_input_tokens = sum(gen.get("input_tokens", 0) for gen in token_data["generations"])
-    total_output_tokens = sum(gen.get("output_tokens", 0) for gen in token_data["generations"])
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Cost", f"${total_cost:.4f}")
-    with col2:
-        st.metric("Total Input Tokens", f"{total_input_tokens:,}")
-    with col3:
-        st.metric("Total Output Tokens", f"{total_output_tokens:,}")
-
-    # ... existing code ...
 
 def extract_key_topics(scenario_text):
     """Extract key topics from the scenario using OpenAI."""
